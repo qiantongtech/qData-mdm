@@ -1,0 +1,142 @@
+######################################################################
+# Build Tools
+
+.gradle
+/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+target/
+!.mvn/wrapper/maven-wrapper.jar
+dependency-reduced-pom.xml
+
+######################################################################
+# IDE
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+
+### IntelliJ IDEA ###
+.idea
+.vscode
+.codebuddy
+*.iws
+*.iml
+*.ipr
+
+### JRebel ###
+rebel.xml
+
+### NetBeans ###
+nbproject/private/
+build/*
+nbbuild/
+#dist/
+!*/anivia-ui/dist/
+!*/sso-ui/dist/
+!*/sso-ui/node_modules/
+!*/anivia-ui/node_modules/
+/anivia-ui/dist/
+/sso-ui/dist/
+/anivia-ui/node_modules/
+/sso-ui/node_modules/
+!*/resources/static
+nbdist/
+.nb-gradle/
+
+######################################################################
+# Others
+*.log
+*.xml.versionsBackup
+*.swp
+
+!*/build/*.java
+!*/build/*.html
+!*/build/*.xml
+
+
+
+### 组件库编译后的文件 ###
+storybook-static/
+
+### pdman 备份文件 ###
+/sql/pdman/.back_anivia/
+sql/pdman/.back_数据中台
+
+### Anivia-App ###
+######################################################################
+# Build Tools
+
+Anivia-App/unpackage/*
+Anivia-App/node_modules/*
+
+######################################################################
+# Development Tools
+
+Anivia-App/.idea/*
+Anivia-App/.vscode/*
+Anivia-App/.hbuilderx/*
+Anivia-App/uni_modules/*
+Anivia-App/package-lock.json
+/upload/*
+
+######################################################################
+# license
+qData.key
+qdata-server/src/main/resources/license/*
+*/dependency-reduced-pom.xml
+
+######################################################################
+# qdata 文档库相关
+
+# Node modules
+qdata-docs/node_modules/
+
+# VuePress build output
+qdata-docs/src/.vuepress/dist/
+
+# VuePress temp/cache
+qdata-docs/src/.vuepress/.temp/
+qdata-docs/src/.vuepress/.cache/
+
+# Log files
+qdata-docs/npm-debug.log*
+qdata-docs/yarn-debug.log*
+qdata-docs/pnpm-debug.log*
+
+# Lock files（任选其一忽略）
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Env files
+qdata-docs/.env
+qdata-docs/.env.*.local
+
+# IDE/editor folders
+qdata-docs/.vscode/
+qdata-docs/.idea/
+
+# OS generated files
+qdata-docs/.DS_Store
+qdata-docs/Thumbs.db
+
+# VS Code project history
+qdata-docs/.history/
+
+# pnpm store
+qdata-docs/.pnpm-store/
+
+
+docker/dolphinscheduler/resource/default/resources/spark-jar/qdata-etl-3.8.8.jar
+docker/dolphinscheduler/soft/flink
+docker/dolphinscheduler/soft/spark
+docker/nginx/dist
+docker/qdata-quality/job-log
+docker/neo4j/data
+docker/neo4j/logs
+docker/mongo
