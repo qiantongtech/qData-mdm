@@ -1,0 +1,141 @@
+/*
+ * Copyright © 2025 Qiantong Technology Co., Ltd.
+ * qData Data Middle Platform (Open Source Edition)
+ *  *
+ * License:
+ * Released under the Apache License, Version 2.0.
+ * You may use, modify, and distribute this software for commercial purposes
+ * under the terms of the License.
+ *  *
+ * Special Notice:
+ * All derivative versions are strictly prohibited from modifying or removing
+ * the default system logo and copyright information.
+ * For brand customization, please apply for brand customization authorization via official channels.
+ *  *
+ * More information: https://qdata.qiantong.tech/business.html
+ *  *
+ * ============================================================================
+ *  *
+ * 版权所有 © 2025 江苏千桐科技有限公司
+ * qData 主数据平台（开源版）
+ *  *
+ * 许可协议：
+ * 本项目基于 Apache License 2.0 开源协议发布，
+ * 允许在遵守协议的前提下进行商用、修改和分发。
+ *  *
+ * 特别说明：
+ * 所有衍生版本不得修改或移除系统默认的 LOGO 和版权信息；
+ * 如需定制品牌，请通过官方渠道申请品牌定制授权。
+ *  *
+ * 更多信息请访问：https://qdata.qiantong.tech/business.html
+ */
+
+package tech.qiantong.qdata.mdm.common.core.domain.entity;
+
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+import tech.qiantong.qdata.mdm.common.annotation.Excel;
+import tech.qiantong.qdata.mdm.common.annotation.Excel.ColumnType;
+import tech.qiantong.qdata.mdm.common.core.domain.BaseEntity;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Pattern;
+import javax.validation.constraints.Size;
+import java.util.List;
+
+/**
+ * 字典类型表 sys_dict_type
+ *
+ * @author qdata
+ */
+public class SysDictType extends BaseEntity
+{
+    private static final long serialVersionUID = 1L;
+
+    /** 字典主键 */
+    @Excel(name = "字典主键", cellType = ColumnType.NUMERIC)
+    private Long dictId;
+
+    /** 字典名称 */
+    @Excel(name = "字典名称")
+    private String dictName;
+
+    /** 字典类型 */
+    @Excel(name = "字典类型")
+    private String dictType;
+
+    /** 状态（0正常 1停用） */
+    @Excel(name = "状态", readConverterExp = "0=正常,1=停用")
+    private String status;
+
+    /** 存储dictData数据 */
+    private List<SysDictData> sysDictData;
+
+    public List<SysDictData> getSysDictData() {
+        return sysDictData;
+    }
+
+    public void setSysDictData(List<SysDictData> sysDictData) {
+        this.sysDictData = sysDictData;
+    }
+
+    public Long getDictId()
+    {
+        return dictId;
+    }
+
+    public void setDictId(Long dictId)
+    {
+        this.dictId = dictId;
+    }
+
+    @NotBlank(message = "字典名称不能为空")
+    @Size(min = 0, max = 100, message = "字典类型名称长度不能超过100个字符")
+    public String getDictName()
+    {
+        return dictName;
+    }
+
+    public void setDictName(String dictName)
+    {
+        this.dictName = dictName;
+    }
+
+    @NotBlank(message = "字典类型不能为空")
+    @Size(min = 0, max = 100, message = "字典类型类型长度不能超过100个字符")
+    @Pattern(regexp = "^[a-z][a-z0-9_]*$", message = "字典类型必须以字母开头，且只能为（小写字母，数字，下滑线）")
+    public String getDictType()
+    {
+        return dictType;
+    }
+
+    public void setDictType(String dictType)
+    {
+        this.dictType = dictType;
+    }
+
+    public String getStatus()
+    {
+        return status;
+    }
+
+    public void setStatus(String status)
+    {
+        this.status = status;
+    }
+
+    @Override
+    public String toString() {
+        return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
+            .append("dictId", getDictId())
+            .append("dictName", getDictName())
+            .append("dictType", getDictType())
+            .append("status", getStatus())
+            .append("createBy", getCreateBy())
+            .append("createTime", getCreateTime())
+            .append("updateBy", getUpdateBy())
+            .append("updateTime", getUpdateTime())
+            .append("remark", getRemark())
+            .toString();
+    }
+}

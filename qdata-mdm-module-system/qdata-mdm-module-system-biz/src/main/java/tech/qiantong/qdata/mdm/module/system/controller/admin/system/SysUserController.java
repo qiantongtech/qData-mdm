@@ -1,0 +1,302 @@
+/*
+ * Copyright © 2025 Qiantong Technology Co., Ltd.
+ * qData Data Middle Platform (Open Source Edition)
+ *  *
+ * License:
+ * Released under the Apache License, Version 2.0.
+ * You may use, modify, and distribute this software for commercial purposes
+ * under the terms of the License.
+ *  *
+ * Special Notice:
+ * All derivative versions are strictly prohibited from modifying or removing
+ * the default system logo and copyright information.
+ * For brand customization, please apply for brand customization authorization via official channels.
+ *  *
+ * More information: https://qdata.qiantong.tech/business.html
+ *  *
+ * ============================================================================
+ *  *
+ * 版权所有 © 2025 江苏千桐科技有限公司
+ * qData 主数据平台（开源版）
+ *  *
+ * 许可协议：
+ * 本项目基于 Apache License 2.0 开源协议发布，
+ * 允许在遵守协议的前提下进行商用、修改和分发。
+ *  *
+ * 特别说明：
+ * 所有衍生版本不得修改或移除系统默认的 LOGO 和版权信息；
+ * 如需定制品牌，请通过官方渠道申请品牌定制授权。
+ *  *
+ * 更多信息请访问：https://qdata.qiantong.tech/business.html
+ */
+
+package tech.qiantong.qdata.mdm.module.system.controller.admin.system;
+
+import org.apache.commons.lang3.ArrayUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import tech.qiantong.qdata.mdm.common.annotation.Log;
+import tech.qiantong.qdata.mdm.common.core.controller.BaseController;
+import tech.qiantong.qdata.mdm.common.core.domain.AjaxResult;
+import tech.qiantong.qdata.mdm.common.core.domain.entity.SysDept;
+import tech.qiantong.qdata.mdm.common.core.domain.entity.SysRole;
+import tech.qiantong.qdata.mdm.common.core.domain.entity.SysUser;
+import tech.qiantong.qdata.mdm.common.core.page.TableDataInfo;
+import tech.qiantong.qdata.mdm.common.enums.BusinessType;
+import tech.qiantong.qdata.mdm.common.utils.SecurityUtils;
+import tech.qiantong.qdata.mdm.common.utils.StringUtils;
+import tech.qiantong.qdata.mdm.common.utils.poi.ExcelUtil;
+import tech.qiantong.qdata.mdm.module.system.service.ISysDeptService;
+import tech.qiantong.qdata.mdm.module.system.service.ISysPostService;
+import tech.qiantong.qdata.mdm.module.system.service.ISysRoleService;
+import tech.qiantong.qdata.mdm.module.system.service.ISysUserService;
+
+import javax.servlet.http.HttpServletResponse;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * 用户信息
+ *
+ * @author qdata
+ */
+@RestController
+@RequestMapping("/system/user")
+public class SysUserController extends BaseController
+{
+    @Autowired
+    private ISysUserService userService;
+
+    @Autowired
+    private ISysRoleService roleService;
+
+    @Autowired
+    private ISysDeptService deptService;
+
+    @Autowired
+    private ISysPostService postService;
+
+    /**
+     * 获取用户列表
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:list')")
+    @GetMapping("/list")
+    public TableDataInfo list(SysUser user)
+    {
+        startPage();
+        List<SysUser> list = userService.selectUserList(user);
+        return getDataTable(list);
+    }
+
+    @Log(title = "用户管理", businessType = BusinessType.EXPORT)
+    @PreAuthorize("@ss.hasPermi('system:user:export')")
+    @PostMapping("/export")
+    public void export(HttpServletResponse response, SysUser user)
+    {
+        List<SysUser> list = userService.selectUserList(user);
+        ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
+        util.exportExcel(response, list, "用户数据");
+    }
+
+    @Log(title = "用户管理", businessType = BusinessType.IMPORT)
+    @PreAuthorize("@ss.hasPermi('system:user:import')")
+    @PostMapping("/importData")
+    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception
+    {
+        ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
+        List<SysUser> userList = util.importExcel(file.getInputStream());
+        String operName = getUsername();
+        String message = userService.importUser(userList, updateSupport, operName);
+        return success(message);
+    }
+
+    @PostMapping("/importTemplate")
+    public void importTemplate(HttpServletResponse response)
+    {
+        ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
+        util.importTemplateExcel(response, "用户数据");
+    }
+
+    /**
+     * 根据用户编号获取详细信息
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:query')")
+    @GetMapping(value = { "/", "/{userId}" })
+    public AjaxResult getInfo(@PathVariable(value = "userId", required = false) Long userId)
+    {
+        userService.checkUserDataScope(userId);
+        AjaxResult ajax = AjaxResult.success();
+        SysRole sysRole = new SysRole();
+        sysRole.setProjectId(0L);
+        List<SysRole> roles = roleService.selectRoleList(sysRole);
+        ajax.put("roles", SysUser.isAdmin(userId) ? roles : roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList()));
+        ajax.put("posts", postService.selectPostAll());
+        if (StringUtils.isNotNull(userId))
+        {
+            SysUser sysUser = userService.getByUserIdAndProjectId(userId,0L);
+            ajax.put(AjaxResult.DATA_TAG, sysUser);
+            ajax.put("postIds", postService.selectPostListByUserId(userId));
+            ajax.put("roleIds", sysUser.getRoles().stream().map(SysRole::getRoleId).collect(Collectors.toList()));
+        }
+        return ajax;
+    }
+
+    /**
+     * 新增用户
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:add')")
+    @Log(title = "用户管理", businessType = BusinessType.INSERT)
+    @PostMapping
+    public AjaxResult add(@Validated @RequestBody SysUser user)
+    {
+        deptService.checkDeptDataScope(user.getDeptId());
+        roleService.checkRoleDataScope(user.getRoleIds());
+        if (!userService.checkUserNameUnique(user))
+        {
+            return error("新增用户'" + user.getUserName() + "'失败，登录账号已存在");
+        }
+        else if (StringUtils.isNotEmpty(user.getPhonenumber()) && !userService.checkPhoneUnique(user))
+        {
+            return error("新增用户'" + user.getUserName() + "'失败，手机号码已存在");
+        }
+        else if (StringUtils.isNotEmpty(user.getEmail()) && !userService.checkEmailUnique(user))
+        {
+            return error("新增用户'" + user.getUserName() + "'失败，邮箱账号已存在");
+        }
+        user.setCreateBy(getUsername());
+        user.setPassword(SecurityUtils.encryptPassword(user.getPassword()));
+        return toAjax(userService.insertUser(user));
+    }
+
+    /**
+     * 修改用户
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    @Log(title = "用户管理", businessType = BusinessType.UPDATE)
+    @PutMapping
+    public AjaxResult edit(@Validated @RequestBody SysUser user)
+    {
+        userService.checkUserAllowed(user);
+        userService.checkUserDataScope(user.getUserId());
+        deptService.checkDeptDataScope(user.getDeptId());
+        roleService.checkRoleDataScope(user.getRoleIds());
+        if (!userService.checkUserNameUnique(user))
+        {
+            return error("修改用户'" + user.getUserName() + "'失败，登录账号已存在");
+        }
+        else if (StringUtils.isNotEmpty(user.getPhonenumber()) && !userService.checkPhoneUnique(user))
+        {
+            return error("修改用户'" + user.getUserName() + "'失败，手机号码已存在");
+        }
+        else if (StringUtils.isNotEmpty(user.getEmail()) && !userService.checkEmailUnique(user))
+        {
+            return error("修改用户'" + user.getUserName() + "'失败，邮箱账号已存在");
+        }
+        user.setUpdateBy(getUsername());
+        return toAjax(userService.updateUser(user));
+    }
+
+    /**
+     * 删除用户
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:remove')")
+    @Log(title = "用户管理", businessType = BusinessType.DELETE)
+    @DeleteMapping("/{userIds}")
+    public AjaxResult remove(@PathVariable Long[] userIds)
+    {
+        if (ArrayUtils.contains(userIds, getUserId()))
+        {
+            return error("当前用户不能删除");
+        }
+        return toAjax(userService.deleteUserByIds(userIds));
+    }
+
+    /**
+     * 重置密码
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:resetPwd')")
+    @Log(title = "用户管理", businessType = BusinessType.UPDATE)
+    @PutMapping("/resetPwd")
+    public AjaxResult resetPwd(@RequestBody SysUser user)
+    {
+        userService.checkUserAllowed(user);
+        userService.checkUserDataScope(user.getUserId());
+        user.setPassword(SecurityUtils.encryptPassword(user.getPassword()));
+        user.setUpdateBy(getUsername());
+        return toAjax(userService.resetPwd(user));
+    }
+
+    /**
+     * 状态修改
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    @Log(title = "用户管理", businessType = BusinessType.UPDATE)
+    @PutMapping("/changeStatus")
+    public AjaxResult changeStatus(@RequestBody SysUser user)
+    {
+        userService.checkUserAllowed(user);
+        userService.checkUserDataScope(user.getUserId());
+        user.setUpdateBy(getUsername());
+        return toAjax(userService.updateUserStatus(user));
+    }
+
+    /**
+     * 根据用户编号获取授权角色
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:query')")
+    @GetMapping("/authRole/{userId}")
+    public AjaxResult authRole(@PathVariable("userId") Long userId)
+    {
+        AjaxResult ajax = AjaxResult.success();
+        SysUser user = userService.selectUserById(userId);
+        List<SysRole> roles = roleService.selectRolesByUserId(userId);
+        ajax.put("user", user);
+        ajax.put("roles", SysUser.isAdmin(userId) ? roles : roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList()));
+        return ajax;
+    }
+
+    /**
+     * 用户授权角色
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    @Log(title = "用户管理", businessType = BusinessType.GRANT)
+    @PutMapping("/authRole")
+    public AjaxResult insertAuthRole(Long userId, Long[] roleIds)
+    {
+        userService.checkUserDataScope(userId);
+        roleService.checkRoleDataScope(roleIds);
+        userService.insertUserAuth(userId, roleIds);
+        return success();
+    }
+
+    /**
+     * 获取部门树列表
+     */
+    @PreAuthorize("@ss.hasPermi('system:user:list')")
+    @GetMapping("/deptTree")
+    public AjaxResult deptTree(SysDept dept)
+    {
+        return success(deptService.selectDeptTreeList(dept));
+    }
+
+    /**
+     * 获取部门树列表不要权限
+     */
+    @GetMapping("/noPermi/deptTree")
+    public AjaxResult deptTreeNoPermi(SysDept dept)
+    {
+        return success(deptService.selectDeptTreeList(dept));
+    }
+
+    /**
+     * 获取部门用户树列表
+     */
+    @GetMapping("/userDeptTree")
+    public AjaxResult userDeptTreeSelect()
+    {
+        return success(userService.selectDeptUserTreeList());
+    }
+}

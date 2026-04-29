@@ -1,0 +1,196 @@
+/*
+ * Copyright © 2025 Qiantong Technology Co., Ltd.
+ * qData Data Middle Platform (Open Source Edition)
+ *  *
+ * License:
+ * Released under the Apache License, Version 2.0.
+ * You may use, modify, and distribute this software for commercial purposes
+ * under the terms of the License.
+ *  *
+ * Special Notice:
+ * All derivative versions are strictly prohibited from modifying or removing
+ * the default system logo and copyright information.
+ * For brand customization, please apply for brand customization authorization via official channels.
+ *  *
+ * More information: https://qdata.qiantong.tech/business.html
+ *  *
+ * ============================================================================
+ *  *
+ * 版权所有 © 2025 江苏千桐科技有限公司
+ * qData 主数据平台（开源版）
+ *  *
+ * 许可协议：
+ * 本项目基于 Apache License 2.0 开源协议发布，
+ * 允许在遵守协议的前提下进行商用、修改和分发。
+ *  *
+ * 特别说明：
+ * 所有衍生版本不得修改或移除系统默认的 LOGO 和版权信息；
+ * 如需定制品牌，请通过官方渠道申请品牌定制授权。
+ *  *
+ * 更多信息请访问：https://qdata.qiantong.tech/business.html
+ */
+
+package tech.qiantong.qdata.mdm.module.system.controller.admin.system;
+
+import java.util.Date;
+import java.util.List;
+
+import cn.hutool.core.date.DateUtil;
+import com.github.pagehelper.PageHelper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import tech.qiantong.qdata.mdm.common.annotation.Log;
+import tech.qiantong.qdata.mdm.common.core.controller.BaseController;
+import tech.qiantong.qdata.mdm.common.core.domain.AjaxResult;
+import tech.qiantong.qdata.mdm.common.core.page.PageDomain;
+import tech.qiantong.qdata.mdm.common.core.page.TableDataInfo;
+import tech.qiantong.qdata.mdm.common.core.page.TableSupport;
+import tech.qiantong.qdata.mdm.common.enums.BusinessType;
+import tech.qiantong.qdata.mdm.common.utils.sql.SqlUtil;
+import tech.qiantong.qdata.mdm.module.system.controller.admin.system.message.vo.MessagePageReqVO;
+import tech.qiantong.qdata.mdm.module.system.controller.admin.system.message.websocket.WebSocketMessageServer;
+import tech.qiantong.qdata.mdm.module.system.dal.dataobject.message.MessageDO;
+import tech.qiantong.qdata.mdm.module.system.domain.SysNotice;
+import tech.qiantong.qdata.mdm.module.system.service.ISysNoticeService;
+import tech.qiantong.qdata.mdm.module.system.service.message.IMessageService;
+
+import javax.annotation.Resource;
+
+/**
+ * 公告 信息操作处理
+ *
+ * @author qdata
+ */
+@RestController
+@RequestMapping("/system/notice")
+public class SysNoticeController extends BaseController
+{
+    @Autowired
+    private ISysNoticeService noticeService;
+    @Resource
+    private WebSocketMessageServer webSocketMessageServer;
+    @Resource
+    private IMessageService messageService;
+
+    /**
+     * 获取通知公告列表
+     */
+    @GetMapping("/list")
+    public TableDataInfo list(SysNotice notice)
+    {
+        startPage();
+        List<SysNotice> list = noticeService.selectNoticeList(notice);
+        return getDataTable(list);
+    }
+
+
+    /**
+     * 获取通知公告列表(排序后)
+     */
+//    @PreAuthorize("@ss.hasPermi('system:notice:list')")
+    @GetMapping("/sortList")
+    public TableDataInfo sortList(SysNotice notice)
+    {
+        PageDomain var0 = TableSupport.buildPageRequest();
+        Integer var1 = var0.getPageNum();
+        Integer var2 = var0.getPageSize();
+        String var3 = SqlUtil.escapeOrderBySql("top_flag desc, create_time desc");
+        Boolean var4 = var0.getReasonable();
+        PageHelper.startPage(var1, var2, var3).setReasonable(var4);
+        List<SysNotice> list = noticeService.selectNoticeList(notice);
+        return getDataTable(list);
+    }
+
+
+    /**
+     * 获取弹框公告
+     * @return
+     */
+    @GetMapping("/alertNotice")
+    public AjaxResult alertNotice()
+    {
+        SysNotice noticeQo = new SysNotice();
+        noticeQo.setAlertFlag(1);
+        noticeQo.setStatus("1");
+        noticeQo.getParams().put("efftectTime", DateUtil.now());
+        List<SysNotice> list = noticeService.selectNoticeList(noticeQo);
+        if (list.size() > 0){
+            return success(list.get(0));
+        }
+        return success();
+    }
+
+
+    /**
+     * 根据通知公告编号获取详细信息
+     */
+    @PreAuthorize("@ss.hasPermi('system:notice:query')")
+    @GetMapping(value = "/one")
+    public AjaxResult getInfo(@RequestParam Long noticeId)
+    {
+        return success(noticeService.selectNoticeById(noticeId));
+    }
+    /**
+     * 新增通知公告
+     */
+    @PreAuthorize("@ss.hasPermi('system:notice:add')")
+    @Log(title = "通知公告", businessType = BusinessType.INSERT)
+    @PostMapping
+    public AjaxResult add(@Validated @RequestBody SysNotice notice)
+    {
+        //测试 消息通知
+        MessagePageReqVO messagePageReqVO = new MessagePageReqVO();
+        messagePageReqVO.setContent(notice.getNoticeContent());
+        messagePageReqVO.setTitle(notice.getNoticeTitle());
+        messagePageReqVO.setEntityType(Integer.valueOf(notice.getNoticeType()));
+        messagePageReqVO.setCreateTime(new Date());
+        webSocketMessageServer.broadcastMessage(messagePageReqVO);
+        notice.setCreateBy(getUsername());
+
+        return toAjax(noticeService.insertNotice(notice));
+    }
+
+    /**
+     * 修改通知公告
+     */
+    @PreAuthorize("@ss.hasPermi('system:notice:edit')")
+    @Log(title = "通知公告", businessType = BusinessType.UPDATE)
+    @PutMapping
+    public AjaxResult edit(@Validated @RequestBody SysNotice notice)
+    {
+        notice.setUpdateBy(getUsername());
+        MessagePageReqVO messagePageReqVO = new MessagePageReqVO();
+        messagePageReqVO.setContent(notice.getNoticeContent());
+        messagePageReqVO.setTitle(notice.getNoticeTitle());
+        messagePageReqVO.setEntityType(Integer.valueOf(notice.getNoticeType()));
+        messagePageReqVO.setCreateTime(new Date());
+        webSocketMessageServer.broadcastMessage(messagePageReqVO);
+
+        MessageDO messageDO = new MessageDO();
+        // 设置模版基本数据
+        messageDO.setCategory(Integer.valueOf(0));
+        messageDO.setMsgLevel(Integer.valueOf(0));
+        messageDO.setTitle("测试");
+        // 实际消息
+        messageDO.setContent("测试内容");
+
+//        messageDO.setCreatorId(getLoginUser().getUserId());
+//        messageDO.setCreateBy(getLoginUser().getUser().getNickName());
+        boolean save = messageService.save(messageDO);
+
+        return toAjax(noticeService.updateNotice(notice));
+    }
+
+    /**
+     * 删除通知公告
+     */
+    @PreAuthorize("@ss.hasPermi('system:notice:remove')")
+    @Log(title = "通知公告", businessType = BusinessType.DELETE)
+    @DeleteMapping("/{noticeIds}")
+    public AjaxResult remove(@PathVariable Long[] noticeIds)
+    {
+        return toAjax(noticeService.deleteNoticeByIds(noticeIds));
+    }
+}

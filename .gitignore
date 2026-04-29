@@ -65,7 +65,7 @@ storybook-static/
 
 ### pdman 备份文件 ###
 /sql/pdman/.back_anivia/
-sql/pdman/.back_数据中台
+sql/pdman/.back_主数据平台
 
 ### Anivia-App ###
 ######################################################################

@@ -1,0 +1,215 @@
+/*
+ * Copyright © 2025 Qiantong Technology Co., Ltd.
+ * qData Data Middle Platform (Open Source Edition)
+ *  *
+ * License:
+ * Released under the Apache License, Version 2.0.
+ * You may use, modify, and distribute this software for commercial purposes
+ * under the terms of the License.
+ *  *
+ * Special Notice:
+ * All derivative versions are strictly prohibited from modifying or removing
+ * the default system logo and copyright information.
+ * For brand customization, please apply for brand customization authorization via official channels.
+ *  *
+ * More information: https://qdata.qiantong.tech/business.html
+ *  *
+ * ============================================================================
+ *  *
+ * 版权所有 © 2025 江苏千桐科技有限公司
+ * qData 主数据平台（开源版）
+ *  *
+ * 许可协议：
+ * 本项目基于 Apache License 2.0 开源协议发布，
+ * 允许在遵守协议的前提下进行商用、修改和分发。
+ *  *
+ * 特别说明：
+ * 所有衍生版本不得修改或移除系统默认的 LOGO 和版权信息；
+ * 如需定制品牌，请通过官方渠道申请品牌定制授权。
+ *  *
+ * 更多信息请访问：https://qdata.qiantong.tech/business.html
+ */
+
+package tech.qiantong.qdata.mdm.common.core.domain.entity;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+import tech.qiantong.qdata.mdm.common.annotation.Excel;
+import tech.qiantong.qdata.mdm.common.annotation.Excel.ColumnType;
+import tech.qiantong.qdata.mdm.common.constant.UserConstants;
+import tech.qiantong.qdata.mdm.common.core.domain.BaseEntity;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Size;
+
+/**
+ * 字典数据表 sys_dict_data
+ *
+ * @author qdata
+ */
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class SysDictData extends BaseEntity
+{
+    private static final long serialVersionUID = 1L;
+
+    /** 字典编码 */
+    @Excel(name = "字典编码", cellType = ColumnType.NUMERIC)
+    private Long dictCode;
+
+    /** 字典排序 */
+    @Excel(name = "字典排序", cellType = ColumnType.NUMERIC)
+    private Long dictSort;
+
+    /** 字典标签 */
+    @Excel(name = "字典标签")
+    private String dictLabel;
+
+    /** 字典键值 */
+    @Excel(name = "字典键值")
+    private String dictValue;
+
+    /** 字典类型 */
+    @Excel(name = "字典类型")
+    private String dictType;
+
+    /** 样式属性（其他样式扩展） */
+    private String cssClass;
+
+    /** 表格字典样式 */
+    private String listClass;
+
+    /** 是否默认（Y是 N否） */
+    @Excel(name = "是否默认", readConverterExp = "Y=是,N=否")
+    private String isDefault;
+
+    /** 状态（0正常 1停用） */
+    @Excel(name = "状态", readConverterExp = "0=正常,1=停用")
+    private String status;
+
+    public Long getDictCode()
+    {
+        return dictCode;
+    }
+
+    public void setDictCode(Long dictCode)
+    {
+        this.dictCode = dictCode;
+    }
+
+    public Long getDictSort()
+    {
+        return dictSort;
+    }
+
+    public void setDictSort(Long dictSort)
+    {
+        this.dictSort = dictSort;
+    }
+
+    @NotBlank(message = "字典标签不能为空")
+    @Size(min = 0, max = 100, message = "字典标签长度不能超过100个字符")
+    public String getDictLabel()
+    {
+        return dictLabel;
+    }
+
+    public void setDictLabel(String dictLabel)
+    {
+        this.dictLabel = dictLabel;
+    }
+
+    @NotBlank(message = "字典键值不能为空")
+    @Size(min = 0, max = 100, message = "字典键值长度不能超过100个字符")
+    public String getDictValue()
+    {
+        return dictValue;
+    }
+
+    public void setDictValue(String dictValue)
+    {
+        this.dictValue = dictValue;
+    }
+
+    @NotBlank(message = "字典类型不能为空")
+    @Size(min = 0, max = 100, message = "字典类型长度不能超过100个字符")
+    public String getDictType()
+    {
+        return dictType;
+    }
+
+    public void setDictType(String dictType)
+    {
+        this.dictType = dictType;
+    }
+
+    @Size(min = 0, max = 100, message = "样式属性长度不能超过100个字符")
+    public String getCssClass()
+    {
+        return cssClass;
+    }
+
+    public void setCssClass(String cssClass)
+    {
+        this.cssClass = cssClass;
+    }
+
+    public String getListClass()
+    {
+        return listClass;
+    }
+
+    public void setListClass(String listClass)
+    {
+        this.listClass = listClass;
+    }
+
+    public boolean getDefault()
+    {
+        return UserConstants.YES.equals(this.isDefault);
+    }
+
+    public String getIsDefault()
+    {
+        return isDefault;
+    }
+
+    public void setIsDefault(String isDefault)
+    {
+        this.isDefault = isDefault;
+    }
+
+    public String getStatus()
+    {
+        return status;
+    }
+
+    public void setStatus(String status)
+    {
+        this.status = status;
+    }
+
+    @Override
+    public String toString() {
+        return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
+            .append("dictCode", getDictCode())
+            .append("dictSort", getDictSort())
+            .append("dictLabel", getDictLabel())
+            .append("dictValue", getDictValue())
+            .append("dictType", getDictType())
+            .append("cssClass", getCssClass())
+            .append("listClass", getListClass())
+            .append("isDefault", getIsDefault())
+            .append("status", getStatus())
+            .append("createBy", getCreateBy())
+            .append("createTime", getCreateTime())
+            .append("updateBy", getUpdateBy())
+            .append("updateTime", getUpdateTime())
+            .append("remark", getRemark())
+            .toString();
+    }
+}

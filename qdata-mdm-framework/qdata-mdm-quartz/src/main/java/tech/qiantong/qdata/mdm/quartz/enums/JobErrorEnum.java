@@ -1,0 +1,80 @@
+/*
+ * Copyright © 2025 Qiantong Technology Co., Ltd.
+ * qData Data Middle Platform (Open Source Edition)
+ *  *
+ * License:
+ * Released under the Apache License, Version 2.0.
+ * You may use, modify, and distribute this software for commercial purposes
+ * under the terms of the License.
+ *  *
+ * Special Notice:
+ * All derivative versions are strictly prohibited from modifying or removing
+ * the default system logo and copyright information.
+ * For brand customization, please apply for brand customization authorization via official channels.
+ *  *
+ * More information: https://qdata.qiantong.tech/business.html
+ *  *
+ * ============================================================================
+ *  *
+ * 版权所有 © 2025 江苏千桐科技有限公司
+ * qData 主数据平台（开源版）
+ *  *
+ * 许可协议：
+ * 本项目基于 Apache License 2.0 开源协议发布，
+ * 允许在遵守协议的前提下进行商用、修改和分发。
+ *  *
+ * 特别说明：
+ * 所有衍生版本不得修改或移除系统默认的 LOGO 和版权信息；
+ * 如需定制品牌，请通过官方渠道申请品牌定制授权。
+ *  *
+ * 更多信息请访问：https://qdata.qiantong.tech/business.html
+ */
+
+package tech.qiantong.qdata.mdm.quartz.enums;
+
+/**
+ * 任务操作错误信息枚举
+ *
+ * @author qdata
+ */
+public enum JobErrorEnum {
+
+    CRON_INVALID(-1L, "Cron表达式不正确"),
+    RMI_NOT_ALLOWED(-2L, "目标字符串不允许'rmi'调用"),
+    LDAP_NOT_ALLOWED(-3L, "目标字符串不允许'ldap(s)'调用"),
+    HTTP_NOT_ALLOWED(-4L, "目标字符串不允许'http(s)'调用"),
+    INVALID_TARGET(-5L, "目标字符串存在违规"),
+    NOT_IN_WHITELIST(-6L, "目标字符串不在白名单内");
+
+    private final Long code;
+    private final String message;
+
+    JobErrorEnum(Long code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
+    public Long getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public String getMessage(String jobName, String operationType) {
+        return String.format("%s任务'%s'失败，%s", operationType, jobName, this.message);
+    }
+
+    /**
+     * 根据错误码获取枚举
+     */
+    public static JobErrorEnum getByCode(Long code) {
+        for (JobErrorEnum error : values()) {
+            if (error.getCode().equals(code)) {
+                return error;
+            }
+        }
+        return null;
+    }
+}

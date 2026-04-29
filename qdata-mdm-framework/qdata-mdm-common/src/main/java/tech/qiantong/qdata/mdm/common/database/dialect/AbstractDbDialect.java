@@ -1,0 +1,232 @@
+/*
+ * Copyright © 2025 Qiantong Technology Co., Ltd.
+ * qData Data Middle Platform (Open Source Edition)
+ *  *
+ * License:
+ * Released under the Apache License, Version 2.0.
+ * You may use, modify, and distribute this software for commercial purposes
+ * under the terms of the License.
+ *  *
+ * Special Notice:
+ * All derivative versions are strictly prohibited from modifying or removing
+ * the default system logo and copyright information.
+ * For brand customization, please apply for brand customization authorization via official channels.
+ *  *
+ * More information: https://qdata.qiantong.tech/business.html
+ *  *
+ * ============================================================================
+ *  *
+ * 版权所有 © 2025 江苏千桐科技有限公司
+ * qData 主数据平台（开源版）
+ *  *
+ * 许可协议：
+ * 本项目基于 Apache License 2.0 开源协议发布，
+ * 允许在遵守协议的前提下进行商用、修改和分发。
+ *  *
+ * 特别说明：
+ * 所有衍生版本不得修改或移除系统默认的 LOGO 和版权信息；
+ * 如需定制品牌，请通过官方渠道申请品牌定制授权。
+ *  *
+ * 更多信息请访问：https://qdata.qiantong.tech/business.html
+ */
+
+package tech.qiantong.qdata.mdm.common.database.dialect;
+
+
+import com.alibaba.fastjson2.JSONObject;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
+import tech.qiantong.qdata.mdm.common.database.DbDialect;
+import tech.qiantong.qdata.mdm.common.database.constants.DbQueryProperty;
+import tech.qiantong.qdata.mdm.common.database.constants.DbType;
+import tech.qiantong.qdata.mdm.common.database.core.DbColumn;
+import tech.qiantong.qdata.mdm.common.database.core.DbName;
+import tech.qiantong.qdata.mdm.common.database.exception.DataQueryException;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 方言抽象类
+ *
+ * @author QianTongDC
+ * @date 2022-11-14
+ */
+@Slf4j
+public abstract class AbstractDbDialect implements DbDialect {
+
+    @Override
+    public String columns(String dbName, String tableName) {
+        return "select column_name AS COLNAME, ordinal_position AS COLPOSITION, column_default AS DATADEFAULT, is_nullable AS NULLABLE, data_type AS DATATYPE, " +
+                "character_maximum_length AS DATALENGTH, numeric_precision AS DATAPRECISION, numeric_scale AS DATASCALE, column_key AS COLKEY, column_comment AS COLCOMMENT " +
+                "from information_schema.columns where table_schema = '" + dbName + "' and table_name = '" + tableName + "' order by ordinal_position ";
+    }
+
+    @Override
+    public String tables(String dbName) {
+        return "SELECT table_name AS TABLENAME, table_comment AS TABLECOMMENT FROM information_schema.tables where table_schema = '" + dbName + "' ";
+    }
+
+    @Override
+    public String getPkColumnNames(DbQueryProperty dbQueryProperty, String tableName) {
+        return "";
+    }
+
+
+    @Override
+    public String getPkColumnNames(DbQueryProperty dbQueryProperty) {
+        return "";
+    }
+
+
+    @Override
+    public String tablesComment(DbQueryProperty dbQueryProperty, String tableName) {
+        return null;
+    }
+
+    @Override
+    public String buildTableNameByDbType(DbQueryProperty dbQueryProperty, String tableName) {
+        return tableName;
+    }
+
+    @Override
+    public String buildPaginationSql(String originalSql, long offset, long count) {
+        // 获取 分页实际条数
+        StringBuilder sqlBuilder = new StringBuilder(originalSql);
+        sqlBuilder.append(" LIMIT ").append(offset).append(" , ").append(count);
+        return sqlBuilder.toString();
+    }
+
+    @Override
+    public String count(String sql) {
+        return "SELECT COUNT(*) FROM ( " + sql + " ) TEMP";
+    }
+
+    @Override
+    public String countNew(String tableName, Map<String, Object> params) {
+        // 动态构建 WHERE 子句
+        StringBuilder countSql = new StringBuilder("SELECT COUNT(*) FROM ").append(tableName);
+        if (params != null && !params.isEmpty()) {
+            countSql.append(buildWhereClause(params));
+        }
+        return countSql.toString();
+    }
+
+    /**
+     * 验证连接
+     *
+     * @param dataSource
+     * @param dbQueryProperty
+     * @return
+     */
+    @Override
+    public Boolean validConnection(DataSource dataSource, DbQueryProperty dbQueryProperty) {
+        try (Connection conn = dataSource.getConnection()) {
+            return conn.isValid(0);
+        } catch (SQLException e) {
+            log.error("数据库连接失败,稍后重试", e);
+            throw new DataQueryException("数据库连接失败,稍后重试");
+        }
+    }
+
+
+    /**
+     * 动态构建 WHERE 子句
+     *
+     * @param params 参数 Map
+     * @return WHERE 子句字符串
+     */
+    private static String buildWhereClause(Map<String, Object> params) {
+        StringBuilder whereClause = new StringBuilder(" WHERE 1=1");
+        for (String key : params.keySet()) {
+            whereClause.append(" AND ").append(key).append(" = :").append(key);
+        }
+        return whereClause.toString();
+    }
+
+    @Override
+    public String trainToJdbcUrl(DbQueryProperty property) {
+        String url = DbType.getDbType(property.getDbType()).getUrl();
+        if (StringUtils.isEmpty(url)) {
+            throw new DataQueryException("无效数据库类型!");
+        }
+        url = url.replace("${host}", property.getHost());
+        url = url.replace("${port}", String.valueOf(property.getPort()));
+        url = url.replace("${dbName}", property.getDbName());
+        return url;
+    }
+
+    @Override
+    public String getFlinkCDCSQL(DbQueryProperty property, String flinkTableName, String tableName, String tableFieldName) {
+        return null;
+    }
+
+    @Override
+    public String getFlinkSQL(DbQueryProperty property, String flinkTableName, String tableName, String tableFieldName) {
+        return null;
+    }
+
+    @Override
+    public String getTableName(DbQueryProperty property, String tableName) {
+        if (!StringUtils.isEmpty(property.getDbName())) {
+            return property.getDbName() + "." + tableName;
+        }
+        return tableName;
+    }
+
+    @Override
+    public String getFlinkSinkSQL(DbQueryProperty property, JSONObject config, String flinkTableName, String tableName, String tableFieldName) {
+        return null;
+    }
+
+    @Override
+    public String getDbName(DbName dbName) {
+        return null;
+    }
+
+
+    @Override
+    public String getDbColumns(DbQueryProperty property) {
+        return null;
+    }
+
+    @Override
+    public List<String> someInternalSqlDorisGenerator(DbQueryProperty dbQueryProperty, String tableName, String tableComment, List<DbColumn> dbColumnList, String partitionRule, String bucketRule, Integer replica) {
+        return null;
+    }
+
+    /**
+     * 检查是否使用SSL
+     *
+     * @param property
+     * @return
+     */
+    protected Boolean checkUseSSL(DbQueryProperty property) {
+        if (property.getDatasourceConfig().containsKey("useSSL")) {
+            Integer useSSL = (Integer) property.getDatasourceConfig().get("useSSL");
+            if (useSSL == 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 检查是否使用Kerberos
+     *
+     * @param property
+     * @return
+     */
+    protected static Boolean checkUseKerberos(DbQueryProperty property) {
+        if (property.getDatasourceConfig().containsKey("useKerberos")) {
+            Integer useSSL = (Integer) property.getDatasourceConfig().get("useKerberos");
+            if (useSSL == 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
