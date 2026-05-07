@@ -122,8 +122,8 @@ const sideTheme = computed(() => settingsStore.sideTheme);
       margin-top: 8px;
       vertical-align: middle;
       // margin-right: 12px;
-      transform: scale(0.7);
-      margin-left: -30px;
+      transform: scale(.43);
+      margin-left: -120px;
     }
 
     & .sidebar-title {
