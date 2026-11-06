@@ -1,218 +1,170 @@
-![banner.png](.gitee/screenshots/banner.png)
+![qData Master Data Platform](images/en-US/banner.png)
 <p align="center">
   <img src="https://img.shields.io/badge/JDK-1.8+-brightgreen.svg" alt="JDK">
   <img src="https://img.shields.io/badge/Spring%20Boot-2.5.15-blue.svg" alt="Spring Boot">
   <img src="https://img.shields.io/badge/Vue-3.5.21-blue.svg" alt="Vue">
-  <img src="https://img.shields.io/badge/license-Apache--2.0-green"/>
-  <img src="https://img.shields.io/badge/qData--MDM-v1.0.0-blue.svg"/>
+  <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License"/>
+  <img src="https://img.shields.io/badge/qData--MDM-v1.0.0-blue.svg" alt="qData-mdm v1.0.0"/>
 
-  <img src="https://gitee.com/qiantongtech/qData-mdm/badge/star.svg"/>
-  <img src="https://img.shields.io/github/stars/qiantongtech/qData-mdm?label=Github%20Stars"/>
+  <img src="https://gitee.com/qiantongtech/qData-mdm/badge/star.svg" alt="Gitee Stars"/>
+  <img src="https://img.shields.io/github/stars/qiantongtech/qData-mdm?label=GitHub%20Stars" alt="GitHub Stars"/>
 </p>
 
 <p align="center">
-  📖简体中文 | <a href="README.en.md">📖English</a>
+  <a href="README.zh-CN.md">📖简体中文</a> | 📖English | <a href="README.ja-JP.md">📖日本語</a>
 </p>
 
+## 🌈 Platform Overview
 
-## 🌈 平台简介
-**qData-mdm 主数据平台**是一套聚焦**主数据建模**、**主数据维护**、**主数据采集**、**主数据分发**与**主数据质量治理**的主数据管理平台，致力于帮助企业建立统一的主数据标准、维护流程和数据共享机制。包含系统管理、基础建模、维护、采集、分发和质量治理等功能。
+**qData-mdm** is a master data platform for managing records such as customers, suppliers, materials, and organizations. It organizes models by business domain, ingests and merges records from multiple systems into authoritative master data, and manages changes through approvals, quality checks, and remediation. Downstream systems can receive data through distribution tasks or query it through published services. The dashboard summarizes data volumes, lifecycle states, effective changes, and items requiring attention. Authorization and auditing support day-to-day maintenance and data sharing.
 
-✨✨✨**在线文档**✨✨✨ <a href="https://qdata.qiantong.tech" target="_blank">https://qdata.qiantong.tech</a>
+✨✨✨**Online Documentation**✨✨✨ <a href="https://qdata.qiantong.tech" target="_blank">https://qdata.qiantong.tech</a>
 
-<!-- ✨✨✨**开源版功能范围**✨✨✨ 包含系统管理、基础建模、维护、采集、分发与质量治理功能 -->
+> If qData-mdm helps you, give the project a **star ⭐️** to support its development.
 
-<!-- ✨✨✨**专业版咨询地址**✨✨✨ <a href="https://qdata.qiantong.tech/business/policy.html" target="_blank">https://qdata.qiantong.tech/business/policy.html</a> -->
+## 🍱 Use Cases
 
-> 如果 qData-mdm 对您有帮助，请点个 **Star ⭐️**，这是我们持续更新的动力！ 🚀
+qData-mdm is designed for enterprises, corporate groups, and public-sector organizations that need consistent data standards, maintenance processes, and data sharing.
 
-## 🍱 使用场景
+| Use case | Description | Typical users |
+|----------|-------------|---------------|
+| **Standardized master data modeling** | Organize models by business domain and directory. Define shared fields, classification hierarchies, relationships, reference data, and code generation rules. | Corporate groups, manufacturers, state-owned enterprises |
+| **Centralized master data maintenance** | Manage requests to create, update, import, or change the lifecycle state of master data. Retain official versions, approval history, and source information. | Mid-sized and large enterprises, shared service centers |
+| **Multi-source ingestion and consolidation** | Ingest records from business databases, files, and APIs. Identify duplicates across systems and produce authoritative records after review, quality checks, and approval. | Manufacturers, government platforms, IT project teams |
+| **Master data distribution and sharing** | Push full or incremental data to ERP, HR, and finance systems, or provide authorized access through published read-only APIs. | Corporate groups, public-sector organizations, industry platforms |
+| **Master data quality management** | Run scheduled quality checks, collect failures, assign remediation to the responsible people, and track outcomes. | Data governance, IT, and operations teams |
 
-适用于需要统一主数据标准、规范主数据维护流程、建立主数据共享机制的企业、集团与政企组织。
+## 💡 Advantages
 
-| 场景          | 描述                            | 典型客户类型             |
-| ----------- | ----------------------------- | ------------------ |
-| **主数据标准建模**  | 需要统一定义组织、客户、供应商、物料、产品等主数据模型，形成标准化的数据结构。 | 集团企业、制造企业、国企平台     |
-| **主数据集中维护** | 需要建立主数据新建、变更、冻结、解冻、失效等统一维护机制，避免多系统各自维护。 | 中大型企业、共享服务中心    |
-| **主数据采集同步**  | 需要从业务系统采集主数据，进行基础同步、入库和核查，形成统一主数据底座。   | 制造企业、政务平台、信息化项目 |
-| **主数据分发共享** | 需要将统一主数据分发到 ERP、HR、财务、门户等下游系统，减少口径不一致问题。 | 集团企业、政企单位、行业平台  |
-| **主数据质量治理** | 需要对主数据进行基础规则校验、任务执行和结果追踪，提升主数据准确性与可用性。 | 数据治理团队、信息中心、运维团队    |
+| Advantage | Description |
+|-----------|-------------|
+| **Versioned models and controlled publication** | The current model stays active during revisions. Publication checks compatibility, references, and data risks, while retaining previous versions and publication history. |
+| **Traceable consolidation** | Retain matching evidence, field value origins, manual adjustments, check results, and approvals. Trace authoritative master data back to its source records. |
+| **Unified task inbox** | A personal task center brings together approvals, data-entry assignments, and remediation tasks. Status updates follow their originating workflows. |
+| **Granular authorization** | Control model access by row, field, and business action. External API calls use separate service authorization. |
+| **Flexible deployment** | Run from source or deploy with Docker for installation, integration, and testing in different environments. |
 
+## 📋 Feature List
 
-## 💡 优势
+| Core business function | Key capabilities |
+|------------------------|------------------|
+| **Master data modeling and publication** | Organize standard and classification models by domain and directory. Configure relationships and one-to-many submodels. Publish manually after validation and approval to create the physical schema. Revisions undergo compatibility checks and retain version history. |
+| **Reference data and automatic code generation** | Maintain shared reference data and bind it to model fields to standardize allowed values. Version code rules that combine fixed text, business fields, reference data mappings, dates and times, and sequence numbers. Check uniqueness when issuing a code. |
+| **Authoritative master data maintenance** | Query official records and related details by published model. Create, edit, copy, bulk update, import, and export records. Validate and apply bulk changes as a whole. Compare historical versions and submit a restoration request. |
+| **Lifecycle and change approval** | Manage active, frozen, inactive, and archived records, with actions to freeze, unfreeze, deactivate, restore, or archive. Apply business approval rules to maintenance and status changes, and track requests, comments, and outcomes. |
+| **Multi-source data ingestion** | Read databases in full or incrementally, import CSV, XLS, and XLSX files, or pull from external APIs. Use source identifiers and field mappings to detect changes, and retain ingestion versions and failure details. |
+| **Duplicate detection and consolidation** | Detect duplicates through exact, fuzzy, or weighted multi-field matching. Review and split candidate groups manually. Recommend field values by source priority, trust score, recency, or non-empty value. Resolve conflicts, run quality checks, and submit the result for approval before it becomes authoritative. |
+| **Quality checks and remediation** | Run manual or scheduled checks using rules for required values, formats, uniqueness, valid reference data, and cross-field logic. Collect failures with their causes, assign issues to responsible people, and track remediation. |
+| **Data distribution and services** | Configure the data scope and field mappings for each target system. Push full or incremental data manually or on a schedule, including lifecycle changes. Publish read-only REST APIs for single-record and paginated queries. |
+| **Data and service authorization** | Control model rows, fields, and business actions by user, role, or organization. Grant API access separately by caller, service, and validity period. |
+| **Business auditing and source traceability** | Record key business operations and affected objects. Query changes and historical versions across models, and trace official records to source records, mappings, and approvals. |
 
-| 优势点           | 描述                             |
-| ------------- | ------------------------------ |
-| **主数据功能覆盖完整**    | 围绕“建模、维护、采集、分发、质量”提供主数据平台基础功能，满足常见主数据管理场景。       |
-| **基础能力清晰**   | 覆盖系统管理、主数据建模、维护、采集、分发和质量治理等主要模块，能力边界清晰。     |
-| **建模维护一体化** | 主数据建模与主数据维护能力协同设计，便于模型定义直接服务后续维护与共享使用。     |
-| **分类、实体、字典协同**  | 支持主题管理、实体模型、分类模型、数据字典等主数据基础建模能力，满足常见主数据设计场景。          |
-| **采集与分发能力** | 提供基础采集任务、采集实例、手动全量分发和分发监控能力，便于打通主数据上下游链路。         |
-| **质量治理能力**    | 提供基础质量规则、简单质量任务、任务实例和质量日志能力，支持常见主数据质量检查场景。   |
-| **支持多种部署方式**   | 支持源码启动和 Docker 方式部署，便于不同环境下安装、联调和使用。         |
+💡 Have a suggestion or feature request? [Open an issue](https://gitee.com/qiantongtech/qData/issues).
 
+## 🛠️ Technology Stack
 
-## 📋 功能清单
-
-| 模块 | 描述 |
-|------|------|
-| 主题管理 | 提供主数据模型主题目录树维护能力，支持按业务域、项目或组织维度挂载与调整主题节点，便于对模型资产分层归类、统一检索入口与权限边界。适用于多业务线并行建模时，**先定主题再挂模型**，避免模型散落、难以治理的问题。 |
-| 实体模型 | 覆盖实体模型的创建与维护、字段定义与约束、实体间基础关联配置，以及版本管理与发布流程；可基于模型生成物理表结构，并配套基础查询/维护类接口能力，支持按业务规则配置主数据编码生成策略。适用于客户、供应商、物料、组织等主数据的**统一建模与对外服务**。 |
-| 分类模型 | 在分类模型下维护层级结构（如品类树、组织树），内置系统保留字段并支持扩展自定义字段；支持单表方式维护层级数据、版本发布及基础接口输出，并可配置分类侧编码规则。适用于需要**树形主数据**、且要与实体主数据关联分类维度的场景。 |
-| 数据字典 | 提供字典类型与字典项的维护、字段级配置、发布与修订记录，支持字典数据的批量维护、导入与导出，便于与实体/分类模型中的下拉、枚举类字段联动。适用于行业码表、内部标准码、状态码等通用参照数据的**集中管理**。 |
-| 主数据查询 | 按已发布模型提供列表检索、条件过滤与明细查看，分类模型场景下支持左侧分类树与右侧数据**联动检索**，快速定位已生效主数据。适用于业务人员日常查数、核对口径及跨部门协同前的数据确认。 |
-| 主数据新建 | 基于模型动态表单发起新增，支持必填校验、字段联动展示及**暂存—提交**流程，提交后进入平台既定的新建与生效链路。适用于一线录入、补录入口统一收口，减少各业务系统重复建数、口径不一致的问题。 |
-| 主数据变更 | 支持对已有主数据的修改，以及**冻结、解冻、失效**等状态类操作，覆盖主数据在生命周期内的常见状态流转，变更过程可追溯。适用于主数据纠错、业务暂停/恢复、下线清理等运维与业务协同场景。 |
-| 数据源管理 | 维护异构数据源连接信息，支持连接参数配置、连通性测试及数据源级挂载路径或目录管理，为后续采集任务提供**统一来源台账**。适用于梳理「数据从哪来」、降低采集配置时的重复录入与连接错误。 |
-| 采集任务 | 支持配置来源库表/映射关系与执行策略，可发起**全量与简单增量**同步，将外部系统主数据拉取并落入平台模型。适用于从 ERP、CRM、自建库等系统批量同步主数据，形成统一主数据底座。 |
-| 采集实例 | 每次任务运行生成独立采集实例，记录起止时间、执行状态、数据量与异常摘要等信息，支持**按实例回溯**一次完整同步过程。适用于运维排障、对账核对及确认某次同步是否成功完成。 |
-| 采集日志 | 提供采集过程与结果的**日志查询**能力，可查看错误明细、重试建议等相关信息，支撑日常监控与问题定位。适用于采集链路不稳定时的快速诊断与审计留痕。 |
-| 应用管理 | 维护主数据**分发目标应用**档案，登记地址、认证或连接参数，并支持可用性检测，形成下游系统台账。适用于管理，为分发配置与监控提供统一主数据消费方视图。 |
-| 分发配置 | 按模型或数据范围配置向目标应用的分发任务，支持**手动触发全量分发**，将平台侧主数据按需推送到下游。适用于项目上线割接、下游系统重建库表或定期全量对齐等场景。 |
-| 分发监控 | 查看分发批次/明细的执行结果，支持失败记录查看与**失败重发**等操作，形成「发现异常—处理—再验证」的闭环。适用于保障主数据出口链路稳定、减少静默失败。 |
-| 质量规则 | 维护面向主数据的基础质量规则（如非空、格式、取值范围、与字典一致性等），为后续校验提供**可复用规则资产**。适用于在入库或定期巡检前统一约定数据合格标准。 |
-| 质量任务 | 将规则组合为可执行的质量任务，支持按模型或数据范围配置并**手动/周期触发**执行，用于批量校验主数据。适用于定期质量巡检、大促/月结前的数据摸底。 |
-| 质量任务实例 | 每次质量任务运行对应一个实例，展示执行进度、**通过/失败统计**及结果概要，便于对比多次运行效果。适用于跟踪一次质量检查是否跑完、结果是否可发布给业务方。 |
-| 质量日志 | 提供质量校验**明细日志**查询，支持按规则、对象、时间等维度筛选，定位不合格记录与原因。适用于治理团队审计、业务整改清单输出及与责任系统对账。 |
-
-👉 qData-mdm 开源版围绕主数据场景提供能力，功能将持续迭代完善。
-
-
-💡 如您有好的建议或功能需求，欢迎 [提交Issue](https://gitee.com/qiantongtech/qData/issues)，与我们共同完善主数据平台功能。
-
-[//]: # (## 🧩 架构图)
-
-[//]: # (![framework.png]&#40;images%2Fframework.png&#41;)
-
-## 🛠️ 技术栈
-qData-mdm 平台采用前后端分离架构，后端基于 Spring Boot，前端基于 Vue 3，并整合了主流的认证、数据库访问、缓存与前端组件能力。
+qData-mdm separates the Spring Boot backend from the Vue 3 frontend and integrates authentication, database access, caching, and UI components.
 
 <table>
   <tr>
-    <th>分类</th><th>技术</th><th>描述</th>
+    <th>Category</th><th>Technology</th><th>Purpose</th>
   </tr>
   <tr>
-    <td rowspan="6">后端技术栈</td><td>Spring Boot</td><td>提供快速开发能力与统一服务启动入口</td>
+    <td rowspan="6">Backend</td><td>Spring Boot</td><td>Application framework for rapid development and consistent startup</td>
   </tr>
   <tr>
-    <td>Spring Security</td><td>实现用户认证、授权与安全控制</td>
+    <td>Spring Security</td><td>User authentication, authorization, and security controls</td>
   </tr>
   <tr>
-    <td>MySQL、达梦8</td><td>持久化存储与数据源配置管理</td>
+    <td>MySQL, DM8</td><td>Persistent storage and data source configuration</td>
   </tr>
   <tr>
-    <td>MyBatis-Plus</td><td>简化数据库操作与多数据源访问</td>
+    <td>MyBatis-Plus</td><td>Database access and multiple data sources</td>
   </tr>
   <tr>
-    <td>Redis</td><td>支持缓存、登录态与基础中间件能力</td>
+    <td>Redis</td><td>Caching, session state, and middleware</td>
   </tr>
   <tr>
-    <td>Knife4j / OpenAPI</td><td>提供接口文档展示与联调支持</td>
-  </tr>
-
-  <tr>
-    <td rowspan="3">前端技术栈</td><td>Vue 3</td><td>现代化响应式前端框架</td>
-  </tr>
-  <tr>
-    <td>Element Plus</td><td>常用 UI 组件支持与后台管理界面构建</td>
-  </tr>
-  <tr>
-    <td>Vite</td><td>快速开发与构建工具</td>
+    <td>Knife4j / OpenAPI</td><td>API documentation and integration testing</td>
   </tr>
 
   <tr>
-    <td rowspan="4">第三方插件</td><td>AntV X6</td><td>支撑流程、图形化设计与可视化交互场景</td>
+    <td rowspan="3">Frontend</td><td>Vue 3</td><td>Reactive frontend framework</td>
   </tr>
   <tr>
-    <td>ECharts</td><td>支撑统计图表与可视化展示能力</td>
+    <td>Element Plus</td><td>UI components for the admin interface</td>
+  </tr>
+  <tr>
+    <td>Vite</td><td>Development and build tooling</td>
+  </tr>
+
+  <tr>
+    <td rowspan="2">Third-party libraries</td><td>AntV X6</td><td>Workflow diagrams, visual design, and interaction</td>
+  </tr>
+  <tr>
+    <td>ECharts</td><td>Charts and data visualization</td>
   </tr>
 </table>
 
+## 🏗️ Deployment Requirements
 
-## 🏗️ 部署要求
-
-在部署 qData-mdm 之前，请确保以下环境和工具已正确安装：
+Install the following prerequisites before deploying qData-mdm.
 
 <table>
   <tr>
-    <th>环境</th><th>项目</th><th>推荐版本</th><th>说明</th>
+    <th>Environment</th><th>Component</th><th>Recommended version</th><th>Notes</th>
   </tr>
   <tr>
-    <td rowspan="6">后端</td><td>JDK</td><td>1.8 或以上</td><td>建议使用 OpenJDK 8 </td>
+    <td rowspan="6">Backend</td><td>JDK</td><td>1.8 or later</td><td>OpenJDK 8 recommended</td>
   </tr>
   <tr>
-    <td>Maven</td><td>3.6+</td><td>项目构建与依赖管理</td>
+    <td>Maven</td><td>3.6+</td><td>Build and dependency management</td>
   </tr>
   <tr>
-    <td>达梦8 / MySQL</td><td>8.0+</td><td>关系型数据库环境，开发配置默认偏向达梦8</td>
+    <td>DM8 / MySQL</td><td>8.0+</td><td>Relational database. Development configuration defaults to DM8.</td>
   </tr>
   <tr>
-    <td>Redis</td><td>5.0+</td><td>缓存与登录态等基础能力支持</td>
+    <td>Redis</td><td>5.0+</td><td>Caching and session state</td>
   </tr>
   <tr>
-    <td>Docker / Docker Compose</td><td>可选</td><td>用于快速体验和测试环境部署</td>
+    <td>Docker / Docker Compose</td><td>Optional</td><td>Quick evaluation and test deployments</td>
   </tr>
   <tr>
-    <td>操作系统</td><td>Windows / Linux / Mac</td><td>通用环境均可运行</td>
+    <td>Operating system</td><td>Windows / Linux / Mac</td><td>All listed systems are supported</td>
   </tr>
 
   <tr>
-    <td rowspan="3">前端</td><td>Node.js</td><td>16+</td><td>前端构建工具依赖</td>
+    <td rowspan="3">Frontend</td><td>Node.js</td><td>16+</td><td>Frontend build tooling</td>
   </tr>
   <tr>
-    <td>npm</td><td>8+</td><td>包管理器</td>
+    <td>npm</td><td>8+</td><td>Package manager</td>
   </tr>
   <tr>
-    <td>Chrome / Edge</td><td>最新版</td><td>推荐用于本地调试与系统访问</td>
+    <td>Chrome / Edge</td><td>Latest</td><td>Recommended for local debugging and access</td>
   </tr>
 </table>
 
+## 👥 QQ Community
 
-[//]: # (## 🚨 商用授权)
+Join the official qData QQ community for updates, technical support, and discussions.
 
-[//]: # ()
-[//]: # (qData-mdm 提供 **专业版** 与 **开源版** 两种形态，满足不同规模与场景下的用户需求。开源版提供系统管理、主数据建模、维护、采集、分发和质量治理等基础功能；专业版则面向更复杂的企业级场景，提供组合模型、订阅体系、实时分发、整改处理、复杂审批与更完整的治理保障。)
+👉 <a href="https://community.qdata.tech/discuss.html">Join the QQ community</a>
 
-[//]: # ()
-[//]: # (👉 如需 **开源版品牌授权** 或 **咨询专业版**，请点击按钮查看详情：[💼 了解授权详情]&#40;https://qdata.qiantong.tech/business/policy.html&#41;)
+## 🖼️ System Screenshots
 
-[//]: # (## 🚀 快速开始)
+The screenshots show the Simplified Chinese interface.
 
-[//]: # ()
-[//]: # (| 部署方式                    | 说明                                                              | 适用场景               |)
-
-[//]: # (| ----------------------- | --------------------------------------------------------------- | ------------------ |)
-
-[//]: # (| Docker Compose 体验部署 | 通过 `docker/` 目录中的编排文件快速启动数据库、Redis、Nginx 与后端服务，适合先体验主数据平台开源版功能。 | **初学者快速上手**、功能演示、测试环境  |)
-
-[//]: # (| 使用源代码本地启动  | 后端可通过 `mvn -pl qData-mdm-server -am spring-boot:run` 启动，前端在 `qData-mdm-ui` 下执行 `npm install` 和 `npm run dev`。  | **日常开发**、功能联调          |)
-
-[//]: # (| 自主部署（纯手工安装）  | 根据 `application-dev.yml` / `application-prod.yml`、数据库初始化脚本和前端构建产物，手工完成部署与参数配置。 | **生产环境**、大规模部署、个性化定制场景 |)
-
-[//]: # ()
-[//]: # (👉 查看完整的安装与部署资料时，建议结合 `docker/`、`qData-mdm-server/src/main/resources/`、`sql/` 目录与官方文档一并使用。)
-
-## 👥 QQ交流群
-欢迎加入 qData 官方 QQ 交流群，获取最新动态、技术支持与使用交流。
-
-👉 <a href="https://qdata.qiantong.tech/discuss.html">点击加入 QQ 交流群</a>
-
-<!-- [![加入QQ群](https://img.shields.io/badge/QQ群-814145903（已满）-blue.svg)](https://qm.qq.com/q/Qz5NJut20y)
-[![加入QQ群](https://img.shields.io/badge/QQ群-236734346-blue.svg)](https://qm.qq.com/q/Bpml33lTWK)
-[![加入QQ群](https://img.shields.io/badge/QQ群-675093323-blue.svg)](https://qm.qq.com/q/VIq5vtICo6) -->
-
-## 🖼️ 系统配图
 <table>
   <tr>
-    <td width="50%" valign="top"><img src=".gitee/screenshots/mdm-01.png" alt="系统界面截图 1" style="max-width:100%;"/></td>
-    <td width="50%" valign="top"><img src=".gitee/screenshots/mdm-02.png" alt="系统界面截图 2" style="max-width:100%;"/></td>
+    <td><img src="images/zh-CN/system/mdm-01.png" alt="Dashboard" width="400"/></td>
+    <td><img src="images/zh-CN/system/mdm-02.png" alt="Entity model list" width="400"/></td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><img src=".gitee/screenshots/mdm-03.png" alt="系统界面截图 3" style="max-width:100%;"/></td>
-    <td width="50%" valign="top"><img src=".gitee/screenshots/mdm-04.png" alt="系统界面截图 4" style="max-width:100%;"/></td>
+    <td><img src="images/zh-CN/system/mdm-03.png" alt="Entity model field configuration" width="400"/></td>
+    <td><img src="images/zh-CN/system/mdm-04.png" alt="Model relationship configuration" width="400"/></td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><img src=".gitee/screenshots/mdm-05.png" alt="系统界面截图 5" style="max-width:100%;"/></td>
-    <td width="50%" valign="top"><img src=".gitee/screenshots/mdm-06.png" alt="系统界面截图 6" style="max-width:100%;"/></td>
+    <td><img src="images/zh-CN/system/mdm-05.png" alt="Classification model configuration" width="400"/></td>
+    <td><img src="images/zh-CN/system/mdm-06.png" alt="Master data model relationship graph" width="400"/></td>
   </tr>
 </table>
