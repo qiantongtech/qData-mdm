@@ -1,0 +1,142 @@
+/*
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+/* Layout */
+import Layout from '@/layout/index.vue';
+
+// System module public routing
+export default [
+  {
+    path: '/redirect',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '/redirect/:path(.*)',
+        component: () => import('@/views/sys/redirect/index.vue')
+      }
+    ]
+  },
+  {
+    path: '/sso',
+    component: () => import('@/views/sys/sso'),
+    hidden: true
+  },
+  {
+    path: '/login',
+    component: () => import('@/views/sys/login.vue'),
+    hidden: true
+  },
+  {
+    path: '/register',
+    component: () => import('@/views/sys/register.vue'),
+    hidden: true
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    component: () => import('@/views/sys/error/404.vue'),
+    hidden: true
+  },
+  {
+    path: '/401',
+    component: () => import('@/views/sys/error/401.vue'),
+    hidden: true
+  },
+  {
+    path: '',
+    component: Layout,
+    redirect: '/index',
+    children: [
+      {
+        path: '/index',
+        component: () => import('@/views/sys/index.vue'),
+        name: 'Index',
+        meta: { title: '工作台', icon: 'dashboard', affix: true, lang: 'public.home' }
+      }
+    ]
+  },
+  {
+    path: '/developing',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/sys/developing/index.vue'),
+        name: 'Developing',
+        meta: { title: 'Feature Under Development', lang: 'public.featureDeveloping' }
+      }
+    ]
+  },
+  {
+    path: '/sys/system/bases/message',
+    component: Layout,
+    redirect: 'message',
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/sys/system/message/index.vue'),
+        name: 'Message',
+        meta: { title: 'My Messages', icon: 'message', lang: 'public.myMessages' },
+        hidden: true
+      }
+    ]
+  },
+  {
+    path: '/user',
+    component: Layout,
+    hidden: true,
+    redirect: 'noredirect',
+    children: [
+      {
+        path: 'profile',
+        component: () => import('@/views/sys/system/user/profile/index.vue'),
+        name: 'Profile',
+        meta: { title: 'Personal Center', icon: 'user', lang: 'public.personalCenter' }
+      }
+    ]
+  },
+  {
+    path: '/system',
+    component: Layout,
+    hidden: true,
+    redirect: 'noredirect',
+    children: [
+      {
+        path: 'user',
+        component: () => import('@/views/sys/system/user/index.vue'),
+        name: 'User',
+        meta: { title: 'User Management', icon: 'user', lang: 'public.userManagement' }
+      }
+    ]
+  },
+  {
+    path: '/sys/system/notice/detail',
+    component: Layout,
+    redirect: 'notice',
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/sys/system/notice/detail.vue'),
+        name: 'noticeDetail',
+        meta: { title: 'Notice Details', activeMenu: '/system/notice', lang: 'public.noticeDetail' }
+      }
+    ]
+  }
+];

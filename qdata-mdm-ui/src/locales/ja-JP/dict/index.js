@@ -1,0 +1,650 @@
+export default {
+  ai_model_platform: {
+    DeepSeek: 'DeepSeek',
+    TongYi: '通義千問'
+  },
+  att_perm_tier_type: {
+    1: '行政区画',
+    2: '流域機構'
+  },
+  att_rule_audit_q_dimension: {
+    1: '完全性',
+    2: '正確性',
+    3: '一貫性',
+    4: '規範性',
+    5: '適時性'
+  },
+  att_rule_audit_type: {
+    1: '文字検証',
+    2: '数値検証',
+    3: 'NULL値検証',
+    4: '長さ検証',
+    5: '重複チェック',
+    6: 'フォーマットチェック'
+  },
+  att_rule_clean_type: {
+    1: '文字列変換',
+    2: '数値処理',
+    3: '時間処理',
+    4: '重複値処理',
+    5: 'NULL値処理'
+  },
+  att_rule_level: {
+    1: 'フィールドレベル',
+    2: 'テーブルレベル'
+  },
+  auth_app_type: {
+    0: 'Web',
+    1: 'アプリ',
+    2: 'ミニプログラム'
+  },
+  auth_public: {
+    0: '非公開',
+    1: '公開'
+  },
+  column_type: {
+    ' DATETIME': ' DATETIME',
+    BIGINT: 'BIGINT',
+    CHAR: 'CHAR',
+    DATE: 'DATE',
+    DECIMAL: 'DECIMAL',
+    DOUBLE: 'DOUBLE',
+    FLOAT: 'FLOAT',
+    INTEGER: 'INTEGER',
+    NUMBER: 'NUMBER',
+    NUMERIC: 'NUMERIC',
+    TEXT: 'TEXT',
+    TIMESTAMP: 'TIMESTAMP',
+    TINYINT: 'TINYINT',
+    VARCHAR: 'VARCHAR',
+    VARCHAR2: 'VARCHAR2'
+  },
+  container_server_status: {
+    0: '無効',
+    1: '有効'
+  },
+  da_api_param_operator: {
+    1: '等しい',
+    2: '等しくない',
+    3: '全文あいまい検索',
+    4: '左あいまい検索',
+    5: '右あいまい検索',
+    6: 'より大きい',
+    7: '以上',
+    8: 'より小さい',
+    9: '以下',
+    10: 'NULLである',
+    11: 'NULLでない',
+    12: 'IN'
+  },
+  da_asset_api_column_type: {
+    Array: 'Array',
+    Boolean: 'Boolean',
+    Date: 'Date',
+    Double: 'Double',
+    Integer: 'Integer',
+    Long: 'Long',
+    Object: 'Object',
+    String: 'String'
+  },
+  da_asset_api_method: {
+    GET: 'GET',
+    POST: 'POST'
+  },
+  da_asset_apply_status: {
+    1: '審査待ち',
+    2: '却下',
+    3: '承認'
+  },
+  da_asset_geo_file_type: {
+    geojson: 'geojson'
+  },
+  da_asset_gis_type: {
+    1: 'WMTS'
+  },
+  da_asset_operate_status: {
+    1: '実行中',
+    2: '失敗',
+    3: '成功',
+    4: 'ロールバック失敗',
+    5: 'ロールバック成功'
+  },
+  da_asset_operate_type: {
+    1: '新規',
+    2: '変更'
+  },
+  da_asset_source: {
+    1: 'データディスカバリ',
+    2: 'データモデル'
+  },
+  da_asset_type: {
+    1: 'データベーステーブル',
+    2: '外部API',
+    3: '地理空間サービス',
+    4: 'ベクターデータ',
+    5: 'ビデオデータ',
+    6: 'ファイルデータ',
+    7: '非構造化データ'
+  },
+  da_asset_video_platform: {
+    1: 'Hikvision',
+    2: 'Dahua'
+  },
+  da_assets_audit_status1: {
+    1: '審査待ち',
+    2: '承認',
+    3: '却下'
+  },
+  da_assets_status: {
+    1: '未公開',
+    2: '公開済み'
+  },
+  da_discovery_table_change_flag: {
+    1: '追加',
+    2: '変更',
+    3: '削除',
+    4: '変更なし'
+  },
+  da_discovery_table_change_ignore_flag: {
+    0: 'いいえ',
+    1: '無視済み'
+  },
+  da_discovery_table_change_status: {
+    1: '未送信',
+    2: '送信済み'
+  },
+  da_discovery_table_log_status: {
+    1: '送信済み',
+    2: '取り消し'
+  },
+  da_discovery_task_log_status: {
+    1: '実行中',
+    2: '成功',
+    3: '失敗'
+  },
+  da_discovery_task_status: {
+    0: 'オンライン',
+    1: 'オフライン'
+  },
+  da_sensitive_level_rule: {
+    1: '全部',
+    2: '開始位置',
+    3: 'カスタム'
+  },
+  da_sensitive_status: {
+    0: 'オフライン',
+    1: 'オンライン'
+  },
+  datasource_type: {
+    DM8: 'DM8',
+    Doris: 'Doris',
+    FTP: 'FTP',
+    HDFS: 'HDFS',
+    Hive: 'Hive',
+    Kafka: 'Kafka',
+    Kingbase8: 'Kingbase8',
+    MySql: 'MySQL',
+    Oracle: 'Oracle',
+    Oracle11: 'Oracle11',
+    'OSS-ALIYUN': 'OSS（アリババクラウド）',
+    Phoenix: 'Phoenix',
+    PostgreSQL: 'PostgreSQL',
+    SQL_Server: 'SQL Server',
+    SQL_Server2008: 'SQL Server2008'
+  },
+  day_report: {
+    0: '出勤',
+    1: '休暇'
+  },
+  ddp_etl_node_type: {
+    DATAX: 'DATAX',
+    PROCEDURE: 'PROCEDURE',
+    SPARK: 'SPARK',
+    SQL: 'SQL',
+    SUB_PROCESS: 'SUB_PROCESS'
+  },
+  defect_status: {
+    1: '未処理',
+    2: '処理済み'
+  },
+  dm_data_layer_category: {
+    1: 'ソース層',
+    2: '共通層',
+    3: 'アプリケーション層'
+  },
+  dm_data_layer_specification_status: {
+    0: '閉じる',
+    1: '開く'
+  },
+  dp_build_log_build_status: {
+    1: '未作成',
+    2: '作成中',
+    3: '完了'
+  },
+  dp_data_elem_code_type: {
+    1: 'データ要素',
+    2: 'コードテーブル'
+  },
+  dp_data_elem_rules_type: {
+    1: '監査ルール',
+    2: 'クレンジングルール'
+  },
+  dp_document_standard_type: {
+    1: '標準',
+    2: '論理モデル',
+    3: 'データ要素',
+    4: 'コードテーブル'
+  },
+  dp_document_status: {
+    1: '草案',
+    2: '施行予定',
+    3: '現行',
+    4: '改定中',
+    5: '移行期間',
+    6: '廃止'
+  },
+  dp_document_type: {
+    1: '国家標準',
+    2: '業界標準',
+    3: '地方標準',
+    4: '団体標準'
+  },
+  dp_model_column_nullable_flag: {
+    0: 'いいえ',
+    1: 'はい'
+  },
+  dp_model_column_pk_flag: {
+    0: 'いいえ',
+    1: 'はい'
+  },
+  dp_model_create_type: {
+    1: '手動入力',
+    2: '実体化テーブルから生成'
+  },
+  dp_model_status: {
+    0: '無効',
+    1: '有効'
+  },
+  dp_template_build_log_build_status: {
+    1: '未作成',
+    2: '作成中',
+    3: '成功',
+    4: '失敗',
+    5: '既に存在'
+  },
+  dp_template_data_source_type: {
+    1: '手動入力',
+    2: '実体化テーブルから生成'
+  },
+  dp_template_online_status: {
+    0: '未公開',
+    1: '公開済み'
+  },
+  dpp_connection: {
+    0: 'データ接続',
+    1: 'アセットテーブル',
+    2: 'SQL'
+  },
+  dpp_etl_node_component_type: {
+    1: 'データベース入力',
+    2: 'EXCEL入力',
+    3: 'Kafka入力',
+    31: 'Sparkクレンジング',
+    51: 'SQL開発',
+    52: 'ストアドプロシージャ開発',
+    53: 'SparkSql開発',
+    71: 'サブタスク',
+    91: 'データベース出力'
+  },
+  dpp_etl_node_instance: {
+    0: '送信成功',
+    1: '実行中',
+    3: '一時停止',
+    5: '停止',
+    6: '失敗',
+    7: '成功',
+    8: 'フォールトトレランス必要',
+    9: 'Kill',
+    12: '遅延実行',
+    13: '強制成功',
+    17: 'ディスパッチ'
+  },
+  dpp_etl_node_priority: {
+    HIGH: '高',
+    HIGHEST: '最高',
+    LOW: '低',
+    LOWEST: '最低',
+    MEDIUM: '中'
+  },
+  dpp_etl_node_type: {
+    DATAX: '統合',
+    SPARK: '変換'
+  },
+  dpp_etl_sql_temp_type: {
+    2: 'DM',
+    3: 'ORACLE',
+    4: 'MYSQL',
+    5: 'KINGBASE',
+    6: 'Sqlerver',
+    7: 'PostgreSql',
+    8: 'Hive',
+    9: 'SparkSql',
+    10: 'FLINKストリーム',
+    11: 'FLINKバッチ'
+  },
+  dpp_etl_task_engine: {
+    0: 'Flink',
+    1: 'Spark'
+  },
+  dpp_etl_task_execution_type: {
+    PARALLEL: '並列',
+    SERIAL_DISCARD: '直列破棄',
+    SERIAL_PRIORITY: '直列優先',
+    SERIAL_WAIT: '直列待機'
+  },
+  dpp_etl_task_instance: {
+    0: '送信成功',
+    1: '実行中',
+    2: '一時停止準備',
+    3: '一時停止',
+    4: '停止準備',
+    5: '停止',
+    6: '失敗',
+    7: '成功',
+    12: '遅延実行',
+    14: '直列待機',
+    15: 'ロック準備',
+    16: 'ロック済み'
+  },
+  dpp_etl_task_instance_command_type: {
+    0: 'タスクフロー開始',
+    1: '現在のノードから実行',
+    2: 'フォールトトレラントワークフローの回復',
+    3: '一時停止プロセスの再開',
+    4: '失敗ノードから実行',
+    5: 'バックフィル',
+    6: 'スケジュール',
+    7: 'リラン',
+    8: '一時停止',
+    9: '停止',
+    10: '待機スレッドの再開'
+  },
+  dpp_etl_task_priority: {
+    HIGH: '高',
+    HIGHEST: '最高',
+    LOW: '低い',
+    LOWEST: '最低',
+    MEDIUM: '中等'
+  },
+  dpp_etl_task_process_type: {
+    0: 'バッチ処理',
+    1: 'ストリーム処理'
+  },
+  dpp_etl_task_status: {
+    0: '未公開',
+    1: '公開済み'
+  },
+  dpp_etl_task_type: {
+    DM8: 'DM8',
+    Fink: 'Fink',
+    Hive: 'Hive',
+    Kingbase8: 'Kingbase8',
+    Mysql: 'Mysql',
+    Oracle: 'Oracle',
+    Spark: 'Spark'
+  },
+  dpp_etl_type: {
+    3: 'データ開発タスク',
+    4: 'ジョブタスク'
+  },
+  ds_api_bas_info_api_method_type: {
+    1: 'GET',
+    2: 'POST'
+  },
+  ds_api_bas_info_api_service_type: {
+    1: '単一テーブルウィザード',
+    2: 'SQLスクリプト',
+    3: 'サードパーティ転送'
+  },
+  ds_api_bas_info_res_data_type: {
+    1: '詳細',
+    2: 'リスト',
+    3: 'ページネーション'
+  },
+  ds_api_limit_status: {
+    0: 'いいえ',
+    1: 'はい'
+  },
+  ds_api_log_res_status: {
+    0: '失敗',
+    1: '成功'
+  },
+  ds_api_log_status: {
+    0: '無効',
+    1: '有効'
+  },
+  ds_api_param_type: {
+    1: '文字列',
+    2: '整数',
+    3: '浮動小数点',
+    4: '日時',
+    5: 'コレクション'
+  },
+  ds_api_status: {
+    0: 'オフライン',
+    1: 'オンライン'
+  },
+  ds_api_transmit_type: {
+    1: 'APIアセットサービス',
+    2: '地理空間データ'
+  },
+  mc_collect_mode: {
+    1: '増分',
+    2: '全量',
+    3: 'CDCキャプチャ'
+  },
+  mc_collect_scope: {
+    1: 'カスタムデータベース',
+    2: 'データソース全体'
+  },
+  mc_task_instance_status: {
+    1: '実行中',
+    2: '失敗',
+    9: '成功'
+  },
+  message_category: {
+    0: '通知',
+    1: 'お知らせ',
+    2: '承認',
+    3: 'その他'
+  },
+  message_level: {
+    0: '重要',
+    1: '一般',
+    2: '警告'
+  },
+  meta_audit_status: {
+    1: '審査中',
+    2: '審査通過',
+    3: '審査却下',
+    4: '審査撤回',
+    5: '審査エラー'
+  },
+  meta_task_status: {
+    0: '未公開',
+    1: '公開済み'
+  },
+  project_priority: {
+    1: '低優先度（0-60）',
+    2: '低（60-80）',
+    3: '中（80-90）',
+    4: '高（90-100）'
+  },
+  project_severity: {
+    1: '提案',
+    2: 'ヒント',
+    3: '一般',
+    4: '重大',
+    5: '致命的'
+  },
+  project_status: {
+    0: '未開始',
+    1: 'アクティブ',
+    2: '完了'
+  },
+  quality_log_data_repair: {
+    0: '未修正',
+    1: '修正済み',
+    2: '無視済み'
+  },
+  quality_log_success_flag: {
+    0: '成功',
+    1: '失敗',
+    2: '進行中'
+  },
+  quality_warning_status: {
+    0: '一般',
+    1: '警告',
+    2: '重大'
+  },
+  report_status: {
+    0: '審査待ち',
+    1: '審査通過',
+    2: '却下'
+  },
+  rp_area_type: {
+    0: '行政区画',
+    1: '流域機構'
+  },
+  rp_dept_type: {
+    0: '機能部門',
+    1: '生産運営部門',
+    2: '技術研究開発部門',
+    3: '地域地理部門',
+    5: '専門サービス部門'
+  },
+  rp_doc_type: {
+    1: 'インフラ資料',
+    2: '監理資料',
+    3: '施工資料',
+    4: '竣工検収資料',
+    5: '基本地理情報データ',
+    6: '水文気象データ',
+    7: '水利工事データ',
+    8: '水質監視データ',
+    9: '水資源管理データ',
+    10: '社会経済データ',
+    11: '契約資料',
+    12: '書簡資料',
+    13: '品質・安全資料',
+    14: '技術・管理資料'
+  },
+  rp_status: {
+    0: '正常',
+    1: '無効'
+  },
+  story_status: {
+    0: '未開始',
+    1: '進行中',
+    2: 'デモ待ち',
+    3: '完了'
+  },
+  sys_boolean: {
+    false: 'いいえ',
+    true: 'はい'
+  },
+  sys_common_status: {
+    0: '成功',
+    1: '失敗'
+  },
+  sys_disable: {
+    0: '無効',
+    1: '有効'
+  },
+  sys_is_or_not: {
+    0: 'いいえ',
+    1: 'はい'
+  },
+  sys_job_group: {
+    DEFAULT: 'デフォルト',
+    SYSTEM: 'システム'
+  },
+  sys_job_status: {
+    0: '正常',
+    1: '一時停止'
+  },
+  sys_normal_disable: {
+    0: '正常',
+    1: '無効'
+  },
+  sys_notice_status: {
+    0: '正常',
+    1: '閉じる'
+  },
+  sys_notice_type: {
+    1: '通知',
+    2: 'お知らせ'
+  },
+  sys_oper_type: {
+    0: 'その他',
+    1: '新規',
+    2: '変更',
+    3: '削除',
+    4: '権限付与',
+    5: 'エクスポート',
+    6: 'インポート',
+    7: '強制ログアウト',
+    8: 'コード生成',
+    9: 'データクリア'
+  },
+  sys_show_hide: {
+    0: '表示',
+    1: '非表示'
+  },
+  sys_source_system_type: {
+    1: '業務システム',
+    2: 'データ収集層',
+    3: 'データ加工層',
+    4: 'データアプリケーション層',
+    5: 'データサービス（API）',
+    6: 'レポートアプリケーション'
+  },
+  sys_user_sex: {
+    0: '男性',
+    1: '女性',
+    2: '不明'
+  },
+  sys_valid: {
+    0: '無効',
+    1: '有効'
+  },
+  sys_yes_no: {
+    N: 'いいえ',
+    Y: 'はい'
+  },
+  table_name_case: {
+    1: '大文字',
+    2: '小文字'
+  },
+  table_type: {
+    1: '明細テーブル',
+    2: '集計テーブル',
+    3: 'ディメンションテーブル',
+    4: 'アプリケーションテーブル',
+    remark: {
+      1: '「測站基本属性表」や「ダム名簿」などの固定基本台帳情報を保存します。',
+      2: '「単回水位報告」や「機器アラームログ」などの未加工の生データ記録を保存します。',
+      3: '「測站日降水量表」や「月平均水位表」など、条件に基づいて集計された段階的結果。',
+      4: '「防汛大屏総合指標表」など、大画面やレポート表示に直接使用される最終データ。'
+    }
+  },
+  table_yes_no: {
+    0: 'いいえ',
+    1: 'はい'
+  },
+  task_status: {
+    0: '未完了',
+    1: '進行中',
+    2: '完了'
+  }
+};

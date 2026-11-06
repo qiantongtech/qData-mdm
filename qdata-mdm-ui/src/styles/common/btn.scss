@@ -1,0 +1,97 @@
+@mixin colorBtn($color) {
+  background: $color;
+
+  &:hover {
+    color: $color;
+
+    &:before,
+    &:after {
+      background: $color;
+    }
+  }
+}
+
+.blue-btn {
+  @include colorBtn(var(--qt-button-blue));
+}
+
+.light-blue-btn {
+  @include colorBtn(var(--qt-button-light-blue));
+}
+
+.red-btn {
+  @include colorBtn(var(--qt-button-red));
+}
+
+.pink-btn {
+  @include colorBtn(var(--qt-button-pink));
+}
+
+.green-btn {
+  @include colorBtn(var(--qt-button-green));
+}
+
+.tiffany-btn {
+  @include colorBtn(var(--qt-button-tiffany));
+}
+
+.yellow-btn {
+  @include colorBtn(var(--qt-button-yellow));
+}
+
+.pan-btn {
+  position: relative;
+  display: inline-block;
+  padding: 14px 36px;
+  border-radius: 8px;
+  border: none;
+  font-size: var(--qt-font-size-base);
+  color: var(--qt-text-inverse);
+  outline: none;
+  transition: 600ms ease all;
+
+  &:hover {
+    background: var(--qt-surface-background);
+
+    &:before,
+    &:after {
+      width: 100%;
+      transition: 600ms ease all;
+    }
+  }
+
+  &:before,
+  &:after {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 2px;
+    width: 0;
+    content: '';
+    transition: 400ms ease all;
+  }
+
+  &::after {
+    right: inherit;
+    top: inherit;
+    left: 0;
+    bottom: 0;
+  }
+}
+
+.custom-button {
+  display: inline-block;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 15px;
+  border-radius: var(--qt-radius-medium);
+  background: var(--qt-surface-background);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--qt-text-inverse);
+  text-align: center;
+  font-size: var(--qt-font-size-base);
+  cursor: pointer;
+  -webkit-appearance: none;
+  outline: 0;
+}

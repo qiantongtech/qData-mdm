@@ -1,0 +1,74 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package tech.qiantong.qdata.mdm.common.enums;
+
+import com.baomidou.mybatisplus.annotation.EnumValue;
+
+/**
+ *  define process and task priority
+ */
+public enum Priority {
+
+    /**
+     * 0 highest priority
+     * 1 higher priority
+     * 2 medium priority
+     * 3 lower priority
+     * 4 lowest priority
+     */
+    HIGHEST(0, "highest"),
+    HIGH(1, "high"),
+    MEDIUM(2, "medium"),
+    LOW(3, "low"),
+    LOWEST(4, "lowest");
+
+    Priority(int code, String descp) {
+        this.code = code;
+        this.descp = descp;
+    }
+
+    @EnumValue
+    private final int code;
+    private final String descp;
+
+    public int getCode() {
+        return code;
+    }
+
+    public String getDescp() {
+        return descp;
+    }
+}

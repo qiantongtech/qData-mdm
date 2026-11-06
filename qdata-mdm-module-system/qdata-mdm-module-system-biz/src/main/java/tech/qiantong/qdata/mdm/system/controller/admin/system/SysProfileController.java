@@ -1,0 +1,220 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.system.controller.admin.system;
+
+import cn.hutool.core.lang.UUID;
+import tech.qiantong.qdata.mdm.common.constant.Constants;
+import tech.qiantong.qdata.mdm.config.ServerConfig;
+import tech.qiantong.qdata.mdm.system.service.ISysUserService;
+import tech.qiantong.qdata.mdm.file.util.FileUploadUtil;
+import org.dromara.x.file.storage.core.FileInfo;
+import org.dromara.x.file.storage.core.FileStorageService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import tech.qiantong.qdata.mdm.common.annotation.Log;
+import tech.qiantong.qdata.mdm.common.core.controller.BaseController;
+import tech.qiantong.qdata.mdm.common.core.domain.AjaxResult;
+import tech.qiantong.qdata.mdm.common.core.domain.entity.SysUser;
+import tech.qiantong.qdata.mdm.common.core.domain.model.LoginUser;
+import tech.qiantong.qdata.mdm.common.enums.BusinessType;
+import tech.qiantong.qdata.mdm.common.utils.SecurityUtils;
+import tech.qiantong.qdata.mdm.common.utils.StringUtils;
+import tech.qiantong.qdata.mdm.security.web.service.TokenService;
+
+import javax.annotation.PostConstruct;
+
+/**
+ * 个人信息 业务处理
+ *
+ * @author qdata
+ */
+@RestController
+@RequestMapping("/system/user/profile")
+public class SysProfileController extends BaseController
+{
+    @Autowired
+    private ISysUserService userService;
+
+    @Autowired
+    private TokenService tokenService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
+
+    @Autowired
+    private ServerConfig serverConfig;
+
+    @Value("${dromara.x-file-storage.local-plus[0].storage-path}")
+    private String storagePath;
+
+    @PostConstruct
+    public void init() {
+        FileUploadUtil.init(fileStorageService, serverConfig, storagePath);
+    }
+
+    /**
+     * 个人信息
+     */
+    @GetMapping
+    public AjaxResult profile()
+    {
+        LoginUser loginUser = getLoginUser();
+        SysUser user = loginUser.getUser();
+        // 如果当前账户没有apitoken，自动更新
+        if (user.getApiToken() == null) {
+            updateToken();
+        }
+        AjaxResult ajax = AjaxResult.success(user);
+        ajax.put("roleGroup", userService.selectUserRoleGroup(loginUser.getUsername()));
+        ajax.put("postGroup", userService.selectUserPostGroup(loginUser.getUsername()));
+        return ajax;
+    }
+
+    /**
+     * 修改用户
+     */
+    @Log(title = "个人信息", businessType = BusinessType.UPDATE)
+    @PutMapping
+    public AjaxResult updateProfile(@RequestBody SysUser user)
+    {
+        LoginUser loginUser = getLoginUser();
+        SysUser currentUser = loginUser.getUser();
+        currentUser.setNickName(user.getNickName());
+        currentUser.setEmail(user.getEmail());
+        currentUser.setPhonenumber(user.getPhonenumber());
+        currentUser.setSex(user.getSex());
+        if (StringUtils.isNotEmpty(user.getPhonenumber()) && !userService.checkPhoneUnique(currentUser))
+        {
+            return error("修改用户'" + loginUser.getUsername() + "'失败，手机号码已存在");
+        }
+        if (StringUtils.isNotEmpty(user.getEmail()) && !userService.checkEmailUnique(currentUser))
+        {
+            return error("修改用户'" + loginUser.getUsername() + "'失败，邮箱账号已存在");
+        }
+        if (userService.updateUserProfile(currentUser) > 0)
+        {
+            // 更新缓存用户信息
+            tokenService.setLoginUser(loginUser);
+            return success();
+        }
+        return error("修改个人信息异常，请联系管理员");
+    }
+
+    /**
+     * 重置密码
+     */
+    @Log(title = "个人信息", businessType = BusinessType.UPDATE)
+    @PutMapping("/updatePwd")
+    public AjaxResult updatePwd(String oldPassword, String newPassword)
+    {
+        LoginUser loginUser = getLoginUser();
+        String userName = loginUser.getUsername();
+        String password = loginUser.getPassword();
+        if (!SecurityUtils.matchesPassword(oldPassword, password))
+        {
+            return error("修改密码失败，旧密码错误");
+        }
+        if (SecurityUtils.matchesPassword(newPassword, password))
+        {
+            return error("新密码不能与旧密码相同");
+        }
+        newPassword = SecurityUtils.encryptPassword(newPassword);
+        if (userService.resetUserPwd(userName, newPassword) > 0)
+        {
+            // 更新缓存用户密码
+            loginUser.getUser().setPassword(newPassword);
+            tokenService.setLoginUser(loginUser);
+            return success();
+        }
+        return error("修改密码异常，请联系管理员");
+    }
+
+    /**
+     * 头像上传
+     */
+    @Log(title = "用户头像", businessType = BusinessType.UPDATE)
+    @PostMapping("/avatar")
+    public AjaxResult avatar(@RequestParam("avatarfile") MultipartFile file) throws Exception
+    {
+        if (!file.isEmpty())
+        {
+            LoginUser loginUser = getLoginUser();
+            FileInfo fileInfo = FileUploadUtil.upload(file, "avatar/");
+            String avatar = Constants.RESOURCE_PREFIX + "/" + fileInfo.getPath() + fileInfo.getFilename();
+            if (userService.updateUserAvatar(loginUser.getUsername(), Constants.RESOURCE_PREFIX + "/" + fileInfo.getPath() + fileInfo.getFilename()))
+            {
+                AjaxResult ajax = AjaxResult.success();
+                ajax.put("imgUrl", avatar);
+                // 更新缓存用户头像
+                loginUser.getUser().setAvatar(avatar);
+                tokenService.setLoginUser(loginUser);
+                return ajax;
+            }
+        }
+        return error("上传图片异常，请联系管理员");
+    }
+
+    /**
+     * 系统配置图片上传（仅上传并返回，不修改用户信息）
+     */
+    @Log(title = "系统配置图片上传", businessType = BusinessType.UPDATE)
+    @PostMapping("/avatarSystemContent")
+    public AjaxResult avatarSystemContent(@RequestParam("avatarfile") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return error("文件为空");
+        }
+        try {
+            FileInfo fileInfo = FileUploadUtil.upload(file, "avatarSystemContent/");
+            String imgUrl = Constants.RESOURCE_PREFIX + "/" + fileInfo.getPath() + fileInfo.getFilename();
+
+            AjaxResult ajax = AjaxResult.success("上传成功");
+            ajax.put("imgUrl", imgUrl);
+            // 可选：返回更多信息
+            ajax.put("filename", fileInfo.getFilename());
+            ajax.put("path", fileInfo.getPath());
+            ajax.put("size", file.getSize());
+            ajax.put("contentType", file.getContentType());
+            return ajax;
+        } catch (Exception e) {
+            return error("上传图片异常，请联系管理员");
+        }
+    }
+
+    @Log(title = "更新apiToken", businessType = BusinessType.UPDATE)
+    @PutMapping("/updateApiToken")
+    public AjaxResult updateToken() {
+        LoginUser loginUser = getLoginUser();
+        String token = UUID.fastUUID().toString().replaceAll("-", "");
+        if (userService.resetUserApiToken(loginUser.getUsername(), token) > 0) {
+            // 更新缓存apiToken
+            loginUser.getUser().setApiToken(token);
+            tokenService.setLoginUser(loginUser);
+            return AjaxResult.success("操作成功", token);
+        }
+        return error("修改ApiToken异常，请联系管理员");
+    }
+}

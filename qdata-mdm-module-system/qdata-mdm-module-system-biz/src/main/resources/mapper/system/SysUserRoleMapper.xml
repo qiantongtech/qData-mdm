@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This document is part of the qData Master Data Platform (open source version).
+
+  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+  You may use qData for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.system.mapper.SysUserRoleMapper">
+
+	<resultMap type="SysUserRole" id="SysUserRoleResult">
+		<result property="userId"     column="user_id"      />
+		<result property="roleId"     column="role_id"      />
+	</resultMap>
+
+	<delete id="deleteUserRoleByUserId" parameterType="Long">
+		delete from system_user_role syr
+		where
+			syr.user_id=#{userId}
+			and exists (select 1 from system_role r where r.role_id=syr.role_id and r.del_flag = '0' and r.project_id = 0)
+	</delete>
+
+	<select id="countUserRoleByRoleId" resultType="Integer">
+	    select count(1) from system_user_role where role_id=#{roleId}
+	</select>
+
+	<select id="getUserRoleByRoleId" resultType="Integer" resultMap="SysUserRoleResult">
+	    select user_id,role_id from system_user_role where user_id=#{userId}
+	</select>
+
+	<select id="getByUserIdList" resultMap="SysUserRoleResult">
+	    select user_id,role_id from system_user_role where user_id in
+		<foreach collection="userIdList" item="item" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+	</select>
+
+	<delete id="deleteUserRole" parameterType="Long">
+ 		delete from system_user_role where user_id in
+ 		<foreach collection="array" item="userId" open="(" separator="," close=")">
+ 			#{userId}
+        </foreach>
+ 	</delete>
+
+	<delete id="deleteUserRoleList">
+		delete from system_user_role where user_id in
+		<foreach collection="sysUserRoleList" item="item" open="(" separator="," close=")">
+			#{item.userId}
+		</foreach>
+		AND role_id in
+		<foreach collection="sysUserRoleList" item="item" open="(" separator="," close=")">
+			#{item.roleId}
+		</foreach>
+ 	</delete>
+
+	<insert id="batchUserRole">
+		<choose>
+			<when test="@tech.qiantong.qdata.mdm.mybatis.config.MasterDataSourceConfig@getDatabaseType() == 'dm8'">
+				INSERT ALL
+				<foreach collection="list" item="item">
+					INTO system_user_role(user_id, role_id)
+					VALUES (#{item.userId}, #{item.roleId})
+				</foreach>
+				SELECT 1 FROM DUAL
+			</when>
+			<when test="@tech.qiantong.qdata.mdm.mybatis.config.MasterDataSourceConfig@getDatabaseType() == 'gbase8s'">
+				INSERT INTO system_user_role (user_id, role_id)
+				VALUES
+				<foreach collection="list" item="item" separator=",">
+					(#{item.userId}, #{item.roleId})
+				</foreach>
+			</when>
+			<otherwise>
+				INSERT INTO system_user_role (user_id, role_id)
+				VALUES
+				<foreach collection="list" item="item" separator=",">
+					(#{item.userId}, #{item.roleId})
+				</foreach>
+			</otherwise>
+		</choose>
+	</insert>
+
+	<delete id="deleteUserRoleInfo" parameterType="SysUserRole">
+		delete from system_user_role where user_id=#{userId} and role_id=#{roleId}
+	</delete>
+
+	<delete id="deleteUserRoleInfos">
+	    delete from system_user_role where role_id=#{roleId} and user_id in
+ 	    <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+ 	        #{userId}
+            </foreach>
+	</delete>
+</mapper>

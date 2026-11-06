@@ -1,0 +1,219 @@
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This document is part of the qData Master Data Platform (open source version).
+
+  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+  You may use qData for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<template>
+  <div class="user-info-head" @click="editCropper()">
+    <img
+      :src="options.img"
+      :title="td('sys.system.userAvatar.clickToUpload')"
+      class="img-circle img-lg"
+    />
+    <el-dialog
+      class="dialog"
+      draggable
+      :title="title"
+      v-model="open"
+      width="800px"
+      append-to-body
+      @opened="modalOpened"
+      @close="closeDialog"
+    >
+      <el-row>
+        <el-col :xs="24" :md="12" :style="{ height: '350px' }">
+          <vue-cropper
+            ref="cropper"
+            :img="options.img"
+            :info="true"
+            :autoCrop="options.autoCrop"
+            :autoCropWidth="options.autoCropWidth"
+            :autoCropHeight="options.autoCropHeight"
+            :fixedBox="options.fixedBox"
+            :outputType="options.outputType"
+            @realTime="realTime"
+            v-if="visible"
+          />
+        </el-col>
+        <el-col :xs="24" :md="12" :style="{ height: '350px' }">
+          <div class="avatar-upload-preview">
+            <img :src="options.previews.url" :style="options.previews.img" />
+          </div>
+        </el-col>
+      </el-row>
+      <br />
+      <el-row>
+        <el-col :lg="2" :md="2">
+          <el-upload
+            action="#"
+            :http-request="requestUpload"
+            :show-file-list="false"
+            :before-upload="beforeUpload"
+          >
+            <el-button>
+              {{ td('sys.system.userAvatar.select') }}
+              <el-icon class="el-icon--right">
+                <upload />
+              </el-icon>
+            </el-button>
+          </el-upload>
+        </el-col>
+        <el-col :lg="{ span: 1, offset: 2 }" :md="2">
+          <el-button icon="Plus" @click="changeScale(1)" />
+        </el-col>
+        <el-col :lg="{ span: 1, offset: 1 }" :md="2">
+          <el-button icon="Minus" @click="changeScale(-1)" />
+        </el-col>
+        <el-col :lg="{ span: 1, offset: 1 }" :md="2">
+          <el-button icon="RefreshLeft" @click="rotateLeft()" />
+        </el-col>
+        <el-col :lg="{ span: 1, offset: 1 }" :md="2">
+          <el-button icon="RefreshRight" @click="rotateRight()" />
+        </el-col>
+      </el-row>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="uploadImg()">{{
+            td('sys.system.userAvatar.submit')
+          }}</el-button>
+        </div>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import useDefaultLang from '@/composables/useDefaultLang';
+import 'vue-cropper/dist/index.css';
+import { VueCropper } from 'vue-cropper';
+import { uploadAvatar } from '@/api/system/system/user.js';
+import useUserStore from '@/store/system/user.js';
+
+const { td } = useDefaultLang();
+const userStore = useUserStore();
+const { proxy } = getCurrentInstance();
+
+const open = ref(false);
+const visible = ref(false);
+const title = ref(td('sys.system.userAvatar.editAvatar'));
+
+//Image cropping data
+const options = reactive({
+  img: userStore.avatar, // The address of the cropped image
+  autoCrop: true, // Whether to generate a screenshot box by default
+  autoCropWidth: 200, // Default generated screenshot frame width
+  autoCropHeight: 200, // Default generated screenshot frame height
+  fixedBox: true, // Fixed screenshot frame size, no change allowed
+  outputType: 'png', // By default, screenshots are generated in PNG format.
+  filename: 'avatar', // File name
+  previews: {} //Preview data
+});
+
+/** Edit avatar */
+function editCropper() {
+  open.value = true;
+}
+
+/** Callback when opening popup layer ends */
+function modalOpened() {
+  visible.value = true;
+}
+
+/** Override default upload behavior */
+function requestUpload() {}
+
+/** Rotate left */
+function rotateLeft() {
+  proxy.$refs.cropper.rotateLeft();
+}
+
+/** Rotate right */
+function rotateRight() {
+  proxy.$refs.cropper.rotateRight();
+}
+
+/** Image zoom */
+function changeScale(num) {
+  num = num || 1;
+  proxy.$refs.cropper.changeScale(num);
+}
+
+/** Upload preprocessing */
+function beforeUpload(file) {
+  if (file.type.indexOf('image/') == -1) {
+    proxy.$modal.msgError(td('sys.system.userAvatar.fileFormatError'));
+  } else {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      options.img = reader.result;
+      options.filename = file.name;
+    };
+  }
+}
+
+/** Upload pictures */
+function uploadImg() {
+  proxy.$refs.cropper.getCropBlob((data) => {
+    let formData = new FormData();
+    formData.append('avatarfile', data, options.filename);
+    uploadAvatar(formData).then((response) => {
+      open.value = false;
+      options.img = import.meta.env.VITE_APP_BASE_API + response.imgUrl;
+      userStore.avatar = options.img;
+      proxy.$modal.msgSuccess(td('common.message.editSuccess'));
+      visible.value = false;
+    });
+  });
+}
+
+/** Live preview */
+function realTime(data) {
+  options.previews = data;
+}
+
+/** close window */
+function closeDialog() {
+  options.img = userStore.avatar;
+  options.visible = false;
+}
+</script>
+
+<style lang="scss" scoped>
+.user-info-head {
+  position: relative;
+  display: inline-block;
+  height: 120px;
+}
+
+.user-info-head:hover:after {
+  content: '+';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  color: #eee;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 24px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  cursor: pointer;
+  line-height: 110px;
+  border-radius: 50%;
+}
+</style>

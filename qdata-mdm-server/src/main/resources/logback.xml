@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This document is part of the qData Master Data Platform (open source version).
+
+  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+  You may use qData for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<configuration>
+    <!-- Log storage path -->
+    <property name="log.path" value="logs" />
+    <!-- Log output format -->
+    <property name="log.pattern" value="%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - [%method,%line] - %msg%n" />
+
+    <!-- Console output -->
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${log.pattern}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- System log output -->
+    <appender name="file_info" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${log.path}/info.log</file>
+        <!-- Rotation policy: create log files based on time -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- Log file name format -->
+            <fileNamePattern>${log.path}/info.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- Log maximum history 60 days -->
+            <maxHistory>15</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${log.pattern}</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <!-- Filter level -->
+            <level>INFO</level>
+            <!-- Action on match: receive (record) -->
+            <onMatch>ACCEPT</onMatch>
+            <!-- Action in case of mismatch: reject (do not log) -->
+            <onMismatch>ACCEPT</onMismatch>
+        </filter>
+    </appender>
+
+    <appender name="file_warn" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${log.path}/warn.log</file>
+        <!-- Rotation policy: create log files based on time -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- Log file name format -->
+            <fileNamePattern>${log.path}/warn.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- Log maximum history 60 days -->
+            <maxHistory>15</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${log.pattern}</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <!-- Filter level -->
+            <level>WARN</level>
+            <!-- Action on match: receive (record) -->
+            <onMatch>ACCEPT</onMatch>
+            <!-- Action in case of mismatch: reject (do not log) -->
+            <onMismatch>DENY</onMismatch>
+        </filter>
+    </appender>
+
+    <appender name="file_error" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${log.path}/error.log</file>
+        <!-- Rotation policy: create log files based on time -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- Log file name format -->
+            <fileNamePattern>${log.path}/error.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- Log maximum history 60 days -->
+            <maxHistory>15</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${log.pattern}</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <!-- Filter level -->
+            <level>ERROR</level>
+            <!-- Action on match: receive (record) -->
+            <onMatch>ACCEPT</onMatch>
+            <!-- Action in case of mismatch: reject (do not log) -->
+            <onMismatch>DENY</onMismatch>
+        </filter>
+    </appender>
+
+    <!-- User access log output  -->
+    <appender name="user" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${log.path}/user.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- Rollback daily -->
+            <fileNamePattern>${log.path}/user.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- Log maximum history 60 days -->
+            <maxHistory>10</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${log.pattern}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- System module log level control  -->
+    <logger name="tech.qiantong.qMes" level="info" />
+    <!-- Spring log level control  -->
+    <logger name="org.springframework" level="warn" />
+
+    <root level="info">
+        <appender-ref ref="console" />
+    </root>
+
+    <!--System operation log-->
+    <root level="info">
+        <appender-ref ref="file_info" />
+        <appender-ref ref="file_warn" />
+        <appender-ref ref="file_error" />
+    </root>
+
+    <!--System user operation log-->
+    <logger name="user" level="info">
+        <appender-ref ref="user"/>
+    </logger>
+</configuration>

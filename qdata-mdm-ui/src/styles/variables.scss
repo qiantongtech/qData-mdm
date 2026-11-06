@@ -1,0 +1,137 @@
+/*
+ * qData-mdm 主数据平台全局样式变量。
+ *
+ * 变量名称与参考项目保持一致，取值沿用当前项目的样式及 Element Plus 配置。
+ * 基础变量和视觉变量统一在 :root 中维护。
+ */
+:root {
+  /* 字体、间距与布局。 */
+  --qt-font-family:
+    Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+  --qt-font-size-base: 14px;
+  --qt-font-weight-regular: 400;
+  --qt-font-weight-medium: 500;
+  --qt-font-weight-bold: 700;
+  --qt-space-1: 4px;
+  --qt-space-2: 8px;
+  --qt-space-3: 12px;
+  --qt-space-4: 16px;
+  --qt-space-5: 20px;
+  --qt-layout-max-width: none;
+
+  /* 项目默认主色及交互色阶，供现有颜色设置统一读取。 */
+  --qt-primary: #2666fb;
+  --qt-primary-rgb: 38, 102, 251;
+  --qt-primary-hover: #6793fc;
+  --qt-primary-active: #1e51c8;
+  --qt-primary-light: #e9effe;
+  --qt-primary-disabled: #92b2fd;
+  --qt-primary-indicator: var(--qt-primary);
+
+  /* 页面分区标题左侧标记沿用当前 h2-titles 的尺寸。 */
+  --qt-title-marker-width: 6px;
+  --qt-title-marker-height: 16px;
+  --qt-title-marker-radius: 3px;
+  --qt-title-marker-gap: 8px;
+  --qt-title-marker-color: var(--qt-primary);
+
+  /* 页面表面与文字。 */
+  --qt-page-background: #f0f2f5;
+  --qt-surface-background: #ffffff;
+  --qt-text-primary: #333333;
+  --qt-text-regular: #606266;
+  --qt-text-secondary: #909399;
+  --qt-text-inverse: #ffffff;
+  --qt-text-inverse-muted: #ffffffb3;
+
+  /* 状态色和登录页沿用当前项目的配色。 */
+  --qt-status-success: #67c23a;
+  --qt-status-warning: #e6a23c;
+  --qt-status-danger: #f56c6c;
+  --qt-status-info: #909399;
+  --qt-login-primary: #2666fb;
+  --qt-login-primary-rgb: 38, 102, 251;
+
+  /* 普通表单控件禁用态沿用当前 Element Plus 默认值。 */
+  --qt-control-disabled-background: #f5f7fa;
+  --qt-control-disabled-border: #e4e7ed;
+  --qt-control-disabled-text: #a8abb2;
+
+  /* 保留参考项目的组件变量名称，色阶使用当前项目的主色计算结果。 */
+  --qt-element-fixed-primary: var(--qt-primary);
+  --qt-element-fixed-primary-rgb: var(--qt-primary-rgb);
+  --qt-element-fixed-primary-light-3: var(--qt-primary-hover);
+  --qt-element-fixed-primary-light-5: var(--qt-primary-disabled);
+  --qt-element-fixed-primary-light-7: #bdd1fd;
+  --qt-element-fixed-primary-light-8: #d3e0fe;
+  --qt-element-fixed-primary-light-9: var(--qt-primary-light);
+  --qt-element-fixed-primary-dark-2: var(--qt-primary-active);
+
+  --qt-element-fixed-tag-background: var(--qt-element-fixed-primary-light-9);
+  --qt-element-fixed-tag-border: var(--qt-element-fixed-primary-light-8);
+  --qt-element-fixed-tag-text: var(--qt-primary);
+
+  /* 表格表面、行高及交互背景沿用 common/anivia.scss 和 QtTable。 */
+  --qt-element-fixed-table-header-background: #f1f1f5;
+  --qt-element-fixed-table-header-text: #666666;
+  --qt-element-fixed-table-row-hover-background: #f5f7fa;
+  --qt-element-fixed-table-border: #ebeef5;
+  --qt-element-fixed-table-text: #333333;
+  --qt-element-fixed-table-background: #ffffff;
+  --qt-element-fixed-qt-table-header-background: #f1f1f5;
+  --qt-element-fixed-qt-table-header-text: #666666;
+  --qt-table-row-hover-background: #e9f0ff;
+  --qt-table-row-current-background: #d8e0f7;
+  --qt-table-row-height: 42px;
+  --qt-element-fixed-dialog-background: #ffffff;
+  --qt-element-fixed-dialog-border: #dcdfe6;
+
+  /* 公共彩色按钮沿用原有调色板，与语义状态色分别维护。 */
+  --qt-button-blue: #324157;
+  --qt-button-light-blue: #3a71a8;
+  --qt-button-red: #c03639;
+  --qt-button-pink: #e65d6e;
+  --qt-button-green: #30b08f;
+  --qt-button-tiffany: #4ab7bd;
+  --qt-button-yellow: #fec171;
+
+  /* 当前侧栏使用深色菜单；顶部与侧栏均无背景图片。 */
+  --qt-sidebar-menu-background: #001529;
+  --qt-sidebar-menu-text: #ffffffb3;
+  --qt-sidebar-menu-icon: #ffffffb3;
+  --qt-sidebar-menu-light-background: var(--qt-surface-background);
+  --qt-sidebar-menu-light-text: rgba(0, 0, 0, 0.7);
+  --qt-sidebar-menu-hover-background: rgb(0, 17, 33);
+  --qt-sidebar-menu-light-hover-background: rgb(204, 204, 204);
+  --qt-sidebar-menu-sub-active-background: rgba(var(--qt-primary-rgb), 0);
+  --qt-sidebar-sub-menu-background: #0c2135;
+  --qt-navbar-background-image: none;
+  --qt-sidebar-background-image: none;
+
+  /* 空状态使用现有公共资源；未使用独立图片的区域保留 none。 */
+  --qt-empty-state-image: url('@/assets/common/images/empty-state/empty-nodata.png');
+  --qt-dpp-console-empty-state-image: none;
+  --qt-meta-empty-state-image: none;
+  --qt-sys-home-logout-icon: none;
+  --qt-da-asset-mart-header-background-image: none;
+
+  --qt-border-color: #dcdfe6;
+  --qt-divider-color: #dcdfe6;
+  --qt-control-height: 32px;
+  --qt-radius-small: 2px;
+  --qt-radius-medium: 4px;
+  --qt-motion-duration: 300ms;
+
+  /* Element Plus and application styles share the same palette. */
+  --el-color-primary: var(--qt-primary);
+  --el-color-primary-rgb: var(--qt-primary-rgb);
+  --el-color-primary-light-3: var(--qt-primary-hover);
+  --el-color-primary-light-5: var(--qt-primary-disabled);
+  --el-color-primary-light-7: var(--qt-element-fixed-primary-light-7);
+  --el-color-primary-light-8: var(--qt-element-fixed-primary-light-8);
+  --el-color-primary-light-9: var(--qt-primary-light);
+  --el-color-primary-dark-2: var(--qt-primary-active);
+  --el-disabled-bg-color: var(--qt-control-disabled-background);
+  --el-disabled-border-color: var(--qt-control-disabled-border);
+  --el-disabled-text-color: var(--qt-control-disabled-text);
+}

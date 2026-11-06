@@ -1,0 +1,156 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.common.database.dialect;
+
+import org.springframework.jdbc.core.RowMapper;
+import tech.qiantong.qdata.mdm.common.database.constants.DbQueryProperty;
+import tech.qiantong.qdata.mdm.common.database.core.DbColumn;
+import tech.qiantong.qdata.mdm.common.database.core.DbName;
+import tech.qiantong.qdata.mdm.common.database.core.DbTable;
+import tech.qiantong.qdata.mdm.common.database.exception.DataQueryException;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Unknown database dialect
+ *
+ * @author QianTongDC
+ * @date 2022-11-14
+ */
+public class UnknownDialect extends AbstractDbDialect {
+
+    @Override
+    public String columns(String dbName, String tableName) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String columns(DbQueryProperty dbQueryProperty, String tableName) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+    @Override
+    public String getPkColumnNames(DbQueryProperty dbQueryProperty, String tableName) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String generateCheckTableExistsSQL(DbQueryProperty dbQueryProperty, String tableName) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String buildTableNameByDbType(DbQueryProperty dbQueryProperty, String tableName) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public List<String> someInternalSqlGenerator(DbQueryProperty dbQueryProperty, String tableName, String tableComment, List<DbColumn> dbColumnList) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public List<String> validateSpecification(String tableName, String tableComment, List<DbColumn> columns) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String tables(String dbName) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+    @Override
+    public String tables(DbQueryProperty dbQueryProperty) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String buildQuerySqlFields(List<DbColumn> columns, String tableName, DbQueryProperty dbQueryProperty) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String buildPaginationSql(String sql, long offset, long count) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String count(String sql) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String countNew(String sql, Map<String, Object> params) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String getDataStorageSize(String dbName) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String getDbName() {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String getDbName(DbName dbName) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String getInsertOrUpdateSql(String tableName, String where, String tableFieldName, String tableFieldValue, String setValue) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public RowMapper<DbColumn> columnMapper() {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public RowMapper<DbTable> tableMapper() {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String dropColumn(DbQueryProperty dbQueryProperty, String tableName, String colName) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public List<String> modifyColumn(DbQueryProperty dbQueryProperty, String tableName, DbColumn column) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public List<String> addColumn(DbQueryProperty dbQueryProperty, String tableName, DbColumn column) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public List<String> updateColKey(DbQueryProperty dbQueryProperty, String tableName, List<DbColumn> colKeyDbColumnList) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+
+    @Override
+    public String getColumnType(DbColumn column) {
+        throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+    }
+}

@@ -1,0 +1,77 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.common.utils.file;
+
+/**
+ * Media type tools
+ *
+ * @author qdata
+ */
+public class MimeTypeUtils
+{
+    public static final String IMAGE_PNG = "image/png";
+
+    public static final String IMAGE_JPG = "image/jpg";
+
+    public static final String IMAGE_JPEG = "image/jpeg";
+
+    public static final String IMAGE_BMP = "image/bmp";
+
+    public static final String IMAGE_GIF = "image/gif";
+
+    public static final String[] IMAGE_EXTENSION = { "bmp", "gif", "jpg", "jpeg", "png" };
+
+    public static final String[] FLASH_EXTENSION = { "swf", "flv" };
+
+    public static final String[] MEDIA_EXTENSION = { "swf", "flv", "mp3", "wav", "wma", "wmv", "mid", "avi", "mpg",
+            "asf", "rm", "rmvb" };
+
+    public static final String[] VIDEO_EXTENSION = { "mp4", "avi", "rmvb" };
+
+    public static final String[] DEFAULT_ALLOWED_EXTENSION = {
+            // Pictures
+            "bmp", "gif", "jpg", "jpeg", "png",
+            // word excel powerpoint
+            "doc", "docx", "xls", "xlsx", "ppt", "pptx", "html", "htm", "txt",
+            // Compressed file
+            "rar", "zip", "gz", "bz2",
+            // Video format
+            "mp4", "avi", "rmvb",
+            // pdf
+            "pdf" };
+
+    public static String getExtension(String prefix)
+    {
+        switch (prefix)
+        {
+            case IMAGE_PNG:
+                return "png";
+            case IMAGE_JPG:
+                return "jpg";
+            case IMAGE_JPEG:
+                return "jpeg";
+            case IMAGE_BMP:
+                return "bmp";
+            case IMAGE_GIF:
+                return "gif";
+            default:
+                return "";
+        }
+    }
+}

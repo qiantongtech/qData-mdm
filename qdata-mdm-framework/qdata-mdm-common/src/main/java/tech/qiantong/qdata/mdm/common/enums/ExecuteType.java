@@ -1,0 +1,90 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package tech.qiantong.qdata.mdm.common.enums;
+
+/**
+ * execute type
+ */
+public enum ExecuteType {
+
+    /**
+     * operation type
+     * 1 repeat running
+     * 2 resume pause
+     * 3 resume failure
+     * 4 stop
+     * 5 pause
+     */
+    NONE(0, "NONE"),
+
+    // ******************************* Workflow ***************************
+    REPEAT_RUNNING(1, "REPEAT_RUNNING"),
+    RECOVER_SUSPENDED_PROCESS(2, "RECOVER_SUSPENDED_PROCESS"),
+    START_FAILURE_TASK_PROCESS(3, "START_FAILURE_TASK_PROCESS"),
+    STOP(4, "STOP"),
+    PAUSE(5, "PAUSE"),
+    // ******************************* Workflow ***************************
+
+    // ******************************* Task *******************************
+    EXECUTE_TASK(6, "EXECUTE_TASK"),
+    // ******************************* Task *******************************
+    ;
+
+    private final int code;
+    private final String desc;
+
+    ExecuteType(int code, String desc) {
+        this.code = code;
+        this.desc = desc;
+    }
+
+    public int getCode() {
+        return code;
+    }
+
+    public String getDesc() {
+        return desc;
+    }
+
+    public static ExecuteType getEnum(int value) {
+        for (ExecuteType e : ExecuteType.values()) {
+            if (e.getCode() == value) {
+                return e;
+            }
+        }
+        return NONE;
+    }
+}

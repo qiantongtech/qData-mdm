@@ -1,0 +1,116 @@
+# Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+#
+# This document is part of the qData Master Data Platform (open source version).
+#
+# qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+# You may use qData for commercial purposes, but you may not remove, hide,
+# modify, or replace the qData master data platform logo, copyright notices, license notices,
+# or attribution information without a separate commercial license.
+#
+# White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+# another product requires separate commercial authorization from
+# Jiangsu Qiantong Technology Co., Ltd.
+#
+# Business License: https://community.qdata.tech/business/policy.html
+# See the LICENSE file in the project root for full license information.
+
+datasource:
+  type: mysql
+
+# Spring configuration
+spring:
+  # Redis configuration
+  redis:
+    # Address
+    host: 127.0.0.1
+    # Port, defaults to 6379
+    port: 6379
+    # Database index
+    database: 0
+    # Password
+    password:
+    # Connection timeout
+    timeout: 10s
+    lettuce:
+      pool:
+        # Minimum idle connections in the connection pool
+        min-idle: 0
+        # Maximum idle connections in the connection pool
+        max-idle: 8
+        # Maximum database connections in the connection pool
+        max-active: 8
+        # Maximum blocking wait time for the connection pool (use a negative value for no limit)
+        max-wait: -1ms
+  datasource:
+    druid:
+      stat-view-servlet:
+        # Whether to enable Druid monitoring statistics
+        enabled: false
+        # Username for accessing the Druid monitoring page
+        loginUsername: qdata
+        # Password for accessing the Druid monitoring page
+        loginPassword: 123456
+    dynamic:
+      druid:
+        # Number of connections created when the connection pool is initialized
+        initial-size: 5
+        # Minimum idle connections in the connection pool
+        min-idle: 5
+        # Maximum active connections in the connection pool
+        maxActive: 20
+        # Maximum time to wait for a connection from the pool (milliseconds)
+        maxWait: 60000
+        # Database connection timeout (milliseconds)
+        connectTimeout: 30000
+        # Socket timeout (milliseconds)
+        socketTimeout: 60000
+        # Idle connection check interval (milliseconds)
+        timeBetweenEvictionRunsMillis: 60000
+        # Minimum lifetime of idle connections (milliseconds)
+        minEvictableIdleTimeMillis: 300000
+        # SQL statement used to validate connections
+        validationQuery: SELECT 1 FROM DUAL
+        # Whether to validate connections while idle
+        testWhileIdle: true
+        # Whether to validate connections when borrowed
+        testOnBorrow: false
+        # Whether to validate connections when returned
+        testOnReturn: false
+        # Whether to enable the PreparedStatement cache for the connection pool
+        poolPreparedStatements: true
+        # Maximum PreparedStatement cache size per connection pool
+        maxPoolPreparedStatementPerConnectionSize: 20
+        # Configure Druid filters
+        filters: stat,slf4j
+        # Druid connection properties
+        connectionProperties: druid.stat.mergeSql\=true;druid.stat.slowSqlMillis\=5000
+      datasource:
+        # Primary database data source configuration
+        master:
+          # Dynamically loaded configuration properties
+          driver-class-name: ${${datasource.type}.driver-class-name}
+          url: ${${datasource.type}.url}
+          username: ${${datasource.type}.username}
+          password: ${${datasource.type}.password}
+
+# MySQL configuration
+mysql:
+  # JDBC driver class name
+  driver-class-name: com.mysql.cj.jdbc.Driver
+  # Primary database JDBC connection URL
+  url: jdbc:mysql://127.0.0.1:3306/qdata_mdm?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+  # Primary database username
+  username: root
+  # Primary database password
+  password: password
+
+# DM configuration
+dm8:
+  # JDBC driver class name
+  driver-class-name: dm.jdbc.driver.DmDriver
+  # Primary database JDBC connection URL
+  url: jdbc:dm://127.0.0.1:5236/qdata_mdm?STU&zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=utf-8&schema=root&serverTimezone=Asia/Shanghai
+  # Primary database username
+  username: root
+  # Primary database password
+  password: password

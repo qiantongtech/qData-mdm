@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This document is part of the qData Master Data Platform (open source version).
+
+  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+  You may use qData for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>qdata-mdm-framework</artifactId>
+        <groupId>tech.qiantong</groupId>
+        <version>${qdata-mdm.version}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>qdata-mdm-file</artifactId>
+
+    <description>
+        File module
+    </description>
+
+    <dependencies>
+        <!-- General tools-->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-common</artifactId>
+        </dependency>
+
+        <!-- File storage https://gitee.com/dromara/x-file-storage-->
+        <dependency>
+            <groupId>org.dromara.x-file-storage</groupId>
+            <artifactId>x-file-storage-spring</artifactId>
+            <version>2.2.1</version>
+        </dependency>
+
+        <!-- Framework configuration module -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-config</artifactId>
+            <version>${qdata-mdm.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- Alibaba Cloud OSS -->
+        <dependency>
+            <groupId>com.aliyun.oss</groupId>
+            <artifactId>aliyun-sdk-oss</artifactId>
+            <version>3.16.1</version>
+        </dependency>
+
+    </dependencies>
+
+</project>

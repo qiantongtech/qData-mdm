@@ -1,0 +1,84 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.common.database.constants;
+
+/**
+ * <P>
+ * Purpose: Interpretation type
+ * </p>
+ *
+ * @author: FXB
+ * @create: 2024-07-31 15:56
+ **/
+public enum InterpretationType {
+
+    GE("1", "大于等于", ">="),
+    GT("2", "大于", ">"),
+    LE("3", "小于等于", "<="),
+    LT("4", "小于", "<"),
+    EQ("5", "等于", "="),
+    NE("6", "不等于", "!="),
+    SCOPE("9", "范围", ""),
+    OUTSIDE_RANGE("10", "范围外", "");
+
+    /**
+     * Value
+     */
+    private final String value;
+
+    /**
+     * Description
+     */
+    private final String desc;
+
+    /**
+     * url
+     */
+    private final String symbol;
+
+    public String getValue() {
+        return this.value;
+    }
+
+    public String getDesc() {
+        return this.desc;
+    }
+
+    public String getSymbol() {
+        return this.symbol;
+    }
+
+    InterpretationType(String value, String desc, String symbol) {
+        this.value = value;
+        this.desc = desc;
+        this.symbol = symbol;
+    }
+
+    /**
+     * Get interpretation type
+     */
+    public static InterpretationType getInterpretationType(String dbType) {
+        for (InterpretationType type : InterpretationType.values()) {
+            if (type.value.equals(dbType)) {
+                return type;
+            }
+        }
+        return null;
+    }
+}

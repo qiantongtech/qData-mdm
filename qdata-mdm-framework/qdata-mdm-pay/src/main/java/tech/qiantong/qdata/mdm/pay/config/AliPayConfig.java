@@ -1,0 +1,55 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.pay.config;
+
+import com.alipay.easysdk.factory.Factory;
+import com.alipay.easysdk.kernel.Config;
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.PostConstruct;
+
+@Data
+@Component
+@ConfigurationProperties(prefix = "payment.alipay")
+public class AliPayConfig {
+    private String appId;
+    private String appPrivateKey;
+    private String alipayPublicKey;
+    private String notifyUrl;
+    private String returnUrl;
+    private String gatewayHost;
+
+    @PostConstruct
+    public void init() {
+        // 设置参数（全局只需设置一次）
+        Config config = new Config();
+        config.protocol = "https";
+        config.gatewayHost = this.gatewayHost;
+        config.signType = "RSA2";
+        config.appId = this.appId;
+        config.merchantPrivateKey = this.appPrivateKey;
+        config.alipayPublicKey = this.alipayPublicKey;
+        config.notifyUrl = this.notifyUrl;
+        Factory.setOptions(config);
+        org.slf4j.LoggerFactory.getLogger(AliPayConfig.class).info("Alipay SDK initialized");
+    }
+
+}

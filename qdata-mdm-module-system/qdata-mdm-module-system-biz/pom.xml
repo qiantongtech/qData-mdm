@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This document is part of the qData Master Data Platform (open source version).
+
+  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+  You may use qData for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>qdata-mdm-module-system</artifactId>
+        <groupId>tech.qiantong</groupId>
+        <version>${qdata-mdm.version}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>qdata-mdm-module-system-biz</artifactId>
+
+    <description>
+        System module
+    </description>
+
+    <dependencies>
+        <!-- Core module configuration-->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-config</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- system module websocket-->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-websocket</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- system module qdata-mdm-security -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-security</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- system module mybatis -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-mybatis</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- system module redis -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-redis</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+<!-- ======================================================================== -->
+        <!-- system API module -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-system-api</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- Scheduled tasks-->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-quartz</artifactId>
+        </dependency>
+
+        <!-- Code generation-->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-generator</artifactId>
+        </dependency>
+
+        <!-- Common utilities-->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-common</artifactId>
+        </dependency>
+
+        <!-- File upload-->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-file</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- pay-->
+<!--        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-pay</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>-->
+
+        <!-- auth-->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-auth</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- swagger3-->
+<!--        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-boot-starter</artifactId>
+        </dependency>-->
+
+        <!-- Avoid type conversion errors on the Swagger page by excluding the 3.0.0 dependency and adding version 1.6.2 explicitly -->
+<!--        <dependency>
+            <groupId>io.swagger</groupId>
+            <artifactId>swagger-models</artifactId>
+            <version>1.6.2</version>
+        </dependency>-->
+    </dependencies>
+
+</project>

@@ -1,0 +1,385 @@
+// ==========================================
+// SCSS 变量定义（颜色 / 字体 / 尺寸 / 间距）
+// ==========================================
+
+// 颜色变量
+$bg-white: #ffffff;
+$bg-gray: #f0f2f5;
+$primary-color: var(--el-color-primary, #358cf3);
+$primary-color-light: var(--qt-primary-light);
+$text-primary: rgba(0, 0, 0, 0.85);
+$text-secondary: #999;
+$text-placeholder: #aaa;
+$border-gray: #ccc;
+$border-gray-light: #d6dae1;
+$icon-selected: #358cf3;
+$danger-color: var(--el-color-danger);
+
+// 字体变量
+$font-family: PingFangSC-Regular, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+$font-size-base: 14px;
+$font-size-sm: 12px;
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+
+// 尺寸变量
+$aside-width-min: 0;
+$aside-padding-y: 2px;
+$tree-padding: 15px;
+$node-padding-x: 12px;
+$node-padding-right: 36px;
+$icon-size-sm: 14px;
+$icon-size-base: 16px;
+$icon-size-md: 18px;
+$icon-size-lg: 28px;
+$collapse-icon-size: 28px;
+$resize-bar-width: 15px;
+$resize-handle-height: 50px;
+$resize-handle-width: 5px;
+
+// 间距变量
+$spacing-xs: 2px;
+
+// ==========================================
+// 基础布局样式
+// ==========================================
+.left-pane {
+  background-color: $bg-white;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin-bottom: 0px;
+  height: var(--qt-wrap-height);
+}
+
+// 保留类名以兼容可能的外部样式覆盖，但外观与 .left-pane 保持一致
+.el-aside {
+  background-color: $bg-white;
+}
+
+.left-tree {
+  padding: 0 10px 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  box-shadow: none !important;
+  background-color: $bg-white;
+  border-radius: 0;
+  width: auto;
+  height: auto;
+}
+
+.left-tree::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.dept-tree {
+  min-width: 100%;
+  background: transparent;
+  color: #333333;
+}
+.dept-tree :deep(.el-tree-node__content:hover) {
+  background: #f5f7fa;
+}
+.dept-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
+  border: none;
+  background: var(--qt-primary-light);
+}
+.dept-tree :deep(.el-tree-node.is-current > .el-tree-node__content .treelabel) {
+  color: var(--el-color-primary);
+}
+:deep(.dept-tree) {
+  .el-tree-node__expand-icon {
+    width: 14px;
+    height: 24px !important;
+    line-height: 24px !important;
+    padding: 0 4px 0 0;
+    color: transparent;
+    transform: none !important;
+    position: relative;
+    flex-shrink: 0;
+
+    svg {
+      display: none;
+    }
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 4px;
+      border-right: 1.3px solid #333;
+      border-bottom: 1.3px solid #333;
+      transform: translate(-60%, -50%) rotate(-45deg);
+      transition: transform 0.16s ease;
+    }
+
+    &.expanded::before {
+      transform: translate(-50%, -65%) rotate(45deg);
+    }
+
+    &.is-leaf::before {
+      display: none;
+    }
+  }
+}
+
+// ==========================================
+// 节点内容样式
+// ==========================================
+.custom-tree-node {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  padding-right: 12px;
+  line-height: 1;
+}
+
+.node-icon-wrapper {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+}
+
+.node-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  display: block;
+  object-fit: contain;
+}
+
+.colorxz {
+  color: $icon-selected;
+}
+
+.colorwxz {
+  color: #2665fb;
+}
+
+.treelabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'PingFang SC', sans-serif;
+  font-size: 14px;
+  line-height: 18px;
+  color: #333333;
+}
+
+.level1-icon {
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  cursor: pointer;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+// ==========================================
+// 操作下拉菜单
+// ==========================================
+.operation-trigger,
+.node-more {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  margin-left: auto;
+  padding: 2px 4px;
+  border-radius: 3px;
+  border: 0;
+  background: transparent;
+  color: #687385;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  pointer-events: none;
+
+  &.is-active,
+  &:hover {
+    opacity: 1;
+    pointer-events: auto;
+    background-color: rgba(0, 0, 0, 0.04);
+  }
+}
+
+.custom-tree-node:hover .operation-trigger,
+.custom-tree-node:hover .node-more {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.action-icon {
+  font-size: 16px;
+  color: #8c8c8c;
+  transform: rotate(90deg);
+  display: inline-block;
+}
+
+.dept-tree-dropdown {
+  .dept-tree-menu-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+    vertical-align: middle;
+    display: inline-block;
+  }
+  .delete-item {
+    color: $danger-color;
+  }
+}
+
+// ==========================================
+// 拖拽栏 & 折叠/展开
+// ==========================================
+.resize-bar {
+  height: var(--qt-wrap-height);
+  cursor: ew-resize;
+  background-color: $bg-gray;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: $resize-bar-width;
+  flex-shrink: 0;
+}
+
+.resize-handle-sx {
+  width: $resize-bar-width;
+  text-align: center;
+  position: relative;
+}
+
+.zjsx {
+  display: none;
+  width: $resize-handle-width;
+  height: $resize-handle-height;
+  border-left: 1px solid $border-gray;
+  border-right: 1px solid $border-gray;
+}
+
+.collapse-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: $collapse-icon-size;
+  color: #aaa;
+  cursor: pointer;
+  z-index: 10;
+  padding: 5px;
+}
+
+// ==========================================
+// 搜索框样式
+// ==========================================
+.search-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.head-container {
+  position: relative;
+  height: 32px !important;
+  box-shadow: none !important;
+  padding: 0;
+  margin-bottom: 16px;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.tree-container,
+.tree-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 100px;
+}
+
+.filter-tree {
+  width: auto;
+  margin: 10px 10px 15px !important;
+}
+:deep(.filter-tree .el-input__prefix) {
+  // color: $primary-color;
+}
+
+// ==========================================
+// el-tree 选中 / 展开样式覆盖
+// ==========================================
+
+// ==========================================
+// 右键菜单样式
+// ==========================================
+.context-menu,
+.node-action-menu {
+  position: fixed;
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  z-index: 3000;
+  user-select: none;
+  width: 148px;
+  padding: 4px 0;
+  border: 1px solid #dcdfe6;
+  box-sizing: border-box;
+
+  ul {
+    margin: 0;
+    padding: 8px 0;
+    list-style: none;
+  }
+
+  li,
+  .node-action-menu-item {
+    padding: 6px 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 14px;
+    color: $text-primary;
+    width: 100%;
+    height: 34px;
+    padding: 0 12px;
+    border: 0;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+
+    img {
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  li:hover,
+  .node-action-menu-item:hover {
+    background-color: #f0f0f0;
+    color: #2f6df6;
+  }
+}

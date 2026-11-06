@@ -1,0 +1,74 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.common.utils.http;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.servlet.ServletRequest;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+
+/**
+ * Universal http tool package
+ *
+ * @author qdata
+ */
+public class HttpHelper
+{
+    private static final Logger LOGGER = LoggerFactory.getLogger(HttpHelper.class);
+
+    public static String getBodyString(ServletRequest request)
+    {
+        StringBuilder sb = new StringBuilder();
+        BufferedReader reader = null;
+        try (InputStream inputStream = request.getInputStream())
+        {
+            reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+            String line = "";
+            while ((line = reader.readLine()) != null)
+            {
+                sb.append(line);
+            }
+        }
+        catch (IOException e)
+        {
+            LOGGER.warn("getBodyString encountered an error");
+        }
+        finally
+        {
+            if (reader != null)
+            {
+                try
+                {
+                    reader.close();
+                }
+                catch (IOException e)
+                {
+                    LOGGER.error(ExceptionUtils.getMessage(e));
+                }
+            }
+        }
+        return sb.toString();
+    }
+}

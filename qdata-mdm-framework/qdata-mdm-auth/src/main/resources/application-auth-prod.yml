@@ -1,0 +1,62 @@
+# Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+#
+# This document is part of the qData Master Data Platform (open source version).
+#
+# qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+# You may use qData for commercial purposes, but you may not remove, hide,
+# modify, or replace the qData master data platform logo, copyright notices, license notices,
+# or attribution information without a separate commercial license.
+#
+# White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+# another product requires separate commercial authorization from
+# Jiangsu Qiantong Technology Co., Ltd.
+#
+# Business License: https://community.qdata.tech/business/policy.html
+# See the LICENSE file in the project root for full license information.
+
+sa-token:
+  # token name (also cookie name)
+  token-name: qdataMdmToken
+  # Token validity period (unit: seconds) Default is 30 days, -1 means permanent validity
+  timeout: 2592000
+  # The minimum active frequency of the token (unit: seconds). If the token does not access the system for more than this time, it will be frozen. The default value -1 means no limit and will never be frozen.
+  active-timeout: -1
+  # Whether to allow the same account to be logged in from multiple places at the same time (when true, login is allowed at the same time, when false, new logins crowd out old logins)
+  is-concurrent: true
+  # When multiple people log in to the same account, whether to share a token (when true, all logins share a token, when false, a new token is created for each login)
+  is-share: true
+  # token style (default possible values: uuid, simple-uuid, random-32, random-64, random-128, tik)
+  token-style: uuid
+  # Whether to output operation logs
+  is-log: true
+  # oauth2 service configuration
+  oauth2-server:
+    # Whether to open the mode: Authorization Code (Authorization Code)
+    enable-authorization-code: true
+    # Whether to open mode: Implicit (Implicit)
+    enable-implicit: true
+    # Whether to open mode: Password (Password)
+    enable-password: true
+    # Whether to open mode: Credentials (Client Credentials)
+    enable-client-credentials: true
+    # Whether to generate a new Refresh-Token every time Refresh-Token refreshes Access-Token
+    is-new-refresh: false
+    # Code authorization code storage time (unit: seconds) Default is five minutes
+    code-timeout: 300
+    # Access-Token storage time (unit: seconds) Default is two hours
+    access-token-timeout: 7200
+    # Refresh-Token storage time (unit: seconds) Default 30 days
+    refresh-token-timeout: 2592000
+    # Client-Token storage time (unit: seconds) Default is two hours
+    client-token-timeout: 7200
+    # Lower-Client-Token storage time (unit: seconds) The default is -1, which means extending the validity period of Client-Token
+    lower-client-token-timeout: -1
+    # Specify advanced permissions, separate multiple ones with commas
+    higher-scope: admin
+    # Specify low-level permissions, separate multiple ones with commas
+    lower-scope: userinfo
+    # Whether mode 4 returns the AccessToken field
+    mode4-return-access-token: false
+    # Whether to hide default status fields (code, msg, data) in return values
+    hide-status-field: false
+

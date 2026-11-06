@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This document is part of the qData Master Data Platform (open source version).
+
+  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+  You may use qData for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>qData-mdm</artifactId>
+        <groupId>tech.qiantong</groupId>
+        <version>${qdata-mdm.version}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <packaging>jar</packaging>
+    <artifactId>qdata-mdm-server</artifactId>
+
+    <description>
+        Backend administration service entry point
+    </description>
+
+    <dependencies>
+        <!-- System module -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-system-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+
+        <!-- spring-boot-devtools -->
+<!--        <dependency>-->
+<!--            <groupId>org.springframework.boot</groupId>-->
+<!--            <artifactId>spring-boot-devtools</artifactId>-->
+<!-- <optional>true</optional> <!– Indicates that dependencies will not be passed –>-->
+<!--        </dependency>-->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- maven-compiler-plugin configuration -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <annotationProcessorPaths>
+                        <!-- Introduce mapstruct-processor -->
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>1.5.5.Final</version>
+                        </path>
+                        <!-- Introduce lombok-processor -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.36</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!-- Spring Boot Maven plugin configuration -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>2.5.15</version>
+                <configuration>
+                    <mainClass>tech.qiantong.qdata.mdm.server.QDataMdmApplication</mainClass>
+                    <fork>true</fork> <!-- Without this configuration, devtools will not take effect -->
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Other required plug-in configurations, such as maven-war-plugin, etc. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <failOnMissingWebXml>false</failOnMissingWebXml>
+                    <warName>${project.artifactId}</warName>
+                </configuration>
+           </plugin>
+
+            <!-- docker image packaging -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+
+                <executions>
+                    <!-- 1. Only print the build command -->
+                    <execution>
+                        <id>print-docker-build</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${docker.print.skip}</skip>
+                            <executable>cmd</executable>
+                            <workingDirectory>${project.basedir}</workingDirectory>
+                            <arguments>
+                                <argument>/c</argument>
+                                <argument>
+                                    echo docker buildx build --load --no-cache -t ${docker.hub}/${docker.repo}:${docker.tag} ${project.basedir} --file=docker/Dockerfile
+                                </argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+
+                    <!-- 2. Only print push commands -->
+                    <execution>
+                        <id>print-docker-push</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${docker.print.skip}</skip>
+                            <executable>cmd</executable>
+                            <workingDirectory>${project.basedir}</workingDirectory>
+                            <arguments>
+                                <argument>/c</argument>
+                                <argument>
+                                    echo docker buildx build --platform linux/amd64,linux/arm64 --provenance=false --no-cache --push -t ${docker.hub}/${docker.repo}:${docker.tag} ${project.basedir} --file=docker/Dockerfile
+                                </argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+
+                    <!-- 3. Really execute docker build (exactly the same as print-docker-build) -->
+                    <execution>
+                        <id>docker-build</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${docker.build.skip}</skip>
+                            <executable>docker</executable>
+                            <workingDirectory>${project.basedir}</workingDirectory>
+                            <arguments>
+                                <argument>buildx</argument>
+                                <argument>build</argument>
+                                <argument>--load</argument>
+                                <argument>--no-cache</argument>
+                                <argument>-t</argument>
+                                <argument>${docker.hub}/${docker.repo}:${docker.tag}</argument>
+                                <argument>${project.basedir}</argument>
+                                <argument>--file=docker/Dockerfile</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+
+                    <!-- 4. Really execute docker push (exactly the same as print-docker-push) -->
+                    <execution>
+                        <id>docker-push</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${docker.push.skip}</skip>
+                            <executable>docker</executable>
+                            <workingDirectory>${project.basedir}</workingDirectory>
+                            <arguments>
+                                <argument>buildx</argument>
+                                <argument>build</argument>
+                                <argument>--platform</argument>
+                                <argument>linux/amd64,linux/arm64</argument>
+                                <!-- 阿里云个人版镜像仓库不支持 BuildKit 默认生成的 OCI provenance 附加清单 -->
+                                <argument>--provenance=false</argument>
+                                <argument>--no-cache</argument>
+                                <argument>--push</argument>
+                                <argument>-t</argument>
+                                <argument>${docker.hub}/${docker.repo}:${docker.tag}</argument>
+                                <argument>${project.basedir}</argument>
+                                <argument>--file=docker/Dockerfile</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+
+                </executions>
+            </plugin>
+        </plugins>
+        <finalName>${project.artifactId}</finalName>
+    </build>
+
+</project>

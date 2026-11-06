@@ -1,0 +1,187 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.common.utils;
+
+import org.apache.commons.lang3.StringUtils;
+
+/**
+ * Serial number generation rules (increment according to the default rules, numbers increase from 1-99, numbers to 99, increase letters; if the number of digits is not enough, increase the number of digits)
+ * A001
+ * A001A002
+ *
+ * @Author zhangdaihao
+ */
+public class YouBianCodeUtil {
+
+    // Number of digits (default generates 3-digit number)
+
+    /**
+     * Represents the number of digits
+     */
+    private static final int NUM_LENGTH = 2;
+
+    public static final int ZHANWEI_LENGTH = 1 + NUM_LENGTH;
+
+    public static final char LETTER = 'Z';
+
+    /**
+     * Based on the previous code, get the next code at the same level
+     * For example: the current maximum code is D01A04, and the next code is: D01A05
+     *
+     * @param code
+     * @return
+     */
+    public static synchronized String getNextYouBianCode(String code) {
+        String newcode = "";
+        if (StringUtils.isBlank(code)) {
+            String zimu = "A";
+            String num = getStrNum(1);
+            newcode = zimu + num;
+        } else {
+            String beforeCode = code.substring(0, code.length() - 1 - NUM_LENGTH);
+            String afterCode = code.substring(code.length() - 1 - NUM_LENGTH, code.length());
+            char afterCodeZimu = afterCode.substring(0, 1).charAt(0);
+            Integer afterCodeNum = Integer.parseInt(afterCode.substring(1));
+            String nextNum = "";
+            char nextZimu = 'A';
+            // First determine that the number is equal to 999*, then the counting will restart from 1 and increase
+            if (afterCodeNum == getMaxNumByLength(NUM_LENGTH)) {
+                nextNum = getNextStrNum(0);
+            } else {
+                nextNum = getNextStrNum(afterCodeNum);
+            }
+            // First determine that the number is equal to 999*, then the letters start again from A and increase
+            if (afterCodeNum == getMaxNumByLength(NUM_LENGTH)) {
+                nextZimu = getNextZiMu(afterCodeZimu);
+            } else {
+                nextZimu = afterCodeZimu;
+            }
+
+            // For example, Z99, the next code is Z99A01
+            if (LETTER == afterCodeZimu && getMaxNumByLength(NUM_LENGTH) == afterCodeNum) {
+                newcode = code + (nextZimu + nextNum);
+            } else {
+                newcode = beforeCode + (nextZimu + nextNum);
+            }
+        }
+        return newcode;
+
+    }
+
+    /**
+     * According to the father code, get the next code of the subordinate
+     * <p>
+     * For example: Father CODE:A01
+     * Current CODE:A01B03
+     * Obtained code:A01B04
+     *
+     * @param parentCode parent code
+     * @param localCode sibling code
+     * @return
+     */
+    public static synchronized String getSubYouBianCode(String parentCode, String localCode) {
+        if (localCode != null && localCode != "") {
+
+//			return parentCode + getNextYouBianCode(localCode);
+            return getNextYouBianCode(localCode);
+
+        } else {
+            parentCode = parentCode + "A" + getNextStrNum(0);
+        }
+        return parentCode;
+    }
+
+    /**
+     * Pad the number in front with zeros
+     *
+     * @param num
+     * @return
+     */
+    private static String getNextStrNum(int num) {
+        return getStrNum(getNextNum(num));
+    }
+
+    /**
+     * Pad the number in front with zeros
+     *
+     * @param num
+     * @return
+     */
+    private static String getStrNum(int num) {
+        String s = String.format("%0" + NUM_LENGTH + "d", num);
+        return s;
+    }
+
+    /**
+     * Incrementally get the next number
+     *
+     * @param num
+     * @return
+     */
+    private static int getNextNum(int num) {
+        num++;
+        return num;
+    }
+
+    /**
+     * Get the next letter incrementally
+     *
+     * @param zimu
+     * @return
+     */
+    private static char getNextZiMu(char zimu) {
+        if (zimu == LETTER) {
+            return 'A';
+        }
+        zimu++;
+        return zimu;
+    }
+
+    /**
+     * Get the maximum value based on the number of digits
+     *
+     * @param length
+     * @return
+     */
+    private static int getMaxNumByLength(int length) {
+        if (length == 0) {
+            return 0;
+        }
+        StringBuilder maxNum = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            maxNum.append("9");
+        }
+        return Integer.parseInt(maxNum.toString());
+    }
+
+    public static String[] cutYouBianCode(String code) {
+        if (StringUtils.isBlank(code)) {
+            return null;
+        } else {
+            //The standard length obtained is numLength+1, and the intercepted quantity is code.length/numLength+1
+            int c = code.length() / (NUM_LENGTH + 1);
+            String[] cutcode = new String[c];
+            for (int i = 0; i < c; i++) {
+                cutcode[i] = code.substring(0, (i + 1) * (NUM_LENGTH + 1));
+            }
+            return cutcode;
+        }
+
+    }
+}

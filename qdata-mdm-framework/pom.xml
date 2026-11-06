@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This document is part of the qData Master Data Platform (open source version).
+
+  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+  You may use qData for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>tech.qiantong</groupId>
+        <artifactId>qData-mdm</artifactId>
+        <version>${qdata-mdm.version}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <modules>
+        <module>qdata-mdm-config</module>
+        <module>qdata-mdm-websocket</module>
+        <module>qdata-mdm-mybatis</module>
+        <module>qdata-mdm-redis</module>
+        <module>qdata-mdm-quartz</module>
+        <module>qdata-mdm-security</module>
+        <module>qdata-mdm-generator</module>
+        <module>qdata-mdm-common</module>
+        <module>qdata-mdm-file</module>
+        <module>qdata-mdm-pay</module>
+        <module>qdata-mdm-auth</module>
+        <module>qdata-mdm-neo4j</module>
+    </modules>
+    <packaging>pom</packaging>
+
+    <artifactId>qdata-mdm-framework</artifactId>
+
+    <description>
+        qdata-mdm-framework module
+    </description>
+
+</project>

@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+    <groupId>tech.qiantong</groupId>
+    <artifactId>qData-mdm</artifactId>
+    <version>${qdata-mdm.version}</version>
+
+    <name>qData-mdm</name>
+    <url>https://qiantong.tech</url>
+    <description>qData开源主数据平台</description>
+
+    <properties>
+        <qdata-mdm.version>0.6.0</qdata-mdm.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <java.version>1.8</java.version>
+        <maven-jar-plugin.version>3.1.1</maven-jar-plugin.version>
+        <spring-framework.version>5.3.33</spring-framework.version>
+        <spring-security.version>5.7.12</spring-security.version>
+        <druid.version>1.2.23</druid.version>
+        <bitwalker.version>1.21</bitwalker.version>
+        <swagger.version>3.0.0</swagger.version>
+        <kaptcha.version>2.3.3</kaptcha.version>
+        <pagehelper.boot.version>1.4.7</pagehelper.boot.version>
+        <fastjson.version>2.0.43</fastjson.version>
+        <oshi.version>6.6.1</oshi.version>
+        <commons.io.version>2.13.0</commons.io.version>
+        <poi.version>4.1.2</poi.version>
+        <velocity.version>2.3</velocity.version>
+        <jwt.version>0.9.1</jwt.version>
+        <scala.version>2.12.18</scala.version>
+        <spark.version>3.4.4</spark.version>
+        <hadoop.version>3.0.0</hadoop.version>
+        <!-- Docker image build configuration -->
+        <docker.hub>crpi-kf13onfj0v8f6jax.cn-shanghai.personal.cr.aliyuncs.com/qiantongkeji</docker.hub>
+        <!-- Image repository name: uses the module name by default -->
+        <docker.repo>${project.name}-ce</docker.repo>
+        <!-- Image version: uses the current module version by default -->
+        <docker.tag>${project.version}</docker.tag>
+        <!-- Whether to print the build command (printed by default for debugging without executing the actual build) -->
+        <docker.print.skip>true</docker.print.skip>
+        <!-- Whether to skip the image build (skipped by default to prevent accidental builds in the development environment) -->
+        <docker.build.skip>true</docker.build.skip>
+        <!-- Whether to skip the image push (skipped by default to prevent test images from being pushed accidentally) -->
+        <docker.push.skip>true</docker.push.skip>
+    </properties>
+
+    <!-- Dependency declarations -->
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- Spring Framework dependency configuration -->
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-framework-bom</artifactId>
+                <version>${spring-framework.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring Security dependency configuration -->
+            <dependency>
+                <groupId>org.springframework.security</groupId>
+                <artifactId>spring-security-bom</artifactId>
+                <version>${spring-security.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring Boot dependency configuration -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>2.5.15</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Alibaba database connection pool -->
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>druid-spring-boot-starter</artifactId>
+                <version>${druid.version}</version>
+            </dependency>
+
+            <!-- Parse the client operating system, browser, and other information -->
+            <dependency>
+                <groupId>eu.bitwalker</groupId>
+                <artifactId>UserAgentUtils</artifactId>
+                <version>${bitwalker.version}</version>
+            </dependency>
+
+            <!-- PageHelper pagination plugin -->
+            <dependency>
+                <groupId>com.github.pagehelper</groupId>
+                <artifactId>pagehelper-spring-boot-starter</artifactId>
+                <version>${pagehelper.boot.version}</version>
+            </dependency>
+
+            <!-- Retrieve system information -->
+            <dependency>
+                <groupId>com.github.oshi</groupId>
+                <artifactId>oshi-core</artifactId>
+                <version>${oshi.version}</version>
+            </dependency>
+
+            <!-- Swagger 3 dependency -->
+<!--            <dependency>
+                <groupId>io.springfox</groupId>
+                <artifactId>springfox-boot-starter</artifactId>
+                <version>${swagger.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.swagger</groupId>
+                        <artifactId>swagger-models</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>-->
+
+            <!-- Common I/O utilities -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons.io.version}</version>
+            </dependency>
+
+            <!-- Excel utilities -->
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi.version}</version>
+            </dependency>
+
+            <!-- Velocity templates used for code generation -->
+            <dependency>
+                <groupId>org.apache.velocity</groupId>
+                <artifactId>velocity-engine-core</artifactId>
+                <version>${velocity.version}</version>
+            </dependency>
+
+            <!-- Alibaba JSON parser -->
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${fastjson.version}</version>
+            </dependency>
+
+            <!-- Token generation and parsing -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt</artifactId>
+                <version>${jwt.version}</version>
+            </dependency>
+
+            <!-- CAPTCHA -->
+            <dependency>
+                <groupId>pro.fessional</groupId>
+                <artifactId>kaptcha</artifactId>
+                <version>${kaptcha.version}</version>
+            </dependency>
+
+            <!-- Scheduled tasks -->
+            <dependency>
+                <groupId>tech.qiantong</groupId>
+                <artifactId>qdata-mdm-quartz</artifactId>
+                <version>${qdata-mdm.version}</version>
+            </dependency>
+
+            <!-- Code generation -->
+            <dependency>
+                <groupId>tech.qiantong</groupId>
+                <artifactId>qdata-mdm-generator</artifactId>
+                <version>${qdata-mdm.version}</version>
+            </dependency>
+
+            <!-- Core module -->
+            <dependency>
+                <groupId>tech.qiantong</groupId>
+                <artifactId>qdata-mdm-framework</artifactId>
+                <version>${qdata-mdm.version}</version>
+            </dependency>
+
+            <!-- System module -->
+            <dependency>
+                <groupId>tech.qiantong</groupId>
+                <artifactId>qdata-mdm-module-system</artifactId>
+                <version>${qdata-mdm.version}</version>
+            </dependency>
+
+            <!-- Common utilities -->
+            <dependency>
+                <groupId>tech.qiantong</groupId>
+                <artifactId>qdata-mdm-common</artifactId>
+                <version>${qdata-mdm.version}</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+    <modules>
+        <module>qdata-mdm-framework</module>
+        <module>qdata-mdm-module-system</module>
+        <module>qdata-mdm-server</module>
+    </modules>
+    <packaging>pom</packaging>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.5.0</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>defaults</flattenMode>
+                </configuration>
+                <executions>
+                    <!-- Run flatten before compilation -->
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <!-- Remove generated files during clean -->
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.1</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <repositories>
+        <repository>
+            <id>aliyun-public</id>
+            <name>aliyun nexus</name>
+            <url>https://maven.aliyun.com/repository/public</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+        </repository>
+        <repository>
+            <id>central</id>
+            <name>maven central</name>
+            <url>https://repo1.maven.org/maven2/</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+        </repository>
+    </repositories>
+
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>public</id>
+            <name>aliyun nexus</name>
+            <url>https://maven.aliyun.com/repository/public</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
+
+</project>

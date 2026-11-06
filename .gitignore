@@ -7,7 +7,6 @@
 
 target/
 !.mvn/wrapper/maven-wrapper.jar
-dependency-reduced-pom.xml
 
 ######################################################################
 # IDE
@@ -22,8 +21,6 @@ dependency-reduced-pom.xml
 
 ### IntelliJ IDEA ###
 .idea
-.vscode
-.codebuddy
 *.iws
 *.iml
 *.ipr
@@ -35,7 +32,7 @@ rebel.xml
 nbproject/private/
 build/*
 nbbuild/
-#dist/
+dist/
 !*/anivia-ui/dist/
 !*/sso-ui/dist/
 !*/sso-ui/node_modules/
@@ -58,12 +55,28 @@ nbdist/
 !*/build/*.html
 !*/build/*.xml
 
+######################################################################
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
 
+# Caches and thumbnails
+Icon?
+._*
 
-### 组件库编译后的文件 ###
+# Spotlight search index
+.Spotlight-V100
+
+# Time Machine backups
+.TemporaryItems
+.Trashes
+
+######################################################################
+### Compiled component library files ###
 storybook-static/
 
-### pdman 备份文件 ###
+### PDMan backup files ###
 /sql/pdman/.back_anivia/
 sql/pdman/.back_数据中台
 
@@ -82,61 +95,23 @@ Anivia-App/.vscode/*
 Anivia-App/.hbuilderx/*
 Anivia-App/uni_modules/*
 Anivia-App/package-lock.json
-/upload/*
 
-######################################################################
-# license
-qData.key
-qdata-server/src/main/resources/license/*
-*/dependency-reduced-pom.xml
+/qdata-mdm-executor-etl/src/main/java/tech/qiantong/qdata/mdm/spark/etl/EtlApplication2.java
 
-######################################################################
-# qdata 文档库相关
-
-# Node modules
-qdata-docs/node_modules/
-
-# VuePress build output
-qdata-docs/src/.vuepress/dist/
-
-# VuePress temp/cache
-qdata-docs/src/.vuepress/.temp/
-qdata-docs/src/.vuepress/.cache/
-
-# Log files
-qdata-docs/npm-debug.log*
-qdata-docs/yarn-debug.log*
-qdata-docs/pnpm-debug.log*
-
-# Lock files（任选其一忽略）
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-
-# Env files
-qdata-docs/.env
-qdata-docs/.env.*.local
-
-# IDE/editor folders
-qdata-docs/.vscode/
-qdata-docs/.idea/
-
-# OS generated files
-qdata-docs/.DS_Store
-qdata-docs/Thumbs.db
-
-# VS Code project history
-qdata-docs/.history/
-
-# pnpm store
-qdata-docs/.pnpm-store/
-
-
-docker/dolphinscheduler/resource/default/resources/spark-jar/qdata-etl-3.8.8.jar
+docker/dolphinscheduler/resource/default/resources/spark-jar/qdata-mdm-executor-etl-3.8.8.jar
+docker/dolphinscheduler/resource/default/resources/spark-jar/qdata-mdm-executor-etl.jar
 docker/dolphinscheduler/soft/flink
 docker/dolphinscheduler/soft/spark
 docker/nginx/dist
-docker/qdata-quality/job-log
-docker/neo4j/data
-docker/neo4j/logs
-docker/mongo
+docker/qdata-mdm-service-quality/job-log
+docker/qdata-mdm-server/logs
+docker/qdata-mdm-server/upload
+
+qdata-mdm-server/docker/qdata-mdm-server.jar
+qdata-mdm-service-quality/docker/qdata-mdm-service-quality.jar
+**/.flattened-pom.xml
+**/dependency-reduced-pom.xml
+
+# Local/generated build state
+**/${project.build.directory}/
+**/.flattened-pom.xml

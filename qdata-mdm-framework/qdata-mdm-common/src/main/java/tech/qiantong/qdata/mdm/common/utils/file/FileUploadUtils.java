@@ -1,0 +1,251 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.common.utils.file;
+
+import org.apache.commons.io.FilenameUtils;
+import org.springframework.web.multipart.MultipartFile;
+import tech.qiantong.qdata.mdm.common.config.AniviaConfig;
+import tech.qiantong.qdata.mdm.common.constant.Constants;
+import tech.qiantong.qdata.mdm.common.exception.file.FileNameLengthLimitExceededException;
+import tech.qiantong.qdata.mdm.common.exception.file.FileSizeLimitExceededException;
+import tech.qiantong.qdata.mdm.common.exception.file.InvalidExtensionException;
+import tech.qiantong.qdata.mdm.common.utils.DateUtils;
+import tech.qiantong.qdata.mdm.common.utils.StringUtils;
+import tech.qiantong.qdata.mdm.common.utils.uuid.Seq;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.Objects;
+
+/**
+ * File upload tool class
+ *
+ * @author qdata
+ */
+public class FileUploadUtils
+{
+    /**
+     * Default size 50M
+     */
+    public static final long DEFAULT_MAX_SIZE = 50 * 1024 * 1024L;
+
+    /**
+     * Default maximum file name length 100
+     */
+    public static final int DEFAULT_FILE_NAME_LENGTH = 100;
+
+    /**
+     * Default upload address
+     */
+    private static String defaultBaseDir = AniviaConfig.getProfile();
+
+    public static void setDefaultBaseDir(String defaultBaseDir)
+    {
+        FileUploadUtils.defaultBaseDir = defaultBaseDir;
+    }
+
+    public static String getDefaultBaseDir()
+    {
+        return defaultBaseDir;
+    }
+
+    /**
+     * File upload with default configuration
+     *
+     * @param file uploaded file
+     * @return file name
+     * @throws Exception
+     */
+    public static final String upload(MultipartFile file) throws IOException
+    {
+        try
+        {
+            return upload(getDefaultBaseDir(), file, MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION);
+        }
+        catch (Exception e)
+        {
+            throw new IOException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Upload based on file path
+     *
+     * @param baseDir relative to the base directory of the application
+     * @param file uploaded file
+     * @return file name
+     * @throws IOException
+     */
+    public static final String upload(String baseDir, MultipartFile file) throws IOException
+    {
+        try
+        {
+            return upload(baseDir, file, MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION);
+        }
+        catch (Exception e)
+        {
+            throw new IOException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * File upload
+     *
+     * @param baseDir relative to the base directory of the application
+     * @param file uploaded file
+     * @param allowedExtension upload file type
+     * @return Returns the file name of successfully uploaded file
+     * @throws FileSizeLimitExceededException if maximum size is exceeded
+     * @throws FileNameLengthLimitExceededException File name is too long
+     * @throws IOException For example, when an error occurs while reading or writing a file
+     * @throws InvalidExtensionException File verification exception
+     */
+    public static final String upload(String baseDir, MultipartFile file, String[] allowedExtension)
+            throws FileSizeLimitExceededException, IOException, FileNameLengthLimitExceededException,
+            InvalidExtensionException
+    {
+        int fileNamelength = Objects.requireNonNull(file.getOriginalFilename()).length();
+        if (fileNamelength > FileUploadUtils.DEFAULT_FILE_NAME_LENGTH)
+        {
+            throw new FileNameLengthLimitExceededException(FileUploadUtils.DEFAULT_FILE_NAME_LENGTH);
+        }
+
+        assertAllowed(file, allowedExtension);
+
+        String fileName = extractFilename(file);
+
+        String absPath = getAbsoluteFile(baseDir, fileName).getAbsolutePath();
+        file.transferTo(Paths.get(absPath));
+        return getPathFileName(baseDir, fileName);
+    }
+
+    /**
+     * Encoded file name
+     */
+    public static final String extractFilename(MultipartFile file)
+    {
+        return StringUtils.format("{}/{}_{}.{}", DateUtils.datePath(),
+                FilenameUtils.getBaseName(file.getOriginalFilename()), Seq.getId(Seq.uploadSeqType), getExtension(file));
+    }
+
+    public static final File getAbsoluteFile(String uploadDir, String fileName) throws IOException
+    {
+        File desc = new File(uploadDir + File.separator + fileName);
+
+        if (!desc.exists())
+        {
+            if (!desc.getParentFile().exists())
+            {
+                desc.getParentFile().mkdirs();
+            }
+        }
+        return desc;
+    }
+
+    public static final String getPathFileName(String uploadDir, String fileName) throws IOException
+    {
+        int dirLastIndex = AniviaConfig.getProfile().length() + 1;
+        String currentDir = StringUtils.substring(uploadDir, dirLastIndex);
+        return Constants.RESOURCE_PREFIX + "/" + currentDir + "/" + fileName;
+    }
+
+    /**
+     * File size check
+     *
+     * @param file uploaded file
+     * @return
+     * @throws FileSizeLimitExceededException if maximum size is exceeded
+     * @throws InvalidExtensionException
+     */
+    public static final void assertAllowed(MultipartFile file, String[] allowedExtension)
+            throws FileSizeLimitExceededException, InvalidExtensionException
+    {
+        long size = file.getSize();
+        if (size > DEFAULT_MAX_SIZE)
+        {
+            throw new FileSizeLimitExceededException(DEFAULT_MAX_SIZE / 1024 / 1024);
+        }
+
+        String fileName = file.getOriginalFilename();
+        String extension = getExtension(file);
+        if (allowedExtension != null && !isAllowedExtension(extension, allowedExtension))
+        {
+            if (allowedExtension == MimeTypeUtils.IMAGE_EXTENSION)
+            {
+                throw new InvalidExtensionException.InvalidImageExtensionException(allowedExtension, extension,
+                        fileName);
+            }
+            else if (allowedExtension == MimeTypeUtils.FLASH_EXTENSION)
+            {
+                throw new InvalidExtensionException.InvalidFlashExtensionException(allowedExtension, extension,
+                        fileName);
+            }
+            else if (allowedExtension == MimeTypeUtils.MEDIA_EXTENSION)
+            {
+                throw new InvalidExtensionException.InvalidMediaExtensionException(allowedExtension, extension,
+                        fileName);
+            }
+            else if (allowedExtension == MimeTypeUtils.VIDEO_EXTENSION)
+            {
+                throw new InvalidExtensionException.InvalidVideoExtensionException(allowedExtension, extension,
+                        fileName);
+            }
+            else
+            {
+                throw new InvalidExtensionException(allowedExtension, extension, fileName);
+            }
+        }
+    }
+
+    /**
+     * Determine whether the MIME type is an allowed MIME type
+     *
+     * @param extension
+     * @param allowedExtension
+     * @return
+     */
+    public static final boolean isAllowedExtension(String extension, String[] allowedExtension)
+    {
+        for (String str : allowedExtension)
+        {
+            if (str.equalsIgnoreCase(extension))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get the suffix of the file name
+     *
+     * @param file form file
+     * @return suffix name
+     */
+    public static final String getExtension(MultipartFile file)
+    {
+        String extension = FilenameUtils.getExtension(file.getOriginalFilename());
+        if (StringUtils.isEmpty(extension))
+        {
+            extension = MimeTypeUtils.getExtension(Objects.requireNonNull(file.getContentType()));
+        }
+        return extension;
+    }
+}

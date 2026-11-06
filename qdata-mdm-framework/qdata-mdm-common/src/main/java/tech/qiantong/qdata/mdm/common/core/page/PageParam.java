@@ -1,0 +1,88 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.common.core.page;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import tech.qiantong.qdata.mdm.common.core.domain.BaseEntity;
+import tech.qiantong.qdata.mdm.common.utils.StringUtils;
+
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+import java.io.Serializable;
+
+@Schema(description="分页参数")
+@Data
+public class PageParam extends BaseEntity implements Serializable  {
+
+    private static final Integer PAGE_NO = 1;
+    private static final Integer PAGE_SIZE = 120;
+
+    /**
+     * Number of items per page - no pagination
+     *
+     * For example, when exporting an interface, you can set {@link #pageSize} to -1 to query all data without paging.
+     */
+    public static final Integer PAGE_SIZE_NONE = -1;
+
+    @Schema(description = "页码，从 1 开始", requiredMode = Schema.RequiredMode.REQUIRED,example = "1")
+    @NotNull(message = "页码不能为空")
+    @Min(value = 1, message = "页码最小值为 1")
+    private Integer pageNum = PAGE_NO;
+
+    @Schema(description = "每页条数，最大值为 100", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
+    @NotNull(message = "每页条数不能为空")
+    @Min(value = 1, message = "每页条数最小值为 1")
+    @Max(value = 100, message = "每页条数最大值为 100")
+    private Integer pageSize = PAGE_SIZE;
+
+    /** Sorting column */
+    private String orderByColumn;
+
+    /** Sorting direction desc or asc */
+    private String isAsc = "asc";
+    private String isDesc = "desc";
+
+    public String getOrderBy()
+    {
+        if (StringUtils.isEmpty(orderByColumn))
+        {
+            return "";
+        }
+        return StringUtils.toUnderScoreCase(orderByColumn) + " " + isAsc;
+    }
+
+    public void setIsAsc(String isAsc)
+    {
+        if (StringUtils.isNotEmpty(isAsc))
+        {
+            // Compatible with front-end sorting types
+            if ("ascending".equals(isAsc))
+            {
+                isAsc = "asc";
+            }
+            else if ("descending".equals(isAsc))
+            {
+                isAsc = "desc";
+            }
+            this.isAsc = isAsc;
+        }
+    }
+}

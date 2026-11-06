@@ -1,0 +1,38 @@
+# Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+#
+# This document is part of the qData Master Data Platform (open source version).
+#
+# qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+# You may use qData for commercial purposes, but you may not remove, hide,
+# modify, or replace the qData master data platform logo, copyright notices, license notices,
+# or attribution information without a separate commercial license.
+#
+# White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+# another product requires separate commercial authorization from
+# Jiangsu Qiantong Technology Co., Ltd.
+#
+# Business License: https://community.qdata.tech/business/policy.html
+# See the LICENSE file in the project root for full license information.
+
+dromara:
+  x-file-storage: #File storage configuration
+    default-platform: local #The storage platform used by default
+    thumbnail-suffix: ".min.jpg" #Thumbnail suffix, such as [.min.jpg] [.png]
+    #The configuration of the corresponding platform is written here. Pay attention to the indentation.
+    local-plus:
+      - platform: local # Storage platform identification
+        enable-storage: true  #Enable storage
+        enable-access: false #Enable access (please use Nginx configuration online for higher efficiency)
+        domain: "" # Access the domain name, for example: "http://127.0.0.1:8081/file/". Please note that the following must be consistent with path-patterns, ending with "/". It is recommended to use relative paths for local storage to facilitate changing the domain name later.
+        path-patterns: /** # Access path
+        base-path: / # Base path
+        storage-path: ${user.dir}/upload/ # Storage path
+    aliyun-oss:
+      - platform: xxxx-oss-xx # Storage platform identification
+        enable-storage: true # Enable storage
+        access-key: xxxxxxxxxxx # Alibaba Cloud access key
+        secret-key: xxxxxxxxxxx # Alibaba Cloud secret key
+        end-point: https://abc.oss-cn-shanghai.aliyuncs.com # OSS service node
+        bucket-name: xxxxx # Bucket name
+        domain: https://abc.oss-cn-shanghai.aliyuncs.com/ # When accessing the domain name, pay attention to the “/” ending, for example: https://abc.oss-cn-shanghai.aliyuncs.com/
+# base-path: /document # base path

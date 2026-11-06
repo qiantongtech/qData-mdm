@@ -1,0 +1,212 @@
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This document is part of the qData Master Data Platform (open source version).
+
+  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+  You may use qData for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<template>
+  <div class="container" id="top">
+    <qt-wrap :config="{ actions: { show: false }, fullContent: false }">
+      <div class="header-line" />
+      <p class="title">{{ notice.noticeTitle }}</p>
+      <p class="time">
+        {{ td('sys.system.notice.time') }}
+        ：
+        {{ notice.createTime }}
+        丨
+        {{ td('sys.system.notice.author') }}
+        ：
+        {{ notice.createBy }}
+      </p>
+      <div class="content" id="ces">
+        <div class="content-line">
+          <template v-if="notice.noticeContentText != null">
+            <div v-html="notice.noticeContentText" />
+          </template>
+          <div class="empty" v-else>
+            <img src="@/assets/common/images/empty-state/empty-nodata.png" alt="" />
+            <!-- <span>{{ td('common.noDescription') }}</span> -->
+          </div>
+        </div>
+      </div>
+      <div class="attachment" v-if="notice.attachmentUrl != null">
+        {{ td('sys.system.notice.attachment') }}
+        ：
+        <a :href="notice.attachmentUrl">{{ notice.attachmentTitle }}</a>
+      </div>
+    </qt-wrap>
+  </div>
+</template>
+
+<script setup name="NoticeDetail">
+import useDefaultLang from '@/composables/useDefaultLang';
+const { td } = useDefaultLang();
+import { getNoticeOne } from '@/api/system/system/notice.js';
+import moment from 'moment';
+
+const route = useRoute();
+const notice = ref({});
+// Monitor id changes
+watch(
+  () => route.query.id,
+  (newId) => {
+    if (newId !== null && newId !== undefined) {
+      getViewById(newId);
+    }
+  },
+  { immediate: true }
+);
+function getViewById(noticeId) {
+  getNoticeOne(noticeId).then((res) => {
+    notice.value = res.data;
+    /** Display date */
+    let format = moment(notice.value.createTime).format('YYYY-MM-DD');
+    notice.value.createTime = format;
+  });
+}
+</script>
+
+<style scoped lang="scss">
+.container {
+  margin: 15px;
+  scroll-behavior: smooth;
+  min-height: calc(100vh - 94px) !important;
+  background-color: var(--qt-surface-background);
+  flex-direction: row;
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+.form-div {
+  width: 60%;
+  margin-left: 20%;
+}
+.title {
+  font-weight: bold;
+  font-size: 28px;
+  text-align: center;
+  color: var(--qt-text-primary);
+  display: inline-block;
+  width: 100%;
+}
+
+.time {
+  text-align: center;
+  font-size: var(--qt-font-size-base);
+  width: 100%;
+  color: #999;
+}
+
+p {
+  margin: 10px 0 10px;
+}
+
+.attachment {
+  margin-top: 20px;
+  width: 100%;
+  padding: 0 200px 0 200px;
+  font-size: var(--qt-font-size-base);
+  color: #3a71a8;
+}
+
+.content {
+  line-height: 1.8;
+  font-size: var(--qt-font-size-base);
+  color: var(--qt-text-primary);
+  overflow-wrap: break-word;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0 10px;
+
+  ::v-deep &-line {
+    border-top: 1px dashed #ddd;
+    border-bottom: 1px dashed #ddd;
+    padding: 10px 0;
+  }
+
+  ::v-deep h1,
+  ::v-deep h2,
+  ::v-deep h3 {
+    font-weight: 600;
+    margin: 0.67em 0;
+  }
+
+  ::v-deep h1 {
+    font-size: 2em;
+  }
+  ::v-deep h2 {
+    font-size: 1.5em;
+    margin: 0.83em 0;
+  }
+  ::v-deep h3 {
+    font-size: 1.17em;
+    margin: 1em 0;
+  }
+
+  ::v-deep p {
+    margin: 1em 0;
+  }
+
+  ::v-deep ul,
+  ::v-deep ol {
+    margin: 1em 0;
+    padding-left: 2em;
+  }
+
+  ::v-deep img {
+    display: block; // Avoid white space below
+    width: 100%;
+    height: auto;
+    margin: 1em 0;
+    border-radius: var(--qt-radius-small);
+    text-align: center;
+  }
+
+  ::v-deep a {
+    color: var(--qt-primary);
+    text-decoration: underline;
+  }
+
+  ::v-deep pre {
+    background: #23241f;
+    color: #f8f8f2;
+    padding: 12px;
+    border-radius: var(--qt-radius-small);
+    overflow-x: auto;
+    white-space: pre-wrap; // Friendly newline support
+    word-wrap: break-word;
+  }
+
+  ::v-deep blockquote {
+    border-left: 4px solid #ccc;
+    margin-bottom: 5px;
+    margin-top: 5px;
+    margin-left: 0px;
+    padding-left: 16px;
+  }
+
+  ::v-deep .empty {
+    background: var(--qt-surface-background);
+    border-radius: var(--qt-radius-small);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    img {
+      width: 300px;
+      height: 300px;
+    }
+  }
+}
+</style>

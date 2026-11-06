@@ -1,0 +1,184 @@
+/*
+ * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This document is part of the qData Master Data Platform (open source version).
+ *
+ * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
+ * You may use qData for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.system.service;
+
+import java.util.List;
+import java.util.Set;
+import tech.qiantong.qdata.mdm.common.core.domain.TreeSelect;
+import tech.qiantong.qdata.mdm.common.core.domain.entity.SysMenu;
+import tech.qiantong.qdata.mdm.system.domain.vo.RouterVo;
+
+/**
+ * 菜单 业务层
+ *
+ * @author qdata
+ */
+public interface ISysMenuService
+{
+    /**
+     * 根据用户查询系统菜单列表
+     *
+     * @param userId 用户ID
+     * @return 菜单列表
+     */
+    public List<SysMenu> selectMenuList(Long userId);
+
+    /**
+     * 根据用户查询系统菜单列表
+     *
+     * @param menu 菜单信息
+     * @param userId 用户ID
+     * @return 菜单列表
+     */
+    public List<SysMenu> selectMenuList(SysMenu menu, Long userId);
+
+    /**
+     * 根据用户ID查询权限
+     *
+     * @param userId 用户ID
+     * @return 权限列表
+     */
+    public Set<String> selectMenuPermsByUserId(Long userId);
+
+    /**
+     * 根据角色ID查询权限
+     *
+     * @param roleId 角色ID
+     * @return 权限列表
+     */
+    public Set<String> selectMenuPermsByRoleId(Long roleId);
+
+    /**
+     * 根据用户ID查询菜单树信息
+     *
+     * @param userId 用户ID
+     * @return 菜单列表
+     */
+    public List<SysMenu> selectMenuTreeByUserId(Long userId);
+
+    /**
+     * 根据用户ID和项目ID查询菜单树信息
+     *
+     * @param userId 用户ID
+     * @param projectId 项目ID
+     * @return 菜单列表
+     */
+    public List<SysMenu> selectMenuTreeByUserIdAndProjectId(Long userId,Long projectId);
+
+    /**
+     * 根据角色ID查询菜单树信息
+     *
+     * @param roleId 角色ID
+     * @return 选中菜单列表
+     */
+    public List<Long> selectMenuListByRoleId(Long roleId);
+
+    /**
+     * 构建前端路由所需要的菜单
+     *
+     * @param menus 菜单列表
+     * @return 路由列表
+     */
+    public List<RouterVo> buildMenus(List<SysMenu> menus);
+
+    /**
+     * 构建前端所需要树结构
+     *
+     * @param menus 菜单列表
+     * @return 树结构列表
+     */
+    public List<SysMenu> buildMenuTree(List<SysMenu> menus);
+
+    /**
+     * 构建前端所需要下拉树结构
+     *
+     * @param menus 菜单列表
+     * @return 下拉树结构列表
+     */
+    public List<TreeSelect> buildMenuTreeSelect(List<SysMenu> menus);
+
+    /**
+     * 根据菜单ID查询信息
+     *
+     * @param menuId 菜单ID
+     * @return 菜单信息
+     */
+    public SysMenu selectMenuById(Long menuId);
+
+    /**
+     * 是否存在菜单子节点
+     *
+     * @param menuId 菜单ID
+     * @return 结果 true 存在 false 不存在
+     */
+    public boolean hasChildByMenuId(Long menuId);
+
+    /**
+     * 查询菜单是否存在角色
+     *
+     * @param menuId 菜单ID
+     * @return 结果 true 存在 false 不存在
+     */
+    public boolean checkMenuExistRole(Long menuId);
+
+    /**
+     * 新增保存菜单信息
+     *
+     * @param menu 菜单信息
+     * @return 结果
+     */
+    public int insertMenu(SysMenu menu);
+
+    /**
+     * 修改保存菜单信息
+     *
+     * @param menu 菜单信息
+     * @return 结果
+     */
+    public int updateMenu(SysMenu menu);
+
+    /**
+     * 删除菜单管理信息
+     *
+     * @param menuId 菜单ID
+     * @return 结果
+     */
+    public int deleteMenuById(Long menuId);
+
+    /**
+     * 校验菜单名称是否唯一
+     *
+     * @param menu 菜单信息
+     * @return 结果
+     */
+    public boolean checkMenuNameUnique(SysMenu menu);
+
+    /**
+     * 构建前端所需要下拉树结构(只限于数据研发模块)
+     *
+     * @param menus 菜单列表
+     * @return 下拉树结构列表
+     */
+    public List<TreeSelect> buildMenuTreeSelectDpp(List<SysMenu> menus);
+
+    /**
+     * 获取菜单下拉树列表(排除数据研发模块)
+     */
+    List<TreeSelect> buildMenuTreeNoSelectDpp(List<SysMenu> menus);
+}
