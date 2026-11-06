@@ -106,7 +106,13 @@ qData-mdm separates the Spring Boot backend from the Vue 3 frontend and integrat
   </tr>
 </table>
 
-## 🏗️ Deployment Requirements
+## 🚨 Commercial Licensing
+
+qData-mdm provides two editions: **Professional Edition** and **Open-Source Edition**, meeting user needs across different scales and scenarios. Each has its own focus while complementing the other: the Open-Source Edition helps users get started at low cost, while the Professional Edition provides greater depth and support. Whichever edition you choose, qData-mdm aims to be a reliable partner that helps enterprises unlock data value and accelerate digital transformation.
+
+> 👉 For **Open-Source Edition brand authorization** or **Professional Edition consultation**, see [💼 Licensing Details](https://qdata.tech/en/price/).
+
+## 🏗️ Deployment Environment
 
 Install the following prerequisites before deploying qData-mdm.
 
