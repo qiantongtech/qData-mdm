@@ -1,16 +1,14 @@
 # Open Source License
 
-This document is part of the qData Master Data Platform (open source version).
+qData-mdm is made available under the Apache License 2.0, subject to the following additional conditions specific to qData-mdm:
 
-qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-
-For the purpose of this License, "qData master data platform" refers to the entire software project, including but not limited to its frontend, backend, API, and related documentation in whole or in part.
+For the purpose of this License, "qData-mdm" refers to the entire software project, including but not limited to its frontend, backend, API, and related documentation in whole or in part.
 
 For the purpose of this License, "Producer" refers to Jiangsu Qiantong Technology Co., Ltd.
 
-1. You may use qData master data platform for commercial purposes, provided that you do not remove, hide, or modify the qData master data platform logo, copyright notices, license notices, or attribution information displayed in the qData master data platform.
+1. You may use qData-mdm for commercial purposes, provided that you do not remove, hide, or modify the qData-mdm logo, copyright notices, license notices, or attribution information displayed in the qData-mdm.
 
-If you wish to remove, hide, obscure, replace, or modify such logo, copyright notices, license notices, or attribution information, including but not limited to white-label use, OEM distribution, rebranding, or presenting qData master data platform as another product, you must obtain a separate commercial license from the Producer.
+If you wish to remove, hide, obscure, replace, or modify such logo, copyright notices, license notices, or attribution information, including but not limited to white-label use, OEM distribution, rebranding, or presenting qData-mdm as another product, you must obtain a separate commercial license from the Producer.
 
 2. As a contributor, you should agree that:
 
@@ -21,4 +19,4 @@ Apart from the specific conditions mentioned above, all other rights and restric
 
 The interactive design of this product is protected by appearance patent.
 
-© 2025 Jiangsu Qiantong Technology Co., Ltd
+© 2026 Jiangsu Qiantong Technology Co., Ltd
