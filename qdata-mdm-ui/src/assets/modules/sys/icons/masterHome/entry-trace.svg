@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="40px" height="40px" viewBox="0 0 40 40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>个别报表备份 3</title>
+    <defs>
+        <linearGradient x1="82.0815781%" y1="88.8219418%" x2="22.4693793%" y2="0%" id="linearGradient-1">
+            <stop stop-color="#73DCDD" offset="0%"></stop>
+            <stop stop-color="#2EC6C8" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="81.2441291%" y1="117.097092%" x2="42.4854741%" y2="24.1070798%" id="linearGradient-2">
+            <stop stop-color="#FAC986" offset="0%"></stop>
+            <stop stop-color="#F59140" offset="100%"></stop>
+        </linearGradient>
+        <rect id="path-3" x="0" y="0" width="40" height="40" rx="6"></rect>
+    </defs>
+    <g id="qData-mdm-主数据平台" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="主数据平台工作台" transform="translate(-1731, -1115)">
+            <g id="个别报表备份-3" transform="translate(1731, 1115)">
+                <g id="Rectangle-25-Copy">
+                    <use fill="url(#linearGradient-1)" xlink:href="#path-3"></use>
+                    <use fill="url(#linearGradient-2)" xlink:href="#path-3"></use>
+                </g>
+                <path d="M31.6666667,10.8333333 C32.126904,10.8333333 32.5,11.2064294 32.5,11.6666667 C32.5,12.126904 32.126904,12.5 31.6666667,12.5 L30.8333333,12.5 L30.8333333,25 L31.6666667,25 C32.126904,25 32.5,25.373096 32.5,25.8333333 C32.5,26.2935706 32.126904,26.6666667 31.6666667,26.6666667 L20.8333333,26.6666667 L20.833,29.1663333 L23.3333333,29.1666667 C23.7935706,29.1666667 24.1666667,29.5397627 24.1666667,30 C24.1666667,30.4602373 23.7935706,30.8333333 23.3333333,30.8333333 L16.6666667,30.8333333 C16.2064294,30.8333333 15.8333333,30.4602373 15.8333333,30 C15.8333333,29.5397627 16.2064294,29.1666667 16.6666667,29.1666667 L19.166,29.1663333 L19.1666667,26.6666667 L8.33333333,26.6666667 C7.87309604,26.6666667 7.5,26.2935706 7.5,25.8333333 C7.5,25.373096 7.87309604,25 8.33333333,25 L9.16666667,25 L9.16666667,12.5 L8.33333333,12.5 C7.87309604,12.5 7.5,12.126904 7.5,11.6666667 C7.5,11.2064294 7.87309604,10.8333333 8.33333333,10.8333333 L31.6666667,10.8333333 Z M29.1666667,12.5 L10.8333333,12.5 L10.8333333,25 L29.1666667,25 L29.1666667,12.5 Z" id="Combined-Shape" fill="#FFFFFF" opacity="0.900000036"></path>
+                <rect id="Rectangle-13" fill="#FFFFFF" opacity="0.699999988" x="10.8333333" y="12.5" width="18.3333333" height="12.5"></rect>
+                <rect id="Rectangle-20" fill="#F59040" x="15" y="19.1666667" width="1.66666667" height="4.16666667" rx="0.833333333"></rect>
+                <rect id="Rectangle-20-Copy" fill="#F59040" x="19.1666667" y="16.6666667" width="1.66666667" height="6.66666667" rx="0.833333333"></rect>
+                <rect id="Rectangle-20-Copy-2" fill="#F59040" x="23.3333333" y="15" width="1.66666667" height="8.33333333" rx="0.833333333"></rect>
+            </g>
+        </g>
+    </g>
+</svg>

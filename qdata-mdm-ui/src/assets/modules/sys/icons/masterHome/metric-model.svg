@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48px" height="48px" viewBox="0 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>chhs_48_48</title>
+    <defs>
+        <linearGradient x1="95.2569604%" y1="95.9915807%" x2="22.0622656%" y2="23.7508056%" id="linearGradient-1">
+            <stop stop-color="#73DCDD" offset="0%"></stop>
+            <stop stop-color="#2EC6C8" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="qData-mdm-主数据平台" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="主数据平台工作台" transform="translate(-645, -297)">
+            <g id="chhs_48_48" transform="translate(645, 297)">
+                <g id="gzlfw_liuchengsheji_48_48-copy" fill="url(#linearGradient-1)">
+                    <rect id="Rectangle-61-Copy-5" x="0" y="0" width="48" height="48" rx="6"></rect>
+                </g>
+                <path d="M23.6357342,25.64375 L17.707426,22.15 C17.3791178,21.95 16.972641,21.95 16.6443328,22.15 L10.5847013,25.64375 C10.2282524,25.84375 10.0062535,26.23125 10,26.659375 L10,33.603125 C10.0156337,34.034375 10.2501396,34.421875 10.612842,34.61875 L16.6724735,38.115625 C17.0257956,38.315625 17.4479062,38.315625 17.8012284,38.115625 L23.6357342,34.61875 C23.9359017,34.3875 24.079732,33.9875 24.0015634,33.603125 L24.0015634,26.659375 C24.079732,26.275 23.9359017,25.875 23.6357342,25.64375 Z" id="Path" fill="#FFFFFF"></path>
+                <path d="M38.6357342,25.64375 L32.707426,22.15 C32.3791178,21.95 31.972641,21.95 31.6443328,22.15 L25.5847013,25.64375 C25.2282524,25.84375 25.0062535,26.23125 25,26.659375 L25,33.603125 C25.0156337,34.034375 25.2501396,34.421875 25.612842,34.61875 L31.6724735,38.115625 C32.0257956,38.315625 32.4479062,38.315625 32.8012284,38.115625 L38.6357342,34.61875 C38.9359017,34.3875 39.079732,33.9875 39.0015634,33.603125 L39.0015634,26.659375 C39.079732,26.275 38.9359017,25.875 38.6357342,25.64375 Z" id="Path-Copy-3" fill="#FFFFFF"></path>
+                <polygon id="Rectangle" fill="#6FDBDC" opacity="0.7" points="17 30 24 26 24 34.5846929 17 39"></polygon>
+                <polygon id="Rectangle-Copy-5" fill="#C2F0F0" opacity="0.5" transform="translate(13.5, 32) scale(-1, 1) translate(-13.5, -32)" points="10 30 17 26 17 34 10 38"></polygon>
+                <polygon id="Rectangle-Copy-6" fill="#C2F0F0" opacity="0.5" transform="translate(28.5, 32) scale(-1, 1) translate(-28.5, -32)" points="25 30 32 26 32 34 25 38"></polygon>
+                <path d="M30.6357342,11.64375 L24.707426,8.15 C24.3791178,7.95 23.972641,7.95 23.6443328,8.15 L17.5847013,11.64375 C17.2282524,11.84375 17.0062535,12.23125 17,12.659375 L17,19.603125 C17.0156337,20.034375 17.2501396,20.421875 17.612842,20.61875 L23.6724735,24.115625 C24.0257956,24.315625 24.4479062,24.315625 24.8012284,24.115625 L30.6357342,20.61875 C30.9359017,20.3875 31.079732,19.9875 31.0015634,19.603125 L31.0015634,12.659375 C31.079732,12.275 30.9359017,11.875 30.6357342,11.64375 Z" id="Path" fill="#FFFFFF"></path>
+                <polygon id="Rectangle" fill="#6FDBDC" opacity="0.7" points="24 16 31 12 31 20.312826 24 24.5079621"></polygon>
+                <polygon id="Rectangle-Copy-4" fill="#6FDBDC" opacity="0.7" points="32 30 39 26 39 34.7469444 32 38.7317659"></polygon>
+                <polygon id="Rectangle-Copy-7" fill="#C2F0F0" opacity="0.5" transform="translate(20.5, 18) scale(-1, 1) translate(-20.5, -18)" points="17 16 24 12 24 20 17 24"></polygon>
+            </g>
+        </g>
+    </g>
+</svg>

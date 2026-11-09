@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>开</title>
+    <g id="开" stroke="none" fill="none" fill-rule="evenodd" stroke-width="1">
+        <g id="编组">
+            <polygon id="路径" points="0 0 24 0 24 24 0 24"></polygon>
+            <path d="M3,21 C2.44772,21 2,20.5523 2,20 L2,4 C2,3.44772 2.44772,3 3,3 L10.4142,3 L12.4142,5 L20,5 C20.5523,5 21,5.44772 21,6 L21,9 L19,9 L19,7 L11.5858,7 L9.58579,5 L4,5 L4,16.998 L5.5,11 L22.5,11 L20.1894,20.2425 C20.0781,20.6877 19.6781,21 19.2192,21 L3,21 Z M19.9384,13 L7.06155,13 L5.56155,19 L18.4384,19 L19.9384,13 Z" id="形状" fill="#2666FB" fill-rule="nonzero"></path>
+        </g>
+    </g>
+</svg>

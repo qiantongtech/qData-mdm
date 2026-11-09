@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48px" height="48px" viewBox="0 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>业务流服务</title>
+    <defs>
+        <linearGradient x1="81.2441291%" y1="117.097092%" x2="42.4854741%" y2="24.1070798%" id="linearGradient-1">
+            <stop stop-color="#FAC986" offset="0%"></stop>
+            <stop stop-color="#F59140" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="137.129946%" id="linearGradient-2">
+            <stop stop-color="#FFFFFF" offset="0%"></stop>
+            <stop stop-color="#FFFFFF" offset="58.2553051%"></stop>
+            <stop stop-color="#F8B269" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="qData-mdm-主数据平台" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="主数据平台工作台" transform="translate(-1151, -297)">
+            <g id="业务流服务" transform="translate(1151, 297)">
+                <rect id="Rectangle-25-Copy" fill="url(#linearGradient-1)" x="0" y="0" width="48" height="48" rx="6"></rect>
+                <path d="M34,10 C34.5522847,10 35,10.4477153 35,11 L35,33 C35,33.5522847 34.5522847,34 34,34 L18,34 C17.4477153,34 17,33.5522847 17,33 L17,11 C17,10.4477153 17.4477153,10 18,10 L34,10 Z M30.625,24 L21.375,24 C20.8227153,24 20.375,24.4477153 20.375,25 C20.375,25.5522847 20.8227153,26 21.375,26 L30.625,26 C31.1772847,26 31.625,25.5522847 31.625,25 C31.625,24.4477153 31.1772847,24 30.625,24 Z M30.625,19 L21.375,19 C20.8227153,19 20.375,19.4477153 20.375,20 C20.375,20.5522847 20.8227153,21 21.375,21 L30.625,21 C31.1772847,21 31.625,20.5522847 31.625,20 C31.625,19.4477153 31.1772847,19 30.625,19 Z M30.625,14 L21.375,14 C20.8227153,14 20.375,14.4477153 20.375,15 C20.375,15.5522847 20.8227153,16 21.375,16 L30.625,16 C31.1772847,16 31.625,15.5522847 31.625,15 C31.625,14.4477153 31.1772847,14 30.625,14 Z" id="Combined-Shape" fill="url(#linearGradient-2)" opacity="0.849999964"></path>
+                <path d="M14,14 L17,14 L17,14 L17,30 C17,30.5522847 16.5522847,31 16,31 L14,31 C13.4477153,31 13,30.5522847 13,30 L13,15 C13,14.4477153 13.4477153,14 14,14 Z" id="Rectangle-64" fill="#FFFFFF" opacity="0.600000024"></path>
+                <path d="M19,30 C19,31.6568542 20.3431458,33 22,33 L27,33 C28.6568542,33 30,31.6568542 30,30 L30,29 L37,29 C37.5522847,29 38,29.4477153 38,30 L38,38 C38,38.5522847 37.5522847,39 37,39 L11,39 C10.4477153,39 10,38.5522847 10,38 L10,30 C10,29.4477153 10.4477153,29 11,29 L19,29 Z" id="Combined-Shape" fill="#FFFFFF"></path>
+            </g>
+        </g>
+    </g>
+</svg>

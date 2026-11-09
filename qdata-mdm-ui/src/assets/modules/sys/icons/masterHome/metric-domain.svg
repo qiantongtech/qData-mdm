@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48px" height="48px" viewBox="0 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>开放平台</title>
+    <defs>
+        <linearGradient x1="71.9776149%" y1="100%" x2="14.9373956%" y2="5.95990774%" id="linearGradient-1">
+            <stop stop-color="#799AFF" offset="0%"></stop>
+            <stop stop-color="#6F91FA" offset="30.8840779%"></stop>
+            <stop stop-color="#577CEF" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="qData-mdm-主数据平台" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="主数据平台工作台" transform="translate(-898, -297)">
+            <g id="开放平台" transform="translate(898, 297)">
+                <rect id="Rectangle-25-Copy" fill="url(#linearGradient-1)" x="0" y="0" width="48" height="48" rx="6"></rect>
+                <g id="Group-5" transform="translate(9, 7)" fill="#FFFFFF">
+                    <polygon id="Star" fill-opacity="0.3" points="2 24.5773503 2 9.56624327 15 2.06068977 28 9.56624327 28 24.5773503 15 32.0829038"></polygon>
+                    <polygon id="Star" points="6 22 6 12 15 7 24 12 24 22 15 27"></polygon>
+                    <circle id="Oval-12" opacity="0.8" cx="15" cy="2" r="2"></circle>
+                    <circle id="Oval-12-Copy" opacity="0.8" cx="2" cy="9" r="2"></circle>
+                    <circle id="Oval-12-Copy-4" opacity="0.8" cx="2" cy="24" r="2"></circle>
+                    <circle id="Oval-12-Copy-5" opacity="0.8" cx="15" cy="32" r="2"></circle>
+                    <circle id="Oval-12-Copy-2" opacity="0.8" cx="28" cy="9" r="2"></circle>
+                    <circle id="Oval-12-Copy-3" opacity="0.8" cx="28" cy="24" r="2"></circle>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>
