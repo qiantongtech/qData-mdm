@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -25,6 +25,7 @@
         :data="deptOptions"
         :tree-props="{ label: 'label', children: 'children' }"
         node-key="id"
+        directory-icons
         :use-builtin-cat-edit-dialog="false"
         :title="td('sys.system.user.dept')"
         :placeholder="td('sys.system.user.deptNamePlaceholder')"
@@ -190,21 +191,21 @@
     <user-form-dialog
       ref="userFormDialogRef"
       :dept-options="deptOptions || []"
-      @success="getList"
+      @success="handleUsersChanged"
     />
-    <user-import-dialog ref="userImportDialogRef" @success="getList" />
+    <user-import-dialog ref="userImportDialogRef" @success="handleUsersChanged" />
     <user-detail-dialog ref="detailDialogRef" />
   </div>
 </template>
 
 <script setup name="User">
+import { tableTitleLink, titleCellClass } from '@/utils/anivia.js'
 import UserDetailDialog from './components/userDetailDialog.vue';
 
 import { checkPermi } from '@/utils/permission';
 
 import {
   changeUserStatus,
-  listUser,
   resetUserPwd,
   delUser,
   deptTreeSelect
@@ -215,6 +216,9 @@ import QtSearchBar from '@/components/QtSearchBar/index.vue';
 import UserFormDialog from './components/userFormDialog.vue';
 import UserImportDialog from './components/userImportDialog.vue';
 import useDefaultLang from '@/composables/useDefaultLang';
+import useUserDirectoryStore from '@/store/system/userDirectory';
+
+const userDirectoryStore = useUserDirectoryStore();
 
 const { td } = useDefaultLang();
 const router = useRouter();
@@ -247,6 +251,7 @@ const { queryParams } = toRefs(data);
 const tableStore = reactive({
   config: {
     table: {
+      cellClassName: titleCellClass,
       defaultSort: { prop: 'createTime', order: 'descending' },
       stripe: true,
       height: '58vh',
@@ -271,6 +276,9 @@ const tableStore = reactive({
     },
     {
       prop: 'userName',
+      className: 'title-column',
+      get link() { return tableTitleLink(row => proxy.$refs.detailDialogRef.openDialog(row), 'system:user:query'); },
+      align: 'left',
       get label() {
         return td('sys.system.user.userName');
       },
@@ -278,6 +286,7 @@ const tableStore = reactive({
     },
     {
       prop: 'nickName',
+      align: 'left',
       get label() {
         return td('sys.system.user.userNickName');
       },
@@ -285,6 +294,8 @@ const tableStore = reactive({
     },
     {
       slot: 'department',
+      align: 'left',
+      minWidth: 200,
       get label() {
         return td('sys.system.user.dept');
       },
@@ -324,7 +335,7 @@ const tableStore = reactive({
     }
   ],
   func: async (params) => {
-    const response = await listUser(params);
+    const response = await userDirectoryStore.listUserPage(params);
     return { data: { rows: response.rows, total: response.total } };
   },
   params: queryParams,
@@ -388,6 +399,12 @@ function getDeptTree() {
   });
 }
 
+/** 用户新增、编辑或导入成功后，同时刷新共享用户目录和管理列表。 */
+function handleUsersChanged() {
+  userDirectoryStore.invalidateCache();
+  getList();
+}
+
 /** Query user list */
 function getList() {
   tableRef.value?.getList();
@@ -435,6 +452,7 @@ function handleDelete(row) {
     })
     .then(() => {
       getList();
+      userDirectoryStore.invalidateCache();
       proxy.$modal.msgSuccess(td('common.message.deleteSuccess'));
     })
     .catch(() => {});
@@ -454,6 +472,7 @@ function handleStatusChange(row) {
       return changeUserStatus(row.userId, row.status);
     })
     .then(() => {
+      userDirectoryStore.invalidateCache();
       proxy.$modal.msgSuccess(td('common.message.updateSuccess'));
     })
     .catch(function () {

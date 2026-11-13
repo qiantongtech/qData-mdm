@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -44,7 +44,6 @@
       </template>
       <div v-loading="loading">
         <qt-table v-bind="tableStore" ref="tableRef" v-if="refreshTable">
-          <template #menuName="{ row }">{{ row.menuName }}</template>
           <template #icon="scope">
             <svg-icon :icon-class="scope.row.icon" />
           </template>
@@ -133,6 +132,7 @@
 </template>
 
 <script setup name="Menu">
+import { tableTitleLink, titleCellClass } from '@/utils/anivia.js'
 import MenuDetailDialog from './components/menuDetailDialog.vue';
 import { checkPermi } from '@/utils/permission';
 
@@ -265,6 +265,7 @@ const tableStore = reactive({
   config: computed(() => ({
     notPagination: true,
     table: {
+      cellClassName: titleCellClass,
       defaultSort: { prop: 'orderNum', order: 'ascending' },
       height: '60vh',
       rowKey: 'menuId',
@@ -279,7 +280,9 @@ const tableStore = reactive({
       },
       showOverflowTooltip: true,
       width: '160',
-      slot: 'menuName',
+      prop: 'menuName',
+      className: 'title-column',
+      get link() { return tableTitleLink(row => proxy.$refs.detailDialogRef.openDialog(row), 'system:menu:query'); },
       align: 'left'
     },
     {

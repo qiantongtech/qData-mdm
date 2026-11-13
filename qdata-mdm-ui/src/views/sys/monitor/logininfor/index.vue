@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -75,7 +75,6 @@
       <div v-loading="loading">
         <qt-table v-bind="tableStore0" ref="qtTableRef0">
           <template #infoId="{ row }">{{ row.infoId }}</template>
-          <template #userName="{ row }">{{ row.userName }}</template>
           <template #ipaddr="{ row }">{{ row.ipaddr }}</template>
           <template #loginLocation="{ row }">{{ row.loginLocation }}</template>
           <template #os="{ row }">{{ row.os }}</template>
@@ -105,6 +104,7 @@
 </template>
 
 <script setup name="Logininfor">
+import { tableTitleLink, titleCellClass } from '@/utils/anivia.js'
 import LogininforDetailDialog from './components/logininforDetailDialog.vue';
 import { checkPermi } from '@/utils/permission';
 import { reactive, computed, watch, ref, unref, isRef } from 'vue';
@@ -336,6 +336,7 @@ const qtTableRef0 = ref(null);
 const tableStore0 = reactive({
   config: computed(() => ({
     table: {
+      cellClassName: titleCellClass,
       stripe: true,
       height: '60vh',
       onSelectionChange: handleSelectionChange,
@@ -370,7 +371,8 @@ const tableStore0 = reactive({
       showOverflowTooltip: true,
       sortable: 'custom',
       sortOrders: ['descending', 'ascending'],
-      slot: 'userName',
+      className: 'title-column',
+      get link() { return tableTitleLink(row => proxy.$refs.detailDialogRef.openDialog(row), 'monitor:logininfor:query'); },
       prop: 'userName',
       sortableKey: 'userName'
     },

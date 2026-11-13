@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.master.dal.mapper.change.MasterChangeRequestMapper">
+
+    <!-- 所有申请入口共用项目库行锁；持有到申请、明细和任务统一提交或回滚。 -->
+    <select id="lockModelForMaintenance" resultType="long">
+        SELECT ID FROM MODEL_BASE WHERE ID = #{modelId} FOR UPDATE
+    </select>
+
+    <resultMap id="PendingRecordRequestResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterChangeRequestItemQueryDTO">
+        <result property="recordId" column="RECORD_ID"/>
+        <result property="requestId" column="REQUEST_ID"/>
+        <result property="requestNo" column="REQUEST_NO"/>
+    </resultMap>
+
+    <select id="selectPendingRecordRequests" resultMap="PendingRecordRequestResult">
+        SELECT COALESCE(i.RESULT_MASTER_RECORD_ID, i.MASTER_RECORD_ID) AS RECORD_ID,
+               r.ID AS REQUEST_ID, r.REQUEST_NO
+        FROM MASTER_CHANGE_REQUEST_ITEM i
+        INNER JOIN MASTER_CHANGE_REQUEST r ON r.ID = i.REQUEST_ID
+        WHERE r.MODEL_ID = #{modelId}
+          AND (r.STATUS = '0' OR (r.STATUS = '1' AND r.EXECUTE_STATUS IN ('0', '1')))
+          AND r.SUBMIT_TIME IS NOT NULL
+          AND r.VALID_FLAG = '1' AND r.DEL_FLAG = '0'
+          AND i.VALID_FLAG = '1' AND i.DEL_FLAG = '0'
+          AND COALESCE(i.RESULT_MASTER_RECORD_ID, i.MASTER_RECORD_ID) IN
+          <foreach collection="recordIds" item="recordId" open="(" separator="," close=")">
+              #{recordId}
+          </foreach>
+        ORDER BY r.ID, i.ITEM_NO, i.ID
+    </select>
+
+    <resultMap id="PendingCountResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterChangeRequestPendingCountDTO">
+        <id property="modelId" column="MODEL_ID"/>
+        <result property="pendingCount" column="PENDING_COUNT"/>
+    </resultMap>
+
+    <resultMap id="ApprovalHeaderResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterChangeRequestApprovalDTO">
+        <id property="id" column="ID"/>
+        <result property="requestNo" column="REQUEST_NO"/>
+        <result property="requestName" column="REQUEST_NAME"/>
+        <result property="changeType" column="CHANGE_TYPE"/>
+        <result property="instanceId" column="INSTANCE_ID"/>
+        <result property="executionId" column="EXECUTION_ID"/>
+        <result property="status" column="STATUS"/>
+        <result property="executeStatus" column="EXECUTE_STATUS"/>
+        <result property="applicantId" column="APPLICANT_ID"/>
+        <result property="applyReason" column="APPLY_REASON"/>
+        <result property="flowInstanceId" column="FLOW_INSTANCE_ID"/>
+        <result property="itemCount" column="ITEM_COUNT"/>
+        <result property="successItemCount" column="SUCCESS_ITEM_COUNT"/>
+        <result property="failItemCount" column="FAIL_ITEM_COUNT"/>
+        <result property="submitTime" column="SUBMIT_TIME"/>
+        <result property="finishTime" column="FINISH_TIME"/>
+        <result property="terminateReason" column="TERMINATE_REASON"/>
+        <result property="executeMessage" column="EXECUTE_MESSAGE"/>
+    </resultMap>
+
+    <resultMap id="ApprovalStatusCountResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterChangeRequestStatusCountDTO">
+        <result property="status" column="STATUS"/>
+        <result property="rowCount" column="ROW_COUNT"/>
+    </resultMap>
+
+    <!-- 入口卡片按模型统计已提交且仍在审批中的人工维护申请。 -->
+    <select id="selectPendingCountsByModelIds" resultMap="PendingCountResult">
+        SELECT MODEL_ID, COUNT(1) AS PENDING_COUNT
+        FROM MASTER_CHANGE_REQUEST
+        WHERE CHANGE_SOURCE = 'MANUAL' AND STATUS = '0' AND SUBMIT_TIME IS NOT NULL
+          AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+          AND MODEL_ID IN
+          <foreach collection="modelIds" item="modelId" open="(" separator="," close=")">
+              #{modelId}
+          </foreach>
+        GROUP BY MODEL_ID
+    </select>
+
+    <!-- 详情统计指定模型已提交且仍在审批中的人工维护申请。 -->
+    <select id="selectPendingCountByModelId" resultType="long">
+        SELECT COUNT(1)
+        FROM MASTER_CHANGE_REQUEST
+        WHERE MODEL_ID = #{modelId} AND CHANGE_SOURCE = 'MANUAL' AND STATUS = '0'
+          AND SUBMIT_TIME IS NOT NULL AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+    </select>
+
+    <sql id="ApprovalHeaderColumns">
+        r.ID, r.REQUEST_NO, r.REQUEST_NAME, r.CHANGE_TYPE, r.INSTANCE_ID, r.EXECUTION_ID,
+        r.STATUS, r.EXECUTE_STATUS,
+        r.APPLICANT_ID, r.APPLY_REASON, r.FLOW_INSTANCE_ID, r.ITEM_COUNT,
+        r.SUCCESS_ITEM_COUNT, r.FAIL_ITEM_COUNT, r.SUBMIT_TIME, r.FINISH_TIME,
+        r.TERMINATE_REASON, r.EXECUTE_MESSAGE
+    </sql>
+
+    <!-- 指定主数据记录关联的直接维护申请分页。 -->
+    <select id="selectRecordApprovalPage" resultMap="ApprovalHeaderResult">
+        SELECT <include refid="ApprovalHeaderColumns"/>
+        FROM MASTER_CHANGE_REQUEST r
+        WHERE r.MODEL_ID = #{modelId} AND r.CHANGE_SOURCE = 'MANUAL'
+          AND r.SUBMIT_TIME IS NOT NULL AND r.VALID_FLAG = '1' AND r.DEL_FLAG = '0'
+          AND EXISTS (SELECT 1 FROM MASTER_CHANGE_REQUEST_ITEM i
+              WHERE i.REQUEST_ID = r.ID
+                AND (i.MASTER_RECORD_ID = #{masterRecordId}
+                    OR i.RESULT_MASTER_RECORD_ID = #{masterRecordId})
+                AND i.VALID_FLAG = '1' AND i.DEL_FLAG = '0')
+        <choose>
+            <when test="req != null and req.orderByColumn == 'id'">
+                ORDER BY r.ID <choose><when test="req.isAsc == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+            </when>
+            <otherwise>ORDER BY r.SUBMIT_TIME DESC, r.ID DESC</otherwise>
+        </choose>
+    </select>
+
+    <!-- 指定主数据记录关联的一张直接维护申请头信息。 -->
+    <select id="selectRecordApprovalDetail" resultMap="ApprovalHeaderResult">
+        SELECT <include refid="ApprovalHeaderColumns"/>
+        FROM MASTER_CHANGE_REQUEST r
+        WHERE r.ID = #{requestId} AND r.MODEL_ID = #{modelId} AND r.CHANGE_SOURCE = 'MANUAL'
+          AND r.SUBMIT_TIME IS NOT NULL AND r.VALID_FLAG = '1' AND r.DEL_FLAG = '0'
+          AND EXISTS (SELECT 1 FROM MASTER_CHANGE_REQUEST_ITEM i
+              WHERE i.REQUEST_ID = r.ID
+                AND (i.MASTER_RECORD_ID = #{masterRecordId}
+                    OR i.RESULT_MASTER_RECORD_ID = #{masterRecordId})
+                AND i.VALID_FLAG = '1' AND i.DEL_FLAG = '0')
+    </select>
+
+    <!-- 模型维护审批分页；排序列及方向通过固定分支选择。 -->
+    <select id="selectApprovalPage" resultMap="ApprovalHeaderResult">
+        SELECT <include refid="ApprovalHeaderColumns"/>
+        FROM MASTER_CHANGE_REQUEST r
+        WHERE r.MODEL_ID = #{query.modelId} AND r.CHANGE_SOURCE = 'MANUAL'
+          AND r.SUBMIT_TIME IS NOT NULL AND r.VALID_FLAG = '1' AND r.DEL_FLAG = '0'
+        <if test="query.changeType != null and query.changeType != ''">
+            AND r.CHANGE_TYPE = #{query.changeType}
+        </if>
+        <if test="query.approvalStatus != null and query.approvalStatus != ''">
+            AND r.STATUS = #{query.approvalStatus}
+        </if>
+        <if test="query.requestNameLike != null and query.requestNameLike != ''">
+            AND LOWER(r.REQUEST_NAME) LIKE #{query.requestNameLike} ESCAPE '!'
+        </if>
+        <if test="query.masterDataId != null">
+            AND EXISTS (SELECT 1 FROM MASTER_CHANGE_REQUEST_ITEM ki
+                WHERE ki.REQUEST_ID = r.ID AND ki.VALID_FLAG = '1' AND ki.DEL_FLAG = '0'
+                  AND (ki.MASTER_RECORD_ID = #{query.masterDataId}
+                    OR ki.RESULT_MASTER_RECORD_ID = #{query.masterDataId}))
+        </if>
+        <if test="query.categoryRecordIdBatches != null and !query.categoryRecordIdBatches.isEmpty()">
+            AND EXISTS (SELECT 1 FROM MASTER_CHANGE_REQUEST_ITEM ci
+                WHERE ci.REQUEST_ID = r.ID AND ci.VALID_FLAG = '1' AND ci.DEL_FLAG = '0' AND (
+                <foreach collection="query.categoryRecordIdBatches" item="batch" separator=" OR ">
+                    (ci.MASTER_RECORD_ID IN
+                    <foreach collection="batch" item="recordId" open="(" separator="," close=")">#{recordId}</foreach>
+                    OR ci.RESULT_MASTER_RECORD_ID IN
+                    <foreach collection="batch" item="recordId" open="(" separator="," close=")">#{recordId}</foreach>)
+                </foreach>
+            ))
+        </if>
+        <choose>
+            <when test="req != null and req.orderByColumn == 'id'">
+                ORDER BY r.ID <choose><when test="req.isAsc == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+            </when>
+            <when test="req != null and req.orderByColumn == 'submit_time'">
+                ORDER BY r.SUBMIT_TIME <choose><when test="req.isAsc == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>,
+                         r.ID <choose><when test="req.isAsc == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+            </when>
+            <otherwise>ORDER BY r.ID DESC</otherwise>
+        </choose>
+    </select>
+
+    <!-- 模型下的一张有效直接维护申请。 -->
+    <select id="selectApprovalDetail" resultMap="ApprovalHeaderResult">
+        SELECT <include refid="ApprovalHeaderColumns"/>
+        FROM MASTER_CHANGE_REQUEST r
+        WHERE r.ID = #{requestId} AND r.MODEL_ID = #{modelId}
+          AND r.CHANGE_SOURCE = 'MANUAL' AND r.SUBMIT_TIME IS NOT NULL
+          AND r.VALID_FLAG = '1' AND r.DEL_FLAG = '0'
+    </select>
+
+    <!-- 审批页签状态汇总。 -->
+    <select id="selectApprovalStatusCounts" resultMap="ApprovalStatusCountResult">
+        SELECT STATUS, COUNT(1) AS ROW_COUNT
+        FROM MASTER_CHANGE_REQUEST
+        WHERE MODEL_ID = #{modelId} AND CHANGE_SOURCE = 'MANUAL' AND SUBMIT_TIME IS NOT NULL
+          AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+        GROUP BY STATUS
+    </select>
+
+    <resultMap id="MyRequestStatusCountResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterMyRequestStatusCountDTO">
+        <result property="approvalStatus" column="STATUS"/>
+        <result property="rowCount" column="ROW_COUNT"/>
+    </resultMap>
+
+    <resultMap id="MyRequestRowResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterMyRequestRowDTO">
+        <id property="requestId" column="ID"/>
+        <result property="requestNo" column="REQUEST_NO"/>
+        <result property="requestName" column="REQUEST_NAME"/>
+        <result property="applyReason" column="APPLY_REASON"/>
+        <result property="modelId" column="MODEL_ID"/>
+        <result property="instanceId" column="INSTANCE_ID"/>
+        <result property="executionId" column="EXECUTION_ID"/>
+        <result property="changeType" column="CHANGE_TYPE"/>
+        <result property="approvalStatus" column="STATUS"/>
+        <result property="executeStatus" column="EXECUTE_STATUS"/>
+        <result property="submitTime" column="SUBMIT_TIME"/>
+        <result property="finishTime" column="FINISH_TIME"/>
+        <result property="executeMessage" column="EXECUTE_MESSAGE"/>
+        <result property="flowInstanceId" column="FLOW_INSTANCE_ID"/>
+        <result property="itemCount" column="ITEM_COUNT"/>
+    </resultMap>
+
+
+
+    <resultMap id="MyRequestDetailResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterChangeRequestApprovalDTO">
+        <id property="id" column="ID"/>
+        <result property="requestNo" column="REQUEST_NO"/>
+        <result property="requestName" column="REQUEST_NAME"/>
+        <result property="modelId" column="MODEL_ID"/>
+        <result property="modelVersionId" column="MODEL_VERSION_ID"/>
+        <result property="changeSource" column="CHANGE_SOURCE"/>
+        <result property="changeType" column="CHANGE_TYPE"/>
+        <result property="instanceId" column="INSTANCE_ID"/>
+        <result property="executionId" column="EXECUTION_ID"/>
+        <result property="status" column="STATUS"/>
+        <result property="executeStatus" column="EXECUTE_STATUS"/>
+        <result property="applicantId" column="APPLICANT_ID"/>
+        <result property="applyReason" column="APPLY_REASON"/>
+        <result property="flowInstanceId" column="FLOW_INSTANCE_ID"/>
+        <result property="itemCount" column="ITEM_COUNT"/>
+        <result property="successItemCount" column="SUCCESS_ITEM_COUNT"/>
+        <result property="failItemCount" column="FAIL_ITEM_COUNT"/>
+        <result property="submitTime" column="SUBMIT_TIME"/>
+        <result property="finishTime" column="FINISH_TIME"/>
+        <result property="terminateReason" column="TERMINATE_REASON"/>
+        <result property="executeMessage" column="EXECUTE_MESSAGE"/>
+    </resultMap>
+
+    <sql id="MyRequestBaseWhere">
+        WHERE r.APPLICANT_ID = #{query.applicantId}
+          AND r.CHANGE_SOURCE IN ('MANUAL', 'MERGE')
+          AND r.SUBMIT_TIME IS NOT NULL
+          AND r.VALID_FLAG = '1'
+          AND r.DEL_FLAG = '0'
+        <if test="query.selectedApplicantId != null">
+            AND r.APPLICANT_ID = #{query.selectedApplicantId}
+        </if>
+        <choose>
+            <when test="query.changeType == 'CREATE'">
+                AND r.CHANGE_TYPE = 'CREATE'
+            </when>
+            <when test="query.changeType != null and query.changeType != ''">
+                AND r.CHANGE_TYPE = #{query.changeType}
+            </when>
+        </choose>
+        <if test="query.requestNoLike != null">
+            AND LOWER(r.REQUEST_NO) LIKE #{query.requestNoLike} ESCAPE '!'
+        </if>
+        <if test="query.targetNameLike != null">
+            AND LOWER(r.REQUEST_NAME) LIKE #{query.targetNameLike} ESCAPE '!'
+        </if>
+        <if test="query.applicantNameLike != null">
+            AND EXISTS (SELECT 1 FROM system_user u
+                WHERE u.user_id = r.APPLICANT_ID
+                  AND LOWER(u.nick_name) LIKE #{query.applicantNameLike} ESCAPE '!')
+        </if>
+        <if test="query.projectId != null or (query.layerIds != null and !query.layerIds.isEmpty())">
+            AND EXISTS (SELECT 1 FROM MODEL_BASE m WHERE m.ID = r.MODEL_ID
+                <if test="query.projectId != null">AND m.PROJECT_ID = #{query.projectId}</if>
+                <if test="query.layerIds != null and !query.layerIds.isEmpty()">
+                    AND m.LAYER_ID IN
+                    <foreach collection="query.layerIds" item="layerId" open="(" separator="," close=")">#{layerId}</foreach>
+                </if>
+            )
+        </if>
+        <if test="query.modelId != null">
+            AND r.MODEL_ID = #{query.modelId}
+        </if>
+        <if test="query.approvalStatus != null and query.approvalStatus != ''">
+            AND r.STATUS = #{query.approvalStatus}
+        </if>
+        <if test="query.keywordLike != null and query.keywordLike != ''">
+            AND (LOWER(r.REQUEST_NO) LIKE #{query.keywordLike} ESCAPE '!'
+              OR LOWER(r.REQUEST_NAME) LIKE #{query.keywordLike} ESCAPE '!'
+              <foreach collection="query.keywordModelIdGroups" item="modelIds">
+                  OR r.MODEL_ID IN
+                  <foreach collection="modelIds" item="modelId" open="(" separator="," close=")">
+                      #{modelId}
+                  </foreach>
+              </foreach>
+            )
+        </if>
+    </sql>
+
+    <select id="selectMyRequestStatusCounts" resultMap="MyRequestStatusCountResult">
+        SELECT r.STATUS,
+               COUNT(1) AS ROW_COUNT
+        FROM MASTER_CHANGE_REQUEST r
+        <include refid="MyRequestBaseWhere"/>
+        GROUP BY r.STATUS
+    </select>
+
+    <select id="selectMyRequestPage" resultMap="MyRequestRowResult">
+        SELECT r.ID,
+               r.REQUEST_NO,
+               r.REQUEST_NAME,
+               r.APPLY_REASON,
+               r.MODEL_ID,
+               r.INSTANCE_ID,
+               r.EXECUTION_ID,
+               r.CHANGE_TYPE,
+               r.STATUS,
+               r.EXECUTE_STATUS,
+               r.SUBMIT_TIME,
+               r.FINISH_TIME,
+               r.EXECUTE_MESSAGE,
+               r.FLOW_INSTANCE_ID,
+               r.ITEM_COUNT
+        FROM MASTER_CHANGE_REQUEST r
+        <include refid="MyRequestBaseWhere"/>
+        <choose>
+            <when test="query.statusGroup == 'PROCESSING'">
+                AND r.STATUS = '0'
+            </when>
+            <when test="query.statusGroup == 'ENDED'">
+                AND r.STATUS &lt;&gt; '0'
+            </when>
+        </choose>
+        <choose>
+            <when test="req != null and req.orderByColumn == 'id'">
+                ORDER BY r.ID
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <when test="req != null and req.orderByColumn == 'submit_time'">
+                ORDER BY r.SUBMIT_TIME
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+                , r.ID DESC
+            </when>
+            <otherwise>
+                ORDER BY r.SUBMIT_TIME DESC, r.ID DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 只读取 master 自己的申请关联ID，名称由服务层通过 model-api 补齐。 -->
+    <select id="selectMyRequestModelIds" resultType="java.lang.Long">
+        SELECT DISTINCT r.MODEL_ID
+        FROM MASTER_CHANGE_REQUEST r
+        WHERE r.APPLICANT_ID = #{applicantId}
+          AND r.CHANGE_SOURCE IN ('MANUAL', 'MERGE')
+          AND r.SUBMIT_TIME IS NOT NULL
+          AND r.VALID_FLAG = '1'
+          AND r.DEL_FLAG = '0'
+        ORDER BY r.MODEL_ID
+    </select>
+
+    <select id="selectMyRequestDetail" resultMap="MyRequestDetailResult">
+        SELECT ID,
+               REQUEST_NO,
+               REQUEST_NAME,
+               MODEL_ID,
+               MODEL_VERSION_ID,
+               CHANGE_SOURCE,
+               CHANGE_TYPE,
+               INSTANCE_ID,
+               EXECUTION_ID,
+               STATUS,
+               EXECUTE_STATUS,
+               APPLICANT_ID,
+               APPLY_REASON,
+               FLOW_INSTANCE_ID,
+               ITEM_COUNT,
+               SUCCESS_ITEM_COUNT,
+               FAIL_ITEM_COUNT,
+               SUBMIT_TIME,
+               FINISH_TIME,
+               TERMINATE_REASON,
+               EXECUTE_MESSAGE
+        FROM MASTER_CHANGE_REQUEST
+        WHERE ID = #{requestId}
+          AND APPLICANT_ID = #{applicantId}
+          AND CHANGE_SOURCE IN ('MANUAL', 'MERGE')
+          AND SUBMIT_TIME IS NOT NULL
+          AND VALID_FLAG = '1'
+          AND DEL_FLAG = '0'
+    </select>
+
+</mapper>

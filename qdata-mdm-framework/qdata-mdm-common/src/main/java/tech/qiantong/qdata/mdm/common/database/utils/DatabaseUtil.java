@@ -1,14 +1,14 @@
 /*
- * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -27,12 +27,41 @@ import tech.qiantong.qdata.mdm.common.utils.MessageUtils;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.Locale;
 import java.util.Map;
 
 /**
  * Data connection tool methods
  */
 public class DatabaseUtil {
+
+    /** 数字物理列的 Boolean 参数转为 0/1，原生布尔列、未知类型及其他值保持原样。 */
+    public static Object convertBooleanParameter(String physicalType, Object value) {
+        if (!(value instanceof Boolean) || physicalType == null) {
+            return value;
+        }
+        String type = physicalType.trim();
+        int argumentIndex = type.indexOf('(');
+        if (argumentIndex >= 0) {
+            type = type.substring(0, argumentIndex);
+        }
+        switch (type.trim().toUpperCase(Locale.ROOT)) {
+            case "TINYINT":
+            case "SMALLINT":
+            case "INT2":
+            case "INT":
+            case "INTEGER":
+            case "INT4":
+            case "BIGINT":
+            case "INT8":
+            case "NUMBER":
+            case "NUMERIC":
+            case "DECIMAL":
+                return (short) ((Boolean) value ? 1 : 0);
+            default:
+                return value;
+        }
+    }
 
     /**
      * Convert a string to type Long. If the string is empty or cannot be converted, 0L is returned.

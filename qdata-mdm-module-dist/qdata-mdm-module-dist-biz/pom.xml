@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>tech.qiantong</groupId>
+        <artifactId>qdata-mdm-module-dist</artifactId>
+        <version>${qdata-mdm.version}</version>
+    </parent>
+
+    <artifactId>qdata-mdm-module-dist-biz</artifactId>
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- 通过模型公共接口校验已发布模型及字段归属。 -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-model-api</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-ingest-api</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+
+        <!-- 保证MapStruct在Lombok生成属性后执行。 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok-mapstruct-binding</artifactId>
+            <version>0.2.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- 与MyBatis-Plus分页解析器保持一致。 -->
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>4.9</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-dist-api</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+        <!-- 复用系统模块的用户查询服务，供分发任务选择创建人。 -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-system-api</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- 全量分发通过 master-api 分页读取已发布模型的真实主数据。 -->
+
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-master-api</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+
+        <!-- 使用同一次成功发布的字段结构，将记录字段编码对应到任务保存的字段 ID。 -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-model-api</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-common</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-mybatis</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-security</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-ingest-api</artifactId>
+            <version>${qdata-mdm.version}</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
+</project>

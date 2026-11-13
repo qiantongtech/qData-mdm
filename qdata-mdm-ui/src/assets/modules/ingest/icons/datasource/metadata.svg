@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>元数据能力</title>
+    <g id="后台管理系统" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="qDate-新增数据连接备份-2" transform="translate(-508, -722)" fill="#135AFB">
+            <g id="元数据能力" transform="translate(508, 722)">
+                <rect id="矩形-3备份-2" fill-opacity="0.06" x="0" y="0" width="32" height="32" rx="4"></rect>
+                <path d="M7,20.5 L25,20.5 L25,25 L7,25 L7,20.5 Z M20.5,21.625 L20.5,23.875 L22.75,23.875 L22.75,21.625 L20.5,21.625 Z M7,13.75 L25,13.75 L25,18.25 L7,18.25 L7,13.75 Z M20.5,14.875 L20.5,17.125 L22.75,17.125 L22.75,14.875 L20.5,14.875 Z M7,7 L25,7 L25,11.5 L7,11.5 L7,7 Z M20.5,8.125 L20.5,10.375 L22.75,10.375 L22.75,8.125 L20.5,8.125 Z" id="形状" fill-rule="nonzero"></path>
+            </g>
+        </g>
+    </g>
+</svg>

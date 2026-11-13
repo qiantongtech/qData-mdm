@@ -1,14 +1,14 @@
 /*
- * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -21,15 +21,13 @@ package tech.qiantong.qdata.mdm.common.database.query;
 import cn.hutool.db.ds.simple.SimpleDataSource;
 import com.alibaba.fastjson2.JSONObject;
 import com.zaxxer.hikari.HikariDataSource;
-import io.lettuce.core.RedisClient;
-import io.lettuce.core.api.StatefulRedisConnection;
 import lombok.Setter;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
 import tech.qiantong.qdata.mdm.common.database.DbDialect;
 import tech.qiantong.qdata.mdm.common.database.DbQuery;
 import tech.qiantong.qdata.mdm.common.database.constants.DbQueryProperty;
@@ -37,7 +35,6 @@ import tech.qiantong.qdata.mdm.common.database.constants.DbType;
 import tech.qiantong.qdata.mdm.common.database.core.*;
 import tech.qiantong.qdata.mdm.common.database.datasource.AbstractDataSourceFactory;
 import tech.qiantong.qdata.mdm.common.database.datasource.DefaultDataSourceFactoryBean;
-import tech.qiantong.qdata.mdm.common.database.dialect.FileDialect;
 import tech.qiantong.qdata.mdm.common.database.dialect.OracleDialect;
 import tech.qiantong.qdata.mdm.common.database.exception.DataQueryException;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
@@ -45,6 +42,7 @@ import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.sql.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,12 +57,21 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
 
     protected JdbcTemplate jdbcTemplate;
 
-    private RedisClient redisClient;
-    protected StatefulRedisConnection<String, String> redisConnection;
-
     protected DbDialect dbDialect;
 
     private DbQueryProperty dbQueryProperty;
+
+    protected Object jdbcParameter(Object value) {
+        if (value instanceof java.util.Date && !(value instanceof java.sql.Date) && !(value instanceof java.sql.Time)
+                && dbQueryProperty != null && DbType.SQL_SERVER2008.getDb().equals(dbQueryProperty.getDbType())
+                && dbQueryProperty.trainToJdbcUrl().startsWith("jdbc:jtds:sqlserver:")) {
+            // 避免 jTDS 按旧 DATETIME 精度绑定时提前舍入 DATETIME2 时间值。
+            Timestamp timestamp = value instanceof Timestamp ? (Timestamp) value
+                    : new Timestamp(((java.util.Date) value).getTime());
+            return timestamp.toLocalDateTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        }
+        return value;
+    }
 
     // JDBC type → Flink SQL type (simplified version, extensible on demand)
     private static final Map<String, String> TYPE_MAPPING = new HashMap<>();
@@ -181,6 +188,14 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
         TYPE_MAPPING.put("GEOMETRY", "STRING");
     }
 
+    /**
+     * 把逻辑字段转换交给当前数据库方言，不执行SQL。
+     */
+    @Override
+    public DbColumn convertLogicalColumn(DbColumn column) {
+        return dbDialect.convertLogicalColumn(column);
+    }
+
     @Override
     public Connection getConnection() {
         try {
@@ -196,6 +211,176 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
         }
     }
 
+    /**
+     * 生成索引SQL，是否需要建立索引由业务计划决定。
+     */
+    @Override
+    public String generateCreateIndexSQL(DbQueryProperty property, String tableName, DbIndex index) {
+        return dbDialect.generateCreateIndexSQL(property, tableName, index);
+    }
+
+    /**
+     * 只生成撤销SQL，不在公共查询层执行补偿。
+     */
+    @Override
+    public String generateDropIndexSQL(DbQueryProperty property, String tableName, String indexName) {
+        return dbDialect.generateDropIndexSQL(property, tableName, indexName);
+    }
+
+    /**
+     * 每次直接读取真实主键，释放本次连接，不关闭共享数据源。
+     */
+    @Override
+    public DbIndex getTablePrimaryKey(DbQueryProperty property, String tableName) {
+        try (Connection connection = getConnection()) {
+            String[] target = resolveMetadataTarget(connection, property, tableName);
+            return readTablePrimaryKey(connection.getMetaData(), target);
+        } catch (SQLException e) {
+            throw new DataQueryException("读取表主键失败：" + tableName, e);
+        }
+    }
+
+    /**
+     * 按驱动返回的序号组织索引列，不使用旧结构缓存判断DDL是否成功。
+     */
+    @Override
+    public List<DbIndex> getTableIndexes(DbQueryProperty property, String tableName) {
+        try (Connection connection = getConnection()) {
+            String[] target = resolveMetadataTarget(connection, property, tableName);
+            DatabaseMetaData metadata = connection.getMetaData();
+            DbIndex primaryKey = readTablePrimaryKey(metadata, target);
+            String primaryIndexName = readPrimaryIndexName(connection, property, target, primaryKey);
+            Map<String, DbIndex> indexes = new LinkedHashMap<>();
+            Map<String, SortedMap<Integer, String>> orderedColumns = new LinkedHashMap<>();
+            // Oracle JDBC refreshes statistics with ANALYZE TABLE when approximate is false.
+            boolean approximate = dbDialect instanceof OracleDialect;
+            try (ResultSet rows = metadata.getIndexInfo(target[0], target[1], target[2], false, approximate)) {
+                while (rows.next()) {
+                    // 统计行不是索引。表达式索引没有普通列名时，不伪造列名。
+                    if (rows.getShort("TYPE") == DatabaseMetaData.tableIndexStatistic) {
+                        continue;
+                    }
+                    String name = rows.getString("INDEX_NAME");
+                    if (name == null) {
+                        throw new DataQueryException("索引元数据缺少实际名称：" + tableName);
+                    }
+                    DbIndex index = indexes.get(name);
+                    if (index == null) {
+                        index = DbIndex.builder().indexName(name).primaryKey(false)
+                                .unique(!rows.getBoolean("NON_UNIQUE")).build();
+                        indexes.put(name, index);
+                        orderedColumns.put(name, new TreeMap<>());
+                    }
+                    String column = rows.getString("COLUMN_NAME");
+                    if (column != null) {
+                        orderedColumns.get(name).put(rows.getInt("ORDINAL_POSITION"), column);
+                    }
+                }
+            }
+            for (DbIndex index : indexes.values()) {
+                index.setColumnNames(new ArrayList<>(orderedColumns.get(index.getIndexName()).values()));
+                // 用数据库中的真实关联确认主键索引；列相同的普通唯一索引不能冒充主键。
+                index.setPrimaryKey(primaryKey != null && primaryIndexName != null
+                        && primaryIndexName.trim().equals(index.getIndexName().trim())
+                        && primaryKey.getColumnNames().equals(index.getColumnNames()));
+            }
+            return new ArrayList<>(indexes.values());
+        } catch (SQLException e) {
+            throw new DataQueryException("读取表索引失败：" + tableName, e);
+        }
+    }
+
+    /**
+     * DM和GBase的主键约束名与底层索引名可能不同，按真实目录关联查出索引名称。
+     * 其他数据库继续使用JDBC返回的主键名称，不因列相同而误认普通唯一索引。
+     *
+     * @param connection 当前元数据读取连接，事务内不另开连接
+     * @param property 数据源配置
+     * @param target 已确定的Catalog、Schema和实际表名
+     * @param primaryKey JDBC读取的主键信息
+     * @return 主键对应的实际索引名称；没有主键时返回null
+     * @throws SQLException 目录查询失败或关联不能唯一确认时抛出
+     */
+    private String readPrimaryIndexName(Connection connection, DbQueryProperty property,
+                                        String[] target, DbIndex primaryKey) throws SQLException {
+        if (primaryKey == null) {
+            return null;
+        }
+        String sql;
+        String owner = target[1];
+        if (dbDialect instanceof tech.qiantong.qdata.mdm.common.database.dialect.DM8Dialect) {
+            sql = "SELECT INDEX_NAME FROM ALL_CONSTRAINTS WHERE OWNER=? AND TABLE_NAME=? AND CONSTRAINT_TYPE='P'";
+        } else {
+            return primaryKey.getIndexName();
+        }
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, owner);
+            statement.setString(2, target[2]);
+            try (ResultSet rows = statement.executeQuery()) {
+                if (!rows.next()) {
+                    throw new SQLException("主键对应的索引关联不存在");
+                }
+                String name = rows.getString(1);
+                if (name == null || name.trim().isEmpty() || rows.next()) {
+                    throw new SQLException("主键对应的索引关联无法唯一确认");
+                }
+                return name;
+            }
+        }
+    }
+
+    /**
+     * 从真实主键元数据读取列顺序；没有主键时才返回null。
+     */
+    private DbIndex readTablePrimaryKey(DatabaseMetaData metadata, String[] target) throws SQLException {
+        SortedMap<Integer, String> columns = new TreeMap<>();
+        String name = null;
+        try (ResultSet rows = metadata.getPrimaryKeys(target[0], target[1], target[2])) {
+            while (rows.next()) {
+                name = rows.getString("PK_NAME");
+                String column = rows.getString("COLUMN_NAME");
+                if (column == null) {
+                    throw new DataQueryException("主键元数据缺少列名：" + target[2]);
+                }
+                columns.put(rows.getInt("KEY_SEQ"), column);
+            }
+        }
+        return columns.isEmpty() ? null : DbIndex.builder().indexName(name).primaryKey(true)
+                                          .unique(true).columnNames(new ArrayList<>(columns.values())).build();
+    }
+
+    /**
+     * 依据方言已确定的限定表名拆分Catalog、Schema、表名。
+     * 不额外更改大小写；Oracle等方言原本的表名处理仍由原方法决定。
+     */
+    private String[] resolveMetadataTarget(Connection connection, DbQueryProperty property, String tableName)
+            throws SQLException {
+        if (tableName == null || !tableName.matches("[a-zA-Z_][a-zA-Z0-9_$]*")) {
+            throw new IllegalArgumentException("请传入未限定的表名");
+        }
+        String qualified = dbDialect.getTableName(property, tableName);
+        String[] parts = qualified.split("\\.");
+        for (int i = 0; i < parts.length; i++) {
+            parts[i] = parts[i].replace("\"", "").replace("`", "").replace("[", "").replace("]", "");
+        }
+        String catalog = connection.getCatalog();
+        String schema = null;
+        String actualTable = parts[parts.length - 1];
+        if (parts.length == 3) {
+            catalog = parts[0];
+            schema = parts[1];
+        } else if (parts.length == 2) {
+            if (dbDialect instanceof tech.qiantong.qdata.mdm.common.database.dialect.MySqlDialect) {
+                catalog = parts[0];
+            } else {
+                schema = parts[0];
+            }
+        } else {
+            schema = connection.getSchema();
+        }
+        return new String[]{catalog, schema, actualTable};
+    }
+
     @Override
     public boolean valid() {
         return dbDialect.validConnection(dataSource, dbQueryProperty);
@@ -203,23 +388,6 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
 
     @Override
     public void close() {
-        DbType dbType = DbType.getDbType(dbQueryProperty.getDbType());
-        if (DbType.KAFKA.getDb().equals(dbType.getDb())
-                || DbType.HDFS.getDb().equals(dbType.getDb())
-                || DbType.RABBITMQ.getDb().equals(dbType.getDb())
-                || DbType.FTP.getDb().equals(dbType.getDb())
-                || DbType.OSS_ALIYUN.getDb().equals(dbType.getDb())) {
-            return;
-        } else if (DbType.REDIS.getDb().equals(dbType.getDb())) {
-            if (redisConnection != null) {
-                redisConnection.close();   // Close connection
-            }
-            if (redisClient != null) {
-                redisClient.shutdown();    // Close client resources
-            }
-            return;
-        }
-
         if (dataSource instanceof HikariDataSource) {
             ((HikariDataSource) dataSource).close();
         } else if (dataSource instanceof SimpleDataSource) {
@@ -264,22 +432,7 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
         if (CollectionUtils.isEmpty(query)) {
             return query;
         }
-        if (DbType.DORIS.getDb().equals(dbQueryProperty.getDbType())) {
-            // SHOW CREATE TABLE requires a table, and keys must be scoped to that table.
-            Map<String, Set<String>> keysByTable = new HashMap<>();
-            for (DbColumn column : query) {
-                String tableName = column.getTableName();
-                Set<String> keys = keysByTable.get(tableName);
-                if (keys == null) {
-                    keys = getTableColumns(dbQueryProperty, tableName).stream()
-                            .filter(c -> Boolean.TRUE.equals(c.getColKey()))
-                            .map(DbColumn::getColName)
-                            .collect(Collectors.toSet());
-                    keysByTable.put(tableName, keys);
-                }
-                column.setColKey(keys.contains(column.getColName()));
-            }
-        }
+
         return query;
     }
 
@@ -301,25 +454,7 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
         if (CollectionUtils.isEmpty(query)) {
             return query;
         }
-        if (DbType.DORIS.getDb().equals(dbQueryProperty.getDbType())) {
-            String pkColumnNames = dbDialect.getPkColumnNames(dbQueryProperty, tableName);
-            List<String> pkList = new ArrayList<>();
 
-            jdbcTemplate.query(pkColumnNames, rs -> {
-                String createTableSql = rs.getString(2); // Column 2 is the complete DDL
-                Pattern pattern = Pattern.compile("(UNIQUE|PRIMARY) KEY\\s*\\(([^)]+)\\)", Pattern.CASE_INSENSITIVE);
-                Matcher matcher = pattern.matcher(createTableSql);
-                if (matcher.find()) {
-                    String keys = matcher.group(2);
-                    Arrays.stream(keys.split(","))
-                            .map(col -> col.replace("`", "").trim())
-                            .forEach(pkList::add);
-                }
-            });
-            for (DbColumn column : query) {
-                column.setColKey(pkList.contains(column.getColName()));
-            }
-        }
         return query;
     }
 
@@ -327,26 +462,15 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
     public int generateCheckTableExistsSQL(DbQueryProperty dbQueryProperty, String tableName) {
         String sql = dbDialect.generateCheckTableExistsSQL(dbQueryProperty, tableName);
 
-        //hive does not support
-        if (DbType.HIVE.getDb().equals(dbQueryProperty.getDbType())) {
-            List<Map<String, Object>> result = jdbcTemplate.queryForList(sql);
-            return CollectionUtils.isEmpty(result) ? 0 : result.size();
-        } else {
             return this.isTableExists(sql);
-        }
+
     }
 
     @Override
     public List<String> generateCreateTableSQL(DbQueryProperty dbQueryProperty, String tableName, String tableComment,
                                                List<DbColumn> dbColumnList) {
+        for (DbColumn column : dbColumnList) dbDialect.identityColumnClause(column);
         List<String> sql = dbDialect.someInternalSqlGenerator(dbQueryProperty, tableName, tableComment, dbColumnList);
-        return sql;
-    }
-
-    @Override
-    public List<String> generateDorisCreateTableSQL(DbQueryProperty dbQueryProperty, String tableName, String tableComment, List<DbColumn> dbColumnList, String partitionRule, String bucketRule, Integer replica) {
-//        DbDialect otherDialect = DialectFactory.getDialect(DbType.getDbType(dbQueryProperty.getDbType()));
-        List<String> sql = dbDialect.someInternalSqlDorisGenerator(dbQueryProperty, tableName, tableComment, dbColumnList, partitionRule, bucketRule, replica);
         return sql;
     }
 
@@ -370,26 +494,10 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
 
     @Override
     public List<DbTable> getTables(DbQueryProperty dbQueryProperty) {
-        if (DbType.HIVE.getDb().equals(dbQueryProperty.getDbType())) {
-            String sql = dbDialect.tables(dbQueryProperty);
-            List<DbTable> query = jdbcTemplate.query(sql, dbDialect.tableMapper());
-            for (DbTable dbTable : query) {
-                String tablesCommentSql = dbDialect.tablesComment(dbQueryProperty, dbTable.getTableName());
-                List<Map<String, Object>> rows = jdbcTemplate.queryForList(tablesCommentSql);
-                String comment = null;
-                for (Map<String, Object> row : rows) {
-                    if ("comment".equalsIgnoreCase(String.valueOf(row.get("col_name")))) {
-                        comment = String.valueOf(row.get("data_type")); // Hive will put the comments in this column
-                        break;
-                    }
-                }
-                dbTable.setTableComment(comment);
-            }
-            return query;
-        } else {
+
             String sql = dbDialect.tables(dbQueryProperty);
             return jdbcTemplate.query(sql, dbDialect.tableMapper());
-        }
+
     }
 
     @Override
@@ -402,16 +510,6 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
 
         String sql = dbDialect.getDbName(dbName);
         return jdbcTemplate.query(sql, dbDialect.firstLevelMapper(level));
-    }
-
-    @Override
-    public List<FileInfo> getFiles(String path) {
-        if (dbDialect instanceof FileDialect) {
-            FileDialect fileDialect = (FileDialect) dbDialect;
-            return fileDialect.getFiles(dbQueryProperty, path);
-        }
-        throw new ServiceException("sys.error.datasource.file.list.unsupported",
-                "The current data source does not support retrieving file lists");
     }
 
     @Override
@@ -508,6 +606,38 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
     @Override
     public List<Map<String, Object>> queryList(String sql, Object[] args) {
         return jdbcTemplate.query(sql, new MyRowMapper(), args);
+    }
+
+    @Override
+    public <T> List<T> queryList(String sql, Object[] args, org.springframework.jdbc.core.RowMapper<T> mapper) {
+        return jdbcTemplate.query(sql, args, mapper);
+    }
+
+    @Override
+    public <T> T query(String sql, Object[] args, org.springframework.jdbc.core.ResultSetExtractor<T> extractor) {
+        return jdbcTemplate.query(sql, args, extractor);
+    }
+
+    @Override
+    public int update(String sql, Object[] args) {
+        return jdbcTemplate.update(sql, args == null ? null : Arrays.stream(args).map(this::jdbcParameter).toArray());
+    }
+
+    /** 使用调用方连接执行更新，连接仍由调用方管理。 */
+    @Override
+    public int update(Connection connection, String sql, Object[] args) {
+        if (connection == null) throw new ServiceException("SQL 执行连接不能为空");
+        JdbcTemplate connectionTemplate = new JdbcTemplate(new SingleConnectionDataSource(connection, true));
+        connectionTemplate.setQueryTimeout(jdbcTemplate.getQueryTimeout());
+        return connectionTemplate.update(sql, args == null ? null : Arrays.stream(args).map(this::jdbcParameter).toArray());
+    }
+
+    @Override
+    public <T> List<T> queryListWithMapper(String sql, Map<String, Object> params,
+                                         org.springframework.jdbc.core.RowMapper<T> mapper) {
+        Map<String, Object> parameters = params == null ? new LinkedHashMap<>() : new LinkedHashMap<>(params);
+        parameters.replaceAll((name, value) -> jdbcParameter(value));
+        return new NamedParameterJdbcTemplate(jdbcTemplate).query(sql, parameters, mapper);
     }
 
     @Override
@@ -650,12 +780,7 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
     @Override
     public Boolean copyTable(Connection conn, DbQueryProperty dbQueryProperty, String tableName, String newTableName) {
         try {
-            //Determine whether it is Hive
-            if (dbQueryProperty.getDbType().equals(DbType.HIVE.getDb())) {
-                String sql = "CREATE TABLE " + newTableName + " LIKE " + tableName;
-                this.execute(sql);
-                return true;
-            }
+
             if (org.apache.commons.lang3.StringUtils.isNotBlank(dbQueryProperty.getDbName())) {
                 tableName = org.apache.commons.lang3.StringUtils.replace(tableName, dbQueryProperty.getDbName() + ".", "");
                 newTableName = org.apache.commons.lang3.StringUtils.replace(newTableName, dbQueryProperty.getDbName() + ".", "");
@@ -688,45 +813,6 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
     }
 
     @Override
-    public Boolean copyTableToOtherDb(DbQueryProperty otherDbQueryProperty, String tableName, String newTableName, String newTableComment, List<JSONObject> addColumn, String partitionRule, String bucketRule, Integer replica) {
-        try {
-            List<DbColumn> dbColumnList = this.getTableColumns(dbQueryProperty, tableName);
-
-            //Get table comments
-            List<DbTable> dbTableList = this.getTables(dbQueryProperty.getDbName());
-            if (addColumn != null && addColumn.size() > 0) {
-                for (JSONObject jsonObject : addColumn) {
-                    DbColumn dbColumn = new DbColumn();
-                    dbColumn.setColName(jsonObject.getString("columnName"));
-                    dbColumn.setColComment(jsonObject.getString("columnComment"));
-                    dbColumn.setDataType(jsonObject.getString("columnType"));
-                    dbColumn.setDataLength(jsonObject.getString("columnLength"));
-                    dbColumn.setDataScale(jsonObject.containsKey("columnScale") ? jsonObject.getString("columnScale") : null);
-                    dbColumn.setColKey(jsonObject.getBooleanValue("colKey", false));
-                    dbColumn.setNullable(jsonObject.getBooleanValue("nullable", true));
-                    dbColumn.setDataDefault(jsonObject.getString("defaultValue"));
-                    dbColumnList.add(dbColumn);
-                }
-            }
-            //Extract the primary key to the top
-            List<DbColumn> keyColumns = dbColumnList.stream().filter(e -> e.getColKey()).collect(Collectors.toList());
-            List<DbColumn> nonKeyColumns = dbColumnList.stream().filter(e -> !e.getColKey()).collect(Collectors.toList());
-            dbColumnList.clear();
-            dbColumnList.addAll(keyColumns);
-            dbColumnList.addAll(nonKeyColumns);
-            List<String> tableSQLList = this.generateDorisCreateTableSQL(otherDbQueryProperty, newTableName, newTableComment, dbColumnList, partitionRule, bucketRule, replica);
-            DbQuery writerDbQuery = dataSourceFactory.createDbQuery(otherDbQueryProperty);
-            for (String sql : tableSQLList) {
-                writerDbQuery.execute(sql);
-            }
-        } catch (Exception e) {
-            org.slf4j.LoggerFactory.getLogger(AbstractDbQueryFactory.class).error("Operation failed", e);
-            return false;
-        }
-        return true;
-    }
-
-    @Override
     public String getInsertOrUpdateSql(DbQueryProperty writerProperty, String tableName, List<String> selectedColumns, List<String> column) {
         if (org.apache.commons.lang3.StringUtils.equals(DbType.KINGBASE8.getDb(), writerProperty.getDbType()) ||
                 org.apache.commons.lang3.StringUtils.equals(DbType.SQL_SERVER.getDb(), writerProperty.getDbType()) ||
@@ -748,12 +834,6 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
                     .append(") VALUES(").append(org.apache.commons.lang3.StringUtils.join(valueHolders, ","))
                     .append(")")
                     .append(onDuplicateKeyUpdateString(column))
-                    .toString();
-        } else if (dbQueryProperty.getDbType().equals(DbType.DORIS.getDb())) {
-            writeDataSqlTemplate = new StringBuilder()
-                    .append("INSERT INTO %s (").append(org.apache.commons.lang3.StringUtils.join(column, ","))
-                    .append(") VALUES(").append(org.apache.commons.lang3.StringUtils.join(valueHolders, ","))
-                    .append(")")
                     .toString();
         } else if (dbQueryProperty.getDbType().equals(DbType.SQL_SERVER.getDb()) || dbQueryProperty.getDbType().equals(DbType.SQL_SERVER2008.getDb())) {
             writeDataSqlTemplate = new StringBuilder().append(onMergeIntoSQLServerDoString(selectedColumns, column)).append("INSERT (")
@@ -957,6 +1037,7 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
                 res.add(DbColumn.builder()
                         .colName(metaData.getColumnName(i))
                         .dataType(metaData.getColumnTypeName(i))
+                        .jdbcType(metaData.getColumnType(i))
                         .dataLength(String.valueOf(metaData.getColumnDisplaySize(i)))
                         .dataPrecision(String.valueOf(metaData.getPrecision(i)))
                         .dataScale(String.valueOf(metaData.getScale(i)))
@@ -993,17 +1074,6 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
         }
 
         return res;
-    }
-
-    @Override
-    public void uploadFile(String path, MultipartFile file) {
-        if (dbDialect instanceof FileDialect) {
-            FileDialect fileDialect = (FileDialect) dbDialect;
-            fileDialect.uploadFile(dbQueryProperty, path, file);
-            return;
-        }
-        throw new ServiceException("sys.error.datasource.file.upload.unsupported",
-                "The current data source does not support file uploads");
     }
 
     @Override
@@ -1154,7 +1224,6 @@ public abstract class AbstractDbQueryFactory implements DbQuery {
             List<DbColumn> colKeyDbColumnList = sourceDbColumnList.stream()
                     .filter(DbColumn::getColKey)
                     .collect(Collectors.toList());
-            //TODO This logic is not needed for the time being - filter the columns that need to be deleted as the primary key
 //            List<DbColumn> deleteColKeyColumnList = columnsToDelete.stream()
 //                    .filter(DbColumn::getColKey)
 //                    .collect(Collectors.toList());

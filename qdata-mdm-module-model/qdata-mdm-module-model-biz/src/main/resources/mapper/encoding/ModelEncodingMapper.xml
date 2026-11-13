@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.encoding.ModelEncodingMapper">
+
+    <resultMap type="ModelEncodingDO" id="ModelEncodingResult">
+        <result property="id" column="ID"/>
+        <result property="code" column="CODE"/>
+        <result property="name" column="NAME"/>
+        <result property="currentVersionId" column="CURRENT_VERSION_ID"/>
+        <result property="description" column="DESCRIPTION"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="delFlag" column="DEL_FLAG"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="updaterId" column="UPDATER_ID"/>
+        <result property="remark" column="REMARK"/>
+        <result property="validFlag" column="VALID_FLAG"/>
+    </resultMap>
+
+    <sql id="selectModelEncodingVo">
+        select ID,
+               CODE,
+               NAME,
+               CURRENT_VERSION_ID,
+               DESCRIPTION,
+               CREATE_BY,
+               CREATE_TIME,
+               UPDATE_BY,
+               UPDATE_TIME,
+               DEL_FLAG,
+               CREATOR_ID,
+               UPDATER_ID,
+               REMARK,
+               VALID_FLAG
+        from MODEL_ENCODING
+    </sql>
+
+    <select id="selectModelEncodingList" parameterType="ModelEncodingDO" resultMap="ModelEncodingResult">
+        <include refid="selectModelEncodingVo"/>
+        <where>
+            <if test="code != null  and schemeCode != ''">and CODE = #{schemeCode}</if>
+            <if test="name != null  and name != ''">and NAME like concat(concat('%', #{name}), '%')</if>
+            <if test="currentVersionId != null ">and CURRENT_VERSION_ID = #{currentVersionId}</if>
+            <if test="description != null  and description != ''">and DESCRIPTION = #{description}</if>
+            <if test="createTime != null ">and CREATE_TIME = #{createTime}</if>
+        </where>
+    </select>
+
+    <select id="selectModelEncodingById" parameterType="Long" resultMap="ModelEncodingResult">
+        <include refid="selectModelEncodingVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertModelEncoding" parameterType="ModelEncodingDO">
+        insert into MODEL_ENCODING
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="code != null and code != ''">CODE,</if>
+            <if test="name != null">NAME,</if>
+            <if test="currentVersionId != null">CURRENT_VERSION_ID,</if>
+            <if test="description != null">DESCRIPTION,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+            <if test="remark != null">REMARK,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="code != null and code != ''">#{code},</if>
+            <if test="name != null">#{name},</if>
+            <if test="currentVersionId != null">#{currentVersionId},</if>
+            <if test="description != null">#{description},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+        </trim>
+    </insert>
+
+    <update id="updateModelEncoding" parameterType="ModelEncodingDO">
+        update MODEL_ENCODING
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="code != null and code != ''">CODE = #{code},</if>
+            <if test="name != null">NAME = #{name},</if>
+            <if test="currentVersionId != null">CURRENT_VERSION_ID = #{currentVersionId},</if>
+            <if test="description != null">DESCRIPTION = #{description},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+            <if test="remark != null">REMARK = #{remark},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteModelEncodingById" parameterType="Long">
+        delete
+        from MODEL_ENCODING
+        where ID = #{id}
+    </delete>
+
+    <delete id="deleteModelEncodingByIds" parameterType="String">
+        delete from MODEL_ENCODING where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- 流水状态显式映射，避免依赖全局下划线转驼峰配置。 -->
+    <resultMap id="ModelEncodingSequenceResult"
+               type="tech.qiantong.qdata.mdm.model.dal.dataobject.encoding.ModelEncodingSequenceDO">
+        <id property="encodingId" column="ENCODING_ID"/>
+        <id property="modelId" column="MODEL_ID"/>
+        <id property="sortOrder" column="SORT_ORDER"/>
+        <id property="periodKey" column="PERIOD_KEY"/>
+        <result property="currentValue" column="CURRENT_VALUE"/>
+        <result property="encodingVersionId" column="ENCODING_VERSION_ID"/>
+        <result property="itemId" column="ITEM_ID"/>
+        <result property="configSnapshot" column="CONFIG_SNAPSHOT"/>
+    </resultMap>
+
+    <!-- 先锁方案主记录再读写流水，即使首次分配无流水行，也不会并发重复起号。 -->
+    <select id="lockScheme" resultType="java.lang.Long">
+        SELECT ID
+        FROM MODEL_ENCODING
+        WHERE ID = #{id} FOR UPDATE
+    </select>
+
+    <!-- 各模型、规则位置和周期独立计数；旧版本与历史周期的已分配进度不回收。 -->
+    <select id="selectState" resultMap="ModelEncodingSequenceResult">
+        SELECT ENCODING_ID,
+               MODEL_ID,
+               SORT_ORDER,
+               PERIOD_KEY,
+               CURRENT_VALUE,
+               ENCODING_VERSION_ID,
+               ITEM_ID,
+               CONFIG_SNAPSHOT
+        FROM MODEL_ENCODING_SEQUENCE
+        WHERE ENCODING_ID = #{encodingId}
+          AND MODEL_ID = #{modelId}
+          AND SORT_ORDER = #{sortOrder}
+          AND PERIOD_KEY = #{periodKey}
+    </select>
+
+    <!-- 首次正式分配，将当前数字与当次使用的完整规则快照一起写入。 -->
+    <insert id="insertState">
+        INSERT INTO MODEL_ENCODING_SEQUENCE
+        (ENCODING_ID, MODEL_ID, SORT_ORDER, PERIOD_KEY, CURRENT_VALUE,
+         ENCODING_VERSION_ID, ITEM_ID, CONFIG_SNAPSHOT)
+        VALUES (#{encodingId}, #{modelId}, #{sortOrder}, #{periodKey}, #{currentValue},
+                #{encodingVersionId}, #{itemId}, #{configSnapshot})
+    </insert>
+
+    <!-- 在已持有方案锁的事务内更新进度，多个流水段与完整编码保持原子分配。 -->
+    <update id="updateState">
+        UPDATE MODEL_ENCODING_SEQUENCE
+        SET CURRENT_VALUE       = #{currentValue},
+            ENCODING_VERSION_ID = #{encodingVersionId},
+            ITEM_ID             = #{itemId},
+            CONFIG_SNAPSHOT     = #{configSnapshot}
+        WHERE ENCODING_ID = #{encodingId}
+          AND MODEL_ID = #{modelId}
+          AND SORT_ORDER = #{sortOrder}
+          AND PERIOD_KEY = #{periodKey}
+    </update>
+</mapper>

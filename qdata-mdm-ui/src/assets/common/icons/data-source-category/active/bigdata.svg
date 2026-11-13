@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="18px" height="18px" viewBox="0 0 18 18" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>数据库节点_database-point备份</title>
+    <g id="数据库节点_database-point备份" stroke="none" fill="none" opacity="0.75" fill-rule="evenodd" stroke-width="1">
+        <g id="编组">
+            <line x1="9" y1="13.5" x2="9" y2="11.25" id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></line>
+            <line x1="7.5" y1="15" x2="2.25" y2="15" id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></line>
+            <line x1="10.5" y1="15" x2="15.75" y2="15" id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></line>
+            <path d="M10.5,15 C10.5,15.8284125 9.8284125,16.5 9,16.5 C8.1715875,16.5 7.5,15.8284125 7.5,15 C7.5,14.1715875 8.1715875,13.5 9,13.5 C9.8284125,13.5 10.5,14.1715875 10.5,15 Z" id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M14.625,3.375 L14.625,9.375 C14.625,10.410525 12.1066125,11.25 9,11.25 C5.8933875,11.25 3.375,10.410525 3.375,9.375 L3.375,3.375" id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M14.625,6.375 C14.625,7.410525 12.1066125,8.25 9,8.25 C5.8933875,8.25 3.375,7.410525 3.375,6.375" id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M14.625,3.375 C14.625,4.410525 12.1066125,5.25 9,5.25 C5.8933875,5.25 3.375,4.410525 3.375,3.375 C3.375,2.3394675 5.8933875,1.5 9,1.5 C12.1066125,1.5 14.625,2.3394675 14.625,3.375 Z" id="路径"></path>
+            <path d="M14.625,3.375 C14.625,4.410525 12.1066125,5.25 9,5.25 C5.8933875,5.25 3.375,4.410525 3.375,3.375 C3.375,2.3394675 5.8933875,1.5 9,1.5 C12.1066125,1.5 14.625,2.3394675 14.625,3.375 Z" id="路径"></path>
+            <path d="M14.625,3.375 C14.625,4.410525 12.1066125,5.25 9,5.25 C5.8933875,5.25 3.375,4.410525 3.375,3.375 C3.375,2.3394675 5.8933875,1.5 9,1.5 C12.1066125,1.5 14.625,2.3394675 14.625,3.375 Z" id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M14.625,3.375 C14.625,4.410525 12.1066125,5.25 9,5.25 C5.8933875,5.25 3.375,4.410525 3.375,3.375 C3.375,2.3394675 5.8933875,1.5 9,1.5 C12.1066125,1.5 14.625,2.3394675 14.625,3.375 Z" id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+        </g>
+    </g>
+</svg>

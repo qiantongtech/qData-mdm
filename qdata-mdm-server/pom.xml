@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -41,13 +41,52 @@
             <version>${qdata-mdm.version}</version>
         </dependency>
 
+        <!-- Model module -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-model-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+        <!-- Master module -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-master-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
 
-        <!-- spring-boot-devtools -->
-<!--        <dependency>-->
-<!--            <groupId>org.springframework.boot</groupId>-->
-<!--            <artifactId>spring-boot-devtools</artifactId>-->
-<!-- <optional>true</optional> <!– Indicates that dependencies will not be passed –>-->
-<!--        </dependency>-->
+
+        <!-- 数据接入与多源融合模块 -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-ingest-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-merge-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- Rule module -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-rule-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- Quality module -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-quality-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+
+        <!-- Audit module -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-audit-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -58,6 +97,23 @@
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Dist module -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-dist-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
+        </dependency>
+        <!-- 授权管理模块 -->
+        <dependency>
+            <groupId>tech.qiantong</groupId>
+            <artifactId>qdata-mdm-module-auth-biz</artifactId>
+            <version>${qdata-mdm.version}</version>
         </dependency>
     </dependencies>
 

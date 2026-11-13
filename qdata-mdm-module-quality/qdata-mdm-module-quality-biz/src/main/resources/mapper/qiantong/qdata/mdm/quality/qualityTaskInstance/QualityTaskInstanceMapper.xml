@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.quality.dal.mapper.qualityTaskInstance.QualityTaskInstanceMapper">
+
+    <resultMap type="QualityTaskInstanceDO" id="QualityTaskInstanceResult">
+        <result property="id"    column="ID"    />
+        <result property="qualityTaskId"    column="QUALITY_TASK_ID"    />
+        <result property="taskCode"    column="TASK_CODE"    />
+        <result property="modelId"    column="MODEL_ID"    />
+        <result property="modelVersion"    column="MODEL_VERSION"    />
+        <result property="executionNo"    column="EXECUTION_NO"    />
+        <result property="personCharge"    column="PERSON_CHARGE"    />
+        <result property="contactNumber"    column="CONTACT_NUMBER"    />
+        <result property="triggerType"    column="TRIGGER_TYPE"    />
+        <result property="status"    column="STATUS"    />
+        <result property="startTime"    column="START_TIME"    />
+        <result property="endTime"    column="END_TIME"    />
+        <result property="totalCount"    column="TOTAL_COUNT"    />
+        <result property="passCount"    column="PASS_COUNT"    />
+        <result property="failCount"    column="FAIL_COUNT"    />
+        <result property="errorMessage"    column="ERROR_MESSAGE"    />
+        <result property="validFlag"    column="VALID_FLAG"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="creatorId"    column="CREATOR_ID"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updaterId"    column="UPDATER_ID"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="remark"    column="REMARK"    />
+    </resultMap>
+
+    <sql id="selectQualityTaskInstanceVo">
+        select ID, QUALITY_TASK_ID, TASK_CODE, MODEL_ID, MODEL_VERSION, EXECUTION_NO, PERSON_CHARGE, CONTACT_NUMBER, TRIGGER_TYPE, STATUS, START_TIME, END_TIME, TOTAL_COUNT, PASS_COUNT, FAIL_COUNT, ERROR_MESSAGE, VALID_FLAG, DEL_FLAG, CREATE_BY, CREATOR_ID, CREATE_TIME, UPDATE_BY, UPDATER_ID, UPDATE_TIME, REMARK from QUALITY_TASK_INSTANCE
+    </sql>
+
+    <select id="selectLatestByTaskIds" resultMap="QualityTaskInstanceResult">
+        SELECT current_run.ID, current_run.QUALITY_TASK_ID, current_run.START_TIME, current_run.END_TIME
+        FROM QUALITY_TASK_INSTANCE current_run
+        WHERE current_run.DEL_FLAG = 0
+          AND current_run.QUALITY_TASK_ID IN
+          <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">
+              #{taskId}
+          </foreach>
+          AND NOT EXISTS (
+              SELECT 1 FROM QUALITY_TASK_INSTANCE newer_run
+              WHERE newer_run.QUALITY_TASK_ID = current_run.QUALITY_TASK_ID
+                AND newer_run.DEL_FLAG = 0
+                AND (newer_run.START_TIME > current_run.START_TIME
+                  OR (newer_run.START_TIME = current_run.START_TIME AND newer_run.ID > current_run.ID)
+                  OR (current_run.START_TIME IS NULL AND newer_run.START_TIME IS NOT NULL)
+                  OR (current_run.START_TIME IS NULL AND newer_run.START_TIME IS NULL AND newer_run.ID > current_run.ID))
+          )
+    </select>
+
+    <select id="selectQualityTaskInstanceList" parameterType="QualityTaskInstanceDO" resultMap="QualityTaskInstanceResult">
+        <include refid="selectQualityTaskInstanceVo"/>
+        <where>
+            <if test="qualityTaskId != null "> and QUALITY_TASK_ID = #{qualityTaskId}</if>
+            <if test="taskCode != null  and taskCode != ''"> and TASK_CODE = #{taskCode}</if>
+            <if test="modelId != null "> and MODEL_ID = #{modelId}</if>
+            <if test="modelVersion != null  and modelVersion != ''"> and MODEL_VERSION = #{modelVersion}</if>
+            <if test="executionNo != null  and executionNo != ''"> and EXECUTION_NO = #{executionNo}</if>
+            <if test="personCharge != null  and personCharge != ''"> and PERSON_CHARGE = #{personCharge}</if>
+            <if test="contactNumber != null  and contactNumber != ''"> and CONTACT_NUMBER = #{contactNumber}</if>
+            <if test="triggerType != null  and triggerType != ''"> and TRIGGER_TYPE = #{triggerType}</if>
+            <if test="status != null  and status != ''"> and STATUS = #{status}</if>
+            <if test="startTime != null "> and START_TIME = #{startTime}</if>
+            <if test="endTime != null "> and END_TIME = #{endTime}</if>
+            <if test="totalCount != null "> and TOTAL_COUNT = #{totalCount}</if>
+            <if test="passCount != null "> and PASS_COUNT = #{passCount}</if>
+            <if test="failCount != null "> and FAIL_COUNT = #{failCount}</if>
+            <if test="errorMessage != null  and errorMessage != ''"> and ERROR_MESSAGE = #{errorMessage}</if>
+            <if test="validFlag != null "> and VALID_FLAG = #{validFlag}</if>
+            <if test="createTime != null "> and CREATE_TIME = #{createTime}</if>
+            <if test="updateTime != null "> and UPDATE_TIME = #{updateTime}</if>
+        </where>
+    </select>
+
+    <select id="selectQualityTaskInstanceById" parameterType="Long" resultMap="QualityTaskInstanceResult">
+        <include refid="selectQualityTaskInstanceVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertQualityTaskInstance" parameterType="QualityTaskInstanceDO">
+        insert into QUALITY_TASK_INSTANCE
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="qualityTaskId != null">QUALITY_TASK_ID,</if>
+            <if test="taskCode != null">TASK_CODE,</if>
+            <if test="modelId != null">MODEL_ID,</if>
+            <if test="modelVersion != null">MODEL_VERSION,</if>
+            <if test="executionNo != null">EXECUTION_NO,</if>
+            <if test="personCharge != null">PERSON_CHARGE,</if>
+            <if test="contactNumber != null">CONTACT_NUMBER,</if>
+            <if test="triggerType != null">TRIGGER_TYPE,</if>
+            <if test="status != null">STATUS,</if>
+            <if test="startTime != null">START_TIME,</if>
+            <if test="endTime != null">END_TIME,</if>
+            <if test="totalCount != null">TOTAL_COUNT,</if>
+            <if test="passCount != null">PASS_COUNT,</if>
+            <if test="failCount != null">FAIL_COUNT,</if>
+            <if test="errorMessage != null">ERROR_MESSAGE,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="remark != null">REMARK,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="qualityTaskId != null">#{qualityTaskId},</if>
+            <if test="taskCode != null">#{taskCode},</if>
+            <if test="modelId != null">#{modelId},</if>
+            <if test="modelVersion != null">#{modelVersion},</if>
+            <if test="executionNo != null">#{executionNo},</if>
+            <if test="personCharge != null">#{personCharge},</if>
+            <if test="contactNumber != null">#{contactNumber},</if>
+            <if test="triggerType != null">#{triggerType},</if>
+            <if test="status != null">#{status},</if>
+            <if test="startTime != null">#{startTime},</if>
+            <if test="endTime != null">#{endTime},</if>
+            <if test="totalCount != null">#{totalCount},</if>
+            <if test="passCount != null">#{passCount},</if>
+            <if test="failCount != null">#{failCount},</if>
+            <if test="errorMessage != null">#{errorMessage},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateQualityTaskInstance" parameterType="QualityTaskInstanceDO">
+        update QUALITY_TASK_INSTANCE
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="qualityTaskId != null">QUALITY_TASK_ID = #{qualityTaskId},</if>
+            <if test="taskCode != null">TASK_CODE = #{taskCode},</if>
+            <if test="modelId != null">MODEL_ID = #{modelId},</if>
+            <if test="modelVersion != null">MODEL_VERSION = #{modelVersion},</if>
+            <if test="executionNo != null">EXECUTION_NO = #{executionNo},</if>
+            <if test="personCharge != null">PERSON_CHARGE = #{personCharge},</if>
+            <if test="contactNumber != null">CONTACT_NUMBER = #{contactNumber},</if>
+            <if test="triggerType != null">TRIGGER_TYPE = #{triggerType},</if>
+            <if test="status != null">STATUS = #{status},</if>
+            <if test="startTime != null">START_TIME = #{startTime},</if>
+            <if test="endTime != null">END_TIME = #{endTime},</if>
+            <if test="totalCount != null">TOTAL_COUNT = #{totalCount},</if>
+            <if test="passCount != null">PASS_COUNT = #{passCount},</if>
+            <if test="failCount != null">FAIL_COUNT = #{failCount},</if>
+            <if test="errorMessage != null">ERROR_MESSAGE = #{errorMessage},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="remark != null">REMARK = #{remark},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteQualityTaskInstanceById" parameterType="Long">
+        delete from QUALITY_TASK_INSTANCE where ID = #{id}
+    </delete>
+
+    <delete id="deleteQualityTaskInstanceByIds" parameterType="String">
+        delete from QUALITY_TASK_INSTANCE where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.base.ModelPublishConfigMapper">
+
+    <!-- 根模型及全部直接子模型，包含逻辑删除配置以保留显式状态证据 -->
+    <select id="selectNodes" resultType="java.util.LinkedHashMap">
+        SELECT * FROM MODEL_BASE WHERE ID = #{modelId} OR PARENT_ID = #{modelId} ORDER BY ID
+    </select>
+
+    <!-- 完整字段配置，包含已逻辑删除字段及当前DO尚未映射的展示配置 -->
+    <select id="selectFields" resultType="java.util.LinkedHashMap">
+        SELECT * FROM MODEL_COLUMN WHERE MODEL_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY ID
+    </select>
+
+    <!-- 字段引用的参考数据集合原始配置 -->
+    <select id="selectReferenceTypes" resultType="java.util.LinkedHashMap">
+        SELECT * FROM MODEL_DICT_TYPE WHERE ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY ID
+    </select>
+
+    <!-- 参考数据集合全部数据项，保留停用及删除状态 -->
+    <select id="selectReferenceItems" resultType="java.util.LinkedHashMap">
+        SELECT * FROM MODEL_DICT_DATA WHERE TYPE_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY ID
+    </select>
+
+    <!-- 引用的编码方案版本完整配置 -->
+    <select id="selectEncodingVersions" resultType="java.util.LinkedHashMap">
+        SELECT * FROM MODEL_ENCODING_VERSION WHERE ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY ID
+    </select>
+
+    <!-- 编码方案主体配置 -->
+    <select id="selectEncodings" resultType="java.util.LinkedHashMap">
+        SELECT * FROM MODEL_ENCODING WHERE ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY ID
+    </select>
+
+    <!-- 编码方案版本全部组成项配置 -->
+    <select id="selectEncodingItems" resultType="java.util.LinkedHashMap">
+        SELECT * FROM MODEL_ENCODING_ITEM WHERE ENCODING_VERSION_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY ID
+    </select>
+
+    <!-- 上次成功实例全部真实表记录，不以启用状态过滤历史对象 -->
+    <select id="selectMaterializedTables" resultType="java.util.LinkedHashMap">
+        SELECT * FROM MODEL_MATERIALIZED_TABLE WHERE INSTANCE_ID = #{instanceId} ORDER BY ID
+    </select>
+
+    <!-- 成功物化表全部真实列记录，不以启用状态过滤停用字段 -->
+    <select id="selectMaterializedColumns" resultType="java.util.LinkedHashMap">
+        SELECT * FROM MODEL_MATERIALIZED_COLUMN WHERE MATERIALIZED_TABLE_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY ID
+    </select>
+    <!-- 本期仅支持主模型及直接子模型，不能静默漏掉第三层配置。 -->
+    <select id="countActiveDescendants" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM MODEL_BASE WHERE DEL_FLAG = '0' AND PARENT_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+    <!-- 不过滤已删除模型，旧物理表仍然存在，不能直接复用编码。 -->
+    <select id="selectModelCodeOwners" resultType="java.util.LinkedHashMap">
+        SELECT ID, CODE FROM MODEL_BASE WHERE LOWER(CODE) IN
+        <foreach collection="codes" item="code" open="(" separator="," close=")">#{code}</foreach>
+        ORDER BY ID
+    </select>
+    <!-- 只读目标数据源，保持接入模块原有增删改逻辑。 -->
+    <select id="selectPublishDatasource" resultType="java.util.LinkedHashMap">
+        SELECT ID, DATASOURCE_TYPE, IP, PORT, DATASOURCE_CONFIG, VALID_FLAG, DEL_FLAG
+        FROM INGEST_DATASOURCE WHERE ID = #{id}
+    </select>
+    <!-- 曾经正式保存过的绑定都要保护，停用或逻辑删除也不能当作可清理对象。 -->
+    <select id="selectPublishedBindingCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM (
+            SELECT ID FROM MODEL_BASE WHERE PUBLISHED_INSTANCE_ID = #{instanceId}
+            UNION ALL
+            SELECT ID FROM MODEL_MATERIALIZED_TABLE WHERE INSTANCE_ID = #{instanceId}
+        ) PUBLISHED_BINDINGS
+    </select>
+</mapper>

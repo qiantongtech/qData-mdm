@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.dict.ModelDictTypeMapper">
+
+    <resultMap type="ModelDictTypeDO" id="ModelDictTypeResult">
+        <result property="id"    column="ID"    />
+        <result property="code"    column="CODE"    />
+        <result property="name"    column="NAME"    />
+        <result property="description"    column="DESCRIPTION"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="validFlag"    column="VALID_FLAG"    />
+        <result property="creatorId"    column="CREATOR_ID"    />
+        <result property="updaterId"    column="UPDATER_ID"    />
+    </resultMap>
+
+    <sql id="selectModelDictTypeVo">
+        select ID, CODE, NAME, DESCRIPTION, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DEL_FLAG, VALID_FLAG, CREATOR_ID, UPDATER_ID from MODEL_DICT_DATA
+    </sql>
+
+    <select id="selectModelDictTypeList" parameterType="ModelDictTypeDO" resultMap="ModelDictTypeResult">
+        <include refid="selectModelDictTypeVo"/>
+        <where>
+            <if test="code != null  and code != ''"> and CODE = #{code}</if>
+            <if test="name != null  and name != ''"> and NAME like concat(concat('%', #{name}), '%')</if>
+            <if test="description != null  and description != ''"> and DESCRIPTION = #{description}</if>
+            <if test="createTime != null "> and CREATE_TIME = #{createTime}</if>
+        </where>
+    </select>
+
+    <select id="selectModelDictTypeById" parameterType="Long" resultMap="ModelDictTypeResult">
+        <include refid="selectModelDictTypeVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertModelDictType" parameterType="ModelDictTypeDO">
+        insert into MODEL_DICT_DATA
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="code != null and code != ''">CODE,</if>
+            <if test="name != null">NAME,</if>
+            <if test="description != null">DESCRIPTION,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="code != null and code != ''">#{code},</if>
+            <if test="name != null">#{name},</if>
+            <if test="description != null">#{description},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+         </trim>
+    </insert>
+
+    <update id="updateModelDictType" parameterType="ModelDictTypeDO">
+        update MODEL_DICT_DATA
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="code != null and code != ''">CODE = #{code},</if>
+            <if test="name != null">NAME = #{name},</if>
+            <if test="description != null">DESCRIPTION = #{description},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteModelDictTypeById" parameterType="Long">
+        delete from MODEL_DICT_DATA where ID = #{id}
+    </delete>
+
+    <delete id="deleteModelDictTypeByIds" parameterType="String">
+        delete from MODEL_DICT_DATA where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

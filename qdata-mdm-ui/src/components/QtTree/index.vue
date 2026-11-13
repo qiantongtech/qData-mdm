@@ -1,3 +1,21 @@
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
 <template>
   <el-aside
     ref="asideRef"
@@ -39,28 +57,40 @@
         @node-contextmenu="onNodeContextMenu"
       >
         <template #default="{ node, data }">
-          <span class="custom-tree-node" @dblclick.stop="handleNodeDblclick(data, node)">
+          <span
+            class="custom-tree-node"
+            :title="modelNodeTypes.has(data.nodeType) ? `${t(`components.qtTree.${data.nodeType}`)} · ${nodeLabelText(data)}` : undefined"
+            @dblclick.stop="handleNodeDblclick(data, node)"
+          >
             <slot
               name="icon"
               :node="node"
               :data="data"
-              :default-icon="
-                node.childNodes.length > 0 || node.level === 1
-                  ? node.expanded
-                    ? folderOpenIcon
-                    : folderCloseIcon
-                  : fileIcon
-              "
+              :default-icon="getNodeIcon(node, data)"
             >
-              <span class="node-icon-wrapper" v-if="node.childNodes.length > 0 || node.level === 1">
+              <span class="node-icon-wrapper">
+                <svg-icon
+                  v-if="data.nodeType === 'project'"
+                  icon-class="stack-line"
+                  class="node-icon node-icon--domain"
+                />
+                <span
+                  v-else-if="data.nodeType === 'layer' || directoryIcons"
+                  class="node-icon node-icon--directory"
+                  :class="{ 'is-expanded': node.expanded, 'node-icon--layer': data.nodeType === 'layer' }"
+                  aria-hidden="true"
+                ></span>
+                <span
+                  v-else-if="data.nodeType === 'model'"
+                  class="node-icon node-icon--model"
+                  aria-hidden="true"
+                ></span>
                 <img
+                  v-else
                   class="node-icon"
-                  :src="node.expanded ? folderOpenIcon : folderCloseIcon"
+                  :src="getNodeIcon(node, data)"
                   alt=""
                 />
-              </span>
-              <span class="node-icon-wrapper" v-else>
-                <img class="node-icon" :src="fileIcon" alt="" />
               </span>
             </slot>
 
@@ -182,6 +212,7 @@
 
 <script setup name="QtTree">
 import { ref, computed, getCurrentInstance, onMounted, nextTick, resolveComponent } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { merge } from 'lodash-es';
 import { MoreFilled, ArrowRight, ArrowLeft } from '@element-plus/icons-vue';
 import { useTreePanel } from './composables/useTreePanel.js';
@@ -192,9 +223,24 @@ import { mergeConfig } from './presets.js';
 import folderOpenIcon from '@/assets/common/icons/tree/folder-open.svg';
 import folderCloseIcon from '@/assets/common/icons/tree/folder-close.svg';
 import fileIcon from '@/assets/common/icons/tree/file.svg';
+import modelIcon from '@/assets/common/icons/model/model.svg';
+import domainIcon from '@/assets/common/icons/svg/stack-line.svg';
+
+const { t } = useI18n();
+const modelNodeTypes = new Set(['project', 'layer', 'model']);
+
+function getNodeIcon(node, data) {
+  if (data.nodeType === 'project') return domainIcon;
+  if (data.nodeType === 'model') return modelIcon;
+  if (data.nodeType === 'layer' || node.childNodes.length > 0 || node.level === 1) {
+    return node.expanded ? folderOpenIcon : folderCloseIcon;
+  }
+  return fileIcon;
+}
 
 const props = defineProps({
   preset: { type: String, default: 'default' },
+  directoryIcons: Boolean,
   config: { type: Object, default: () => ({}) },
   leftWidth: { type: Number, default: undefined },
   deptName: { type: String, default: undefined },
@@ -362,13 +408,6 @@ function safeStartResize(event) {
   startResize(event);
 }
 
-const searchComposed = useTreeSearch({
-  props: mergedPseudoProps,
-  emit,
-  resolvedTreeProps
-});
-const { innerDeptName, filterNode, setDeptTreeRef: _setSearchTreeRef } = searchComposed;
-
 const dataComposed = useTreeData({
   props: mergedPseudoProps,
   emit,
@@ -393,9 +432,16 @@ const {
 } = dataComposed;
 
 const deptTreeRef = ref(null);
+const { innerDeptName, filterNode } = useTreeSearch({
+  props: mergedPseudoProps,
+  emit,
+  resolvedTreeProps,
+  deptTreeRef,
+  resolvedTreeData,
+  modelNodeTypes
+});
 onMounted(() => {
   nextTick(() => {
-    _setSearchTreeRef(deptTreeRef.value);
     _setDataTreeRef(deptTreeRef.value);
   });
 });

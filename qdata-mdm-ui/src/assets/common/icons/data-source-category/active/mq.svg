@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="18px" height="18px" viewBox="0 0 18 18" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>评论_comments备份</title>
+    <g id="评论_comments备份" stroke="none" fill="none" opacity="0.75" fill-rule="evenodd" stroke-linecap="round" stroke-width="1">
+        <g id="编组" stroke="#2666fb">
+            <polygon id="路径" stroke-width="1.5" stroke-linejoin="round" points="12.375 14.25 8.25 14.25 8.25 11.25 13.5 11.25 13.5 8.25 16.5 8.25 16.5 14.25 14.625 14.25 13.5 15.375"></polygon>
+            <polygon id="路径" stroke-width="1.5" stroke-linejoin="round" points="1.5 2.25 13.5 2.25 13.5 11.25 6.375 11.25 4.875 12.75 3.375 11.25 1.5 11.25"></polygon>
+            <line x1="4.5" y1="8.25" x2="6.75" y2="8.25" id="路径" stroke-width="1.5"></line>
+            <line x1="4.5" y1="5.25" x2="9" y2="5.25" id="路径" stroke-width="1.5"></line>
+        </g>
+    </g>
+</svg>

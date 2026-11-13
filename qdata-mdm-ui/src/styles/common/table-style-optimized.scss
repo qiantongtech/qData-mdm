@@ -1,5 +1,15 @@
 /* Table style optimization - table-style-optimized.scss */
 
+// 模型字段设计与主数据子模型维护共用的表格样式。
+.field-design-table {
+  .el-input,
+  .el-input-number,
+  .el-select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 // Task title row layout
 .task-title-row {
   display: flex;
@@ -120,4 +130,98 @@
 
 .app-container .task-title .el-tag--default .el-tag__content {
   font-size: 12px !important;
+}
+
+
+/* QtTable 基础样式 */
+.qt-table {
+  .el-table {
+    .el-table__cell {
+      padding: 7px 0;
+    }
+  }
+
+  .tip-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .is-center.el-table__cell {
+    .tip-wrap {
+      justify-content: center;
+    }
+  }
+
+  .qt-table--pagination {
+    padding: 20px 10px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .empty-wrap {
+    img {
+      width: 380px;
+    }
+
+    p {
+      font-size: 14px;
+      margin: 14px 0;
+    }
+  }
+}
+
+.qt-table .qt-detail-link,
+.qt-table-info .info-title {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+  flex: 0 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 信息列 (图标 + 标题 + 标签 / 描述) */
+.qt-table-info {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+
+  &__main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    min-width: 0;
+  }
+
+  .info-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .info-desc {
+    color: #999;
+    font-size: 12px;
+    line-height: 18px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal !important;
+  }
+
+  .el-link__inner {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }

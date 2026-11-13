@@ -14,54 +14,38 @@
   <a href="README.zh-CN.md">📖简体中文</a> | 📖English | <a href="README.ja-JP.md">📖日本語</a>
 </p>
 
-## 🌈 Platform Overview
+## Platform Overview
 
-**qData-mdm** is a master data platform for managing records such as customers, suppliers, materials, and organizations. It organizes models by business domain, ingests and merges records from multiple systems into authoritative master data, and manages changes through approvals, quality checks, and remediation. Downstream systems can receive data through distribution tasks or query it through published services. The dashboard summarizes data volumes, lifecycle states, effective changes, and items requiring attention. Authorization and auditing support day-to-day maintenance and data sharing.
+**qData Master Data Platform** helps organizations manage master data for customers, suppliers, materials, and organizational units. Teams define models by business domain and match records from different systems that refer to the same entity. Once merged records pass quality checks and receive approval, they become authoritative. Downstream systems can receive the same data through distribution tasks or retrieve it through query APIs. Source records and change history show where each master record came from and how it has changed.
 
 ✨✨✨**Online Documentation**✨✨✨ <a href="https://qdata.qiantong.tech" target="_blank">https://qdata.qiantong.tech</a>
 
+✨✨✨**Open-Source Edition Demo**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a> (username `qData`, password `qData123`).
+
+✨✨✨**Professional Edition Demo**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>. Please [contact customer service](https://community.qdata.tech/business/policy.html) to obtain a demo account.
+
 > If qData-mdm helps you, give the project a **star ⭐️** to support its development.
 
-## 🍱 Use Cases
+## Feature List
 
-qData-mdm is designed for enterprises, corporate groups, and public-sector organizations that need consistent data standards, maintenance processes, and data sharing.
+| Module | Components | What you can do |
+| --- | --- | --- |
+| **Dashboard** | Dashboard | See totals for master records, models, domains, reference items, and active grants within your permissions. Compare record counts by domain and lifecycle state, drill into changes that took effect in the last 7 or 30 days, and follow up on failed publications or expiring grants. |
+| **Master data management** | Authoritative records, my requests, data entry tasks, task center | Create, edit, copy, import, and export records under a published model. Bulk changes pass validation and take effect as a single batch. Manage active, frozen, inactive, and archived records; compare versions and request a restore. Track or withdraw your requests and handle approvals, data entry, and remediation in the task center. |
+| **Model management** | Domains, model catalog, models, hierarchies and relationships, reference data, coding schemes | Organize standard and classification models by domain and folder. Define fields, model references, and one-to-many submodels; inspect dependencies in the relationship graph. Bind fields to reference values or codes built from multiple segments. Publish manually after validation and approval to create the physical schema. Revisions retain history and undergo compatibility checks. |
+| **Rule management** | Matching, survivorship, quality rules | Find duplicate candidates with exact, normalized exact, fuzzy, or weighted multi-field matching. Select field values by source priority, trust score, recency, or preference for non-empty values. Define checks for required values, format, range, uniqueness, reference values, and relationships between fields. |
+| **Workflow management** | Workflow configuration, workflow instances | Route models, record edits, lifecycle changes, and merge results for approval. See the current step, assignee, comments, and decision history. Approved models still require manual publication; approved record changes and merge results take effect according to business rules. |
+| **Data ingestion** | Source systems, ingestion tasks, source records | Read databases in full or incrementally, import CSV/XLS/XLSX files, or pull from external APIs. Identify records by source key and map incoming fields to the model. Unchanged records are skipped; changed records get a new source version. Inspect failures by run. |
+| **Multi-source consolidation** | Duplicate detection, match review, merge management | Review match scores and evidence to confirm, split, or defer candidate groups. Confirm single records individually or resolve conflicting values field by field, retaining their sources. Results must pass quality checks and approval before they create or update authoritative records. |
+| **Data quality** | Quality tasks, issue records, remediation tasks | Check authoritative records manually or on a schedule. Group failures by record, inspect the rule, field, and cause, and assign individual issues for correction. A later passing check marks the item resolved; an administrator confirms closure of the issue record. |
+| **Data distribution** | Target systems, distribution tasks, data services | Set the record scope, field mappings, and schedule for each target API. Push full or incremental updates, including lifecycle changes for previously distributed records. Publish read-only REST services for lookup by master record ID or filtered, paginated queries. |
+| **Access management** | Data grants, service grants | Grant row, field, and operation permissions by user, role, or organization. Inspect effective access and see which grants provide it. Authorize published APIs separately by calling user or client, service, and validity period. |
+| **Audit and traceability** | Operation audit, change history, data versions, source tracing | Inspect records affected by successful operations, search changes across models, and compare any two official versions. Follow current and historical mappings from an authoritative record to manual entries or external source records and their associated approvals. |
+| **System administration** | Users, roles, menus, departments, positions, dictionaries, settings, notices, logs | Manage accounts and the organization hierarchy. Use roles to control menu, button, and data access. Maintain shared lookup values and runtime settings, publish notices, and search operation and system logs. |
 
-| Use case | Description | Typical users |
-|----------|-------------|---------------|
-| **Standardized master data modeling** | Organize models by business domain and directory. Define shared fields, classification hierarchies, relationships, reference data, and code generation rules. | Corporate groups, manufacturers, state-owned enterprises |
-| **Centralized master data maintenance** | Manage requests to create, update, import, or change the lifecycle state of master data. Retain official versions, approval history, and source information. | Mid-sized and large enterprises, shared service centers |
-| **Multi-source ingestion and consolidation** | Ingest records from business databases, files, and APIs. Identify duplicates across systems and produce authoritative records after review, quality checks, and approval. | Manufacturers, government platforms, IT project teams |
-| **Master data distribution and sharing** | Push full or incremental data to ERP, HR, and finance systems, or provide authorized access through published read-only APIs. | Corporate groups, public-sector organizations, industry platforms |
-| **Master data quality management** | Run scheduled quality checks, collect failures, assign remediation to the responsible people, and track outcomes. | Data governance, IT, and operations teams |
+💡 Have a suggestion or feature request? [Open an issue](https://gitee.com/qiantongtech/qData-mdm/issues).
 
-## 💡 Advantages
-
-| Advantage | Description |
-|-----------|-------------|
-| **Versioned models and controlled publication** | The current model stays active during revisions. Publication checks compatibility, references, and data risks, while retaining previous versions and publication history. |
-| **Traceable consolidation** | Retain matching evidence, field value origins, manual adjustments, check results, and approvals. Trace authoritative master data back to its source records. |
-| **Unified task inbox** | A personal task center brings together approvals, data-entry assignments, and remediation tasks. Status updates follow their originating workflows. |
-| **Granular authorization** | Control model access by row, field, and business action. External API calls use separate service authorization. |
-| **Flexible deployment** | Run from source or deploy with Docker for installation, integration, and testing in different environments. |
-
-## 📋 Feature List
-
-| Core business function | Key capabilities |
-|------------------------|------------------|
-| **Master data modeling and publication** | Organize standard and classification models by domain and directory. Configure relationships and one-to-many submodels. Publish manually after validation and approval to create the physical schema. Revisions undergo compatibility checks and retain version history. |
-| **Reference data and automatic code generation** | Maintain shared reference data and bind it to model fields to standardize allowed values. Version code rules that combine fixed text, business fields, reference data mappings, dates and times, and sequence numbers. Check uniqueness when issuing a code. |
-| **Authoritative master data maintenance** | Query official records and related details by published model. Create, edit, copy, bulk update, import, and export records. Validate and apply bulk changes as a whole. Compare historical versions and submit a restoration request. |
-| **Lifecycle and change approval** | Manage active, frozen, inactive, and archived records, with actions to freeze, unfreeze, deactivate, restore, or archive. Apply business approval rules to maintenance and status changes, and track requests, comments, and outcomes. |
-| **Multi-source data ingestion** | Read databases in full or incrementally, import CSV, XLS, and XLSX files, or pull from external APIs. Use source identifiers and field mappings to detect changes, and retain ingestion versions and failure details. |
-| **Duplicate detection and consolidation** | Detect duplicates through exact, fuzzy, or weighted multi-field matching. Review and split candidate groups manually. Recommend field values by source priority, trust score, recency, or non-empty value. Resolve conflicts, run quality checks, and submit the result for approval before it becomes authoritative. |
-| **Quality checks and remediation** | Run manual or scheduled checks using rules for required values, formats, uniqueness, valid reference data, and cross-field logic. Collect failures with their causes, assign issues to responsible people, and track remediation. |
-| **Data distribution and services** | Configure the data scope and field mappings for each target system. Push full or incremental data manually or on a schedule, including lifecycle changes. Publish read-only REST APIs for single-record and paginated queries. |
-| **Data and service authorization** | Control model rows, fields, and business actions by user, role, or organization. Grant API access separately by caller, service, and validity period. |
-| **Business auditing and source traceability** | Record key business operations and affected objects. Query changes and historical versions across models, and trace official records to source records, mappings, and approvals. |
-
-💡 Have a suggestion or feature request? [Open an issue](https://gitee.com/qiantongtech/qData/issues).
-
-## 🛠️ Technology Stack
+## Technology Stack
 
 qData-mdm separates the Spring Boot backend from the Vue 3 frontend and integrates authentication, database access, caching, and UI components.
 
@@ -106,13 +90,25 @@ qData-mdm separates the Spring Boot backend from the Vue 3 frontend and integrat
   </tr>
 </table>
 
-## 🚨 Commercial Licensing
+## Commercial Licensing
 
 qData-mdm provides two editions: **Professional Edition** and **Open-Source Edition**, meeting user needs across different scales and scenarios. Each has its own focus while complementing the other: the Open-Source Edition helps users get started at low cost, while the Professional Edition provides greater depth and support. Whichever edition you choose, qData-mdm aims to be a reliable partner that helps enterprises unlock data value and accelerate digital transformation.
 
 > 👉 For **Open-Source Edition brand authorization** or **Professional Edition consultation**, see [💼 Licensing Details](https://qdata.tech/en/price/).
 
-## 🏗️ Deployment Environment
+## Quick Start
+
+### 1. Online Demo
+
+- Sign in to the [Community Open-Source Edition demo](#platform-overview) to explore the main features without installing anything.
+
+### 2. Choose a Deployment Method
+
+- **Local deployment**. Use the Docker Compose configuration in `deploy/docker/` to start the full environment locally.
+- **Run from source**. Start the `qdata-mdm-server` backend and `qdata-mdm-ui` frontend separately for development and integration testing.
+- **Self-managed deployment**. Install, configure, and manage the services manually for production or custom environments.
+
+## Deployment Environment
 
 Install the following prerequisites before deploying qData-mdm.
 
@@ -150,27 +146,51 @@ Install the following prerequisites before deploying qData-mdm.
   </tr>
 </table>
 
-## 👥 QQ Community
+## QQ Community
 
 Join the official qData QQ community for updates, technical support, and discussions.
 
 👉 <a href="https://community.qdata.tech/discuss.html">Join the QQ community</a>
 
-## 🖼️ System Screenshots
+## System Screenshots
 
 The screenshots show the Simplified Chinese interface.
 
 <table>
   <tr>
-    <td><img src="images/zh-CN/system/mdm-01.png" alt="Dashboard" width="400"/></td>
-    <td><img src="images/zh-CN/system/mdm-02.png" alt="Entity model list" width="400"/></td>
+    <td><img src="images/zh-CN/system/login.png" alt="登录" width="400"/></td>
+    <td><img src="images/zh-CN/system/index.png" alt="首页" width="400"/></td>
   </tr>
   <tr>
-    <td><img src="images/zh-CN/system/mdm-03.png" alt="Entity model field configuration" width="400"/></td>
-    <td><img src="images/zh-CN/system/mdm-04.png" alt="Model relationship configuration" width="400"/></td>
+    <td><img src="images/zh-CN/system/master.png" alt="权威主数据" width="400"/></td>
+    <td><img src="images/zh-CN/system/project.png" alt="主数据域" width="400"/></td>
   </tr>
   <tr>
-    <td><img src="images/zh-CN/system/mdm-05.png" alt="Classification model configuration" width="400"/></td>
-    <td><img src="images/zh-CN/system/mdm-06.png" alt="Master data model relationship graph" width="400"/></td>
+    <td><img src="images/zh-CN/system/layer.png" alt="模型目录" width="400"/></td>
+    <td><img src="images/zh-CN/system/model.png" alt="模型定义" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="images/zh-CN/system/relation.png" alt="模型关系" width="400"/></td>
+    <td><img src="images/zh-CN/system/match.png" alt="匹配规则" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="images/zh-CN/system/survivor.png" alt="生存规则" width="400"/></td>
+    <td><img src="images/zh-CN/system/qualitys.png" alt="质量规则" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="images/zh-CN/system/datasource.png" alt="数据接入" width="400"/></td>
+    <td><img src="images/zh-CN/system/datasource_detail.png" alt="测试连接" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="images/zh-CN/system/ingest_task.png" alt="接入任务" width="400"/></td>
+    <td><img src="images/zh-CN/system/review.png" alt="匹配审核" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="images/zh-CN/system/manage.png" alt="合并管理" width="400"/></td>
+    <td><img src="images/zh-CN/system/quality_task.png" alt="质量任务" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="images/zh-CN/system/quality_issue_task.png" alt="整改任务" width="400"/></td>
+    <td><img src="images/zh-CN/system/operation_log.png" alt="操作审计" width="400"/></td>
   </tr>
 </table>

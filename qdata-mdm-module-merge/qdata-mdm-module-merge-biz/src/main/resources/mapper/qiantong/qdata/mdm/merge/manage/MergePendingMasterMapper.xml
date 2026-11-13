@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.merge.dal.mapper.manage.MergePendingMasterMapper">
+    <select id="selectEffectiveResult" resultType="tech.qiantong.qdata.mdm.merge.domain.manage.MergeEffectiveResultBO">
+        SELECT v.VERSION_NO, v.SNAPSHOT_DATA,
+            (SELECT COUNT(*) FROM MASTER_SOURCE_REL r
+             WHERE r.MODEL_ID = p.MODEL_ID AND r.MASTER_RECORD_ID = p.RESULT_RECORD_ID
+             AND r.STATUS = '1' AND r.VALID_FLAG = '1' AND r.DEL_FLAG = '0') AS SOURCE_MAPPING_COUNT
+        FROM MERGE_PENDING_MASTER p
+        LEFT JOIN MASTER_DATA_VERSION v ON v.ID = p.RESULT_VERSION_ID
+            AND v.MODEL_ID = p.MODEL_ID AND v.MASTER_RECORD_ID = p.RESULT_RECORD_ID
+            AND v.VALID_FLAG = '1' AND v.DEL_FLAG = '0'
+        WHERE p.ID = #{pendingId} AND p.STATUS = '9'
+            AND p.VALID_FLAG = '1' AND p.DEL_FLAG = '0'
+    </select>
+
+    <!-- 排除当前候选组，仅检查其他有效结果中的目标来源，并加锁防止重复占用。 -->
+    <select id="selectOccupiedSourceIds" resultType="java.lang.Long">
+        SELECT m.SOURCE_RECORD_ID FROM MERGE_CANDIDATE_GROUP_MEMBER m
+        JOIN MERGE_PENDING_MASTER p ON p.OBJECT_GROUP_ID = m.GROUP_ID
+        WHERE m.MEMBER_ROLE = '1' AND m.VALID_FLAG = '1' AND m.DEL_FLAG = '0'
+        AND p.VALID_FLAG = '1' AND p.DEL_FLAG = '0' AND p.OBJECT_GROUP_ID != #{groupId}
+        AND m.SOURCE_RECORD_ID IN
+        <foreach collection="sourceIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        FOR UPDATE
+    </select>
+</mapper>

@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -46,7 +46,6 @@
       <div v-loading="loading">
         <qt-table v-bind="tableStore0" ref="qtTableRef0">
           <template #id="{ row }">{{ row.id }}</template>
-          <template #name="{ row }">{{ row.name }}</template>
           <template #cn="{ row }">{{ row.cn }}</template>
           <template #ou="{ row }">{{ row.ou }}</template>
           <template #o="{ row }">{{ row.o }}</template>
@@ -91,6 +90,7 @@
 </template>
 
 <script>
+import { tableTitleLink, titleCellClass } from '@/utils/anivia.js'
 import SubjectDetailDialog from './components/subjectDetailDialog.vue';
 import { checkPermi } from '@/utils/permission';
 
@@ -412,6 +412,7 @@ export default {
       return reactive({
         config: {
           table: {
+            cellClassName: titleCellClass,
             defaultSort: { prop: 'id', order: 'descending' },
             stripe: true,
             height: '60vh',
@@ -441,7 +442,9 @@ export default {
             },
             align: 'center',
             showOverflowTooltip: true,
-            slot: 'name'
+            prop: 'name',
+            className: 'title-column',
+            get link() { return tableTitleLink(row => vm.$refs.detailDialogRef.openDialog(row), 'ca:subject:query'); }
           },
           {
             get label() {

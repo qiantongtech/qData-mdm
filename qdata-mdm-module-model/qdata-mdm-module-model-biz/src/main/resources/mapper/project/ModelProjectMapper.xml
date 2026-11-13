@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.project.ModelProjectMapper">
+
+    <select id="selectAvailableMainInstanceProjects" resultMap="ModelProjectResult">
+        SELECT DISTINCT p.ID, p.NAME
+        FROM MODEL_PROJECT p
+                 INNER JOIN MODEL_BASE b ON b.PROJECT_ID = p.ID
+                 INNER JOIN MODEL_INSTANCE i ON i.MODEL_ID = b.ID AND i.ID = b.PUBLISHED_INSTANCE_ID
+                 INNER JOIN MODEL_MATERIALIZED_TABLE t ON t.INSTANCE_ID = i.ID AND t.MODEL_ID = b.ID
+        WHERE b.TYPE IN ('NORMAL', 'CATEGORY')
+          AND p.DEL_FLAG = '0'
+          AND p.VALID_FLAG = '1'
+          AND i.STATUS = 'SUCCEEDED'
+          AND b.DEL_FLAG = '0'
+          AND EXISTS (SELECT 1
+                      FROM MODEL_VERSION v
+                      WHERE v.ID = b.VERSION_ID
+                        AND v.MODEL_ID = b.ID
+                        AND v.DEL_FLAG = '0'
+                        AND v.STATUS IN (1, 2))
+          AND t.PARENT_ID = 0
+          AND t.TABLE_ROLE = 'AUTHORITY'
+          AND t.VALID_FLAG = '1'
+          AND t.DEL_FLAG = '0'
+          AND t.ENABLED_FLAG = '1'
+        ORDER BY p.NAME, p.ID
+    </select>
+
+    <resultMap type="ModelProjectDO" id="ModelProjectResult">
+        <result property="id"    column="ID"    />
+        <result property="code"    column="CODE"    />
+        <result property="name"    column="NAME"    />
+        <result property="icon" column="ICON" />
+        <result property="responsibleUserId" column="RESPONSIBLE_USER_ID" />
+        <result property="description"    column="DESCRIPTION"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="validFlag"    column="VALID_FLAG"    />
+    </resultMap>
+
+    <sql id="selectModelProjectVo">
+        select ID, CODE, NAME, ICON, RESPONSIBLE_USER_ID, DESCRIPTION, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DEL_FLAG, VALID_FLAG from MODEL_PROJECT
+    </sql>
+
+    <select id="selectModelProjectList" parameterType="ModelProjectDO" resultMap="ModelProjectResult">
+        <include refid="selectModelProjectVo"/>
+        <where>
+            <if test="code != null  and code != ''"> and CODE = #{code}</if>
+            <if test="name != null  and name != ''"> and NAME like concat(concat('%', #{name}), '%')</if>
+            <if test="description != null  and description != ''"> and DESCRIPTION = #{description}</if>
+            <if test="createTime != null "> and CREATE_TIME = #{createTime}</if>
+        </where>
+    </select>
+
+    <select id="selectModelProjectById" parameterType="Long" resultMap="ModelProjectResult">
+        <include refid="selectModelProjectVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertModelProject" parameterType="ModelProjectDO">
+        insert into MODEL_PROJECT
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="code != null and code != ''">CODE,</if>
+            <if test="name != null">NAME,</if>
+            <if test="icon != null">ICON,</if>
+            <if test="responsibleUserId != null">RESPONSIBLE_USER_ID,</if>
+            <if test="description != null">DESCRIPTION,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="code != null and code != ''">#{code},</if>
+            <if test="name != null">#{name},</if>
+            <if test="icon != null">#{icon},</if>
+            <if test="responsibleUserId != null">#{responsibleUserId},</if>
+            <if test="description != null">#{description},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+         </trim>
+    </insert>
+
+    <update id="updateModelProject" parameterType="ModelProjectDO">
+        update MODEL_PROJECT
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="code != null and code != ''">CODE = #{code},</if>
+            <if test="name != null">NAME = #{name},</if>
+            <if test="icon != null">ICON = #{icon},</if>
+            RESPONSIBLE_USER_ID = #{responsibleUserId,jdbcType=BIGINT},
+            <if test="description != null">DESCRIPTION = #{description},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteModelProjectById" parameterType="Long">
+        delete from MODEL_PROJECT where ID = #{id}
+    </delete>
+
+    <delete id="deleteModelProjectByIds" parameterType="String">
+        delete from MODEL_PROJECT where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

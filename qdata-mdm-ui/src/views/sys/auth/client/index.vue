@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -47,7 +47,6 @@
         <qt-table v-bind="tableStore0" ref="qtTableRef0">
           <template #id="{ row }">{{ row.id }}</template>
           <template #secretKey="{ row }">{{ row.secretKey }}</template>
-          <template #name="{ row }">{{ row.name }}</template>
           <template #type="scope">
             <dict-tag :options="auth_app_type" :value="scope.row.type" />
           </template>
@@ -108,6 +107,7 @@
 </template>
 
 <script setup name="Client">
+import { tableTitleLink, titleCellClass } from '@/utils/anivia.js'
 import ClientDetailDialog from './components/clientDetailDialog.vue';
 import { checkPermi } from '@/utils/permission';
 import ClientFormDialog from './components/clientFormDialog.vue';
@@ -451,6 +451,7 @@ const qtTableRef0 = ref(null);
 const tableStore0 = reactive({
   config: computed(() => ({
     table: {
+      cellClassName: titleCellClass,
       defaultSort: { prop: 'createTime', order: 'descending' },
       stripe: true,
       height: '60vh',
@@ -487,7 +488,9 @@ const tableStore0 = reactive({
       },
       align: 'center',
       width: '120',
-      slot: 'name'
+      prop: 'name',
+      className: 'title-column',
+      get link() { return tableTitleLink(row => proxy.$refs.detailDialogRef.openDialog(row), 'auth:client:query'); }
     },
     {
       get label() {

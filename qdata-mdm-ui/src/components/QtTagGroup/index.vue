@@ -1,24 +1,19 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  QtTagGroup Component Notes:
-  This component is used to display tag groups. It supports automatic
-  collapsing and shows the full content in a tooltip.
-  It is commonly used for data source lists, tag lists, and similar cases.
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  Usage Examples:
-  1. Basic usage (string array):
-     <QtTagGroup :items="['tag1', 'tag2', 'tag3']" />
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
 
-  2. Object array (auto-mapped fields):
-     Field mapping: label/DATASOURCE_NAME/name, datasourceType/DATASOURCE_TYPE/type
-     <QtTagGroup :items="[{ name: 'MySQL', type: 'MYSQL' }, { name: 'Oracle', type: 'ORACLE' }]" />
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
 
-  3. Custom maximum display count:
-     <QtTagGroup :items="items" :max-count="3" />
-
-  4. Force data source style:
-     <QtTagGroup :items="['MySQL', 'Oracle']" is-datasource />
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
 -->
 
 <template>

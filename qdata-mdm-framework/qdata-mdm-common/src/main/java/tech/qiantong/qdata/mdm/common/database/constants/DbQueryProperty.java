@@ -1,14 +1,14 @@
 /*
- * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -49,7 +49,7 @@ public class DbQueryProperty implements Serializable {
     private Integer port;
     private String dbName;
     private String sid;
-    //Kafka configuration or configuration needed when generating table SQL
+    // 建表 SQL 配置
     private Map<String, Object> config;
 
     /**
@@ -101,60 +101,9 @@ public class DbQueryProperty implements Serializable {
             throw new DataQueryException("db.error.params.incomplete", "Incomplete parameters");
         }
         DbType dbTypeEnum = DbType.getDbType(dbType);
-        switch (dbTypeEnum) {
-            case MYSQL:
-            case ORACLE:
-            case ORACLE_12C:
-            case POSTGRE_SQL:
-            case SQL_SERVER2008:
-            case SQL_SERVER:
-            case DM8:
-            case KINGBASE8:
-            case PHOENIX:
-            case DORIS:
-            case DB2:
-            case OSCAR:
-                if (StringUtils.isBlank(host)
-                        || StringUtils.isBlank(username)
-                        || StringUtils.isBlank(password)
-                        || port == null) {
-                    throw new DataQueryException("db.error.params.incomplete", "Incomplete parameters");
-                }
-                break;
-            case REDIS:
-                if (StringUtils.isBlank(host)
-                        || port == null) {
-                    throw new DataQueryException("db.error.params.incomplete", "Incomplete parameters");
-                }
-                break;
-            case HIVE:
-                if (StringUtils.isBlank(host) || port == null) {
-                    throw new DataQueryException("db.error.params.incomplete", "Incomplete parameters");
-                }
-                break;
-            case HDFS:
-            case KAFKA:
-            case RABBITMQ:
-                if (StringUtils.isBlank(host) || port == null) {
-                    throw new DataQueryException("db.error.params.incomplete", "Incomplete parameters");
-                }
-                break;
-            case FTP:
-                if (StringUtils.isAnyBlank(host, username, password) || port == null) {
-                    throw new DataQueryException("db.error.params.incomplete", "Incomplete parameters");
-                }
-                break;
-            case OSS_ALIYUN:
-                if (datasourceConfig == null
-                        || datasourceConfig.get("keyId") == null
-                        || datasourceConfig.get("keySecret") == null
-                        || datasourceConfig.get("bucket") == null
-                        || datasourceConfig.get("endpoint") == null) {
-                    throw new DataQueryException("db.error.params.incomplete", "Incomplete parameters");
-                }
-                break;
-            case OTHER:
-                throw new DataQueryException("db.error.unsupported.dbtype", "Unsupported database type");
+        if (StringUtils.isBlank(host) || StringUtils.isBlank(username)
+                || StringUtils.isBlank(password) || port == null) {
+            throw new DataQueryException("db.error.params.incomplete", "Incomplete parameters");
         }
     }
 
@@ -208,18 +157,8 @@ public class DbQueryProperty implements Serializable {
             this.config = JSONObject.parseObject(config);
         }
 
-        if (StringUtils.equals(DbType.MONGODB.getDb(), dbType)) {
-            this.sid = StringUtils.isNotEmpty(this.sid) ? this.sid : "admin";
-        }
-
-        if (!StringUtils.equals(DbType.KAFKA.getDb(), dbType) && !StringUtils.equals(DbType.HIVE.getDb(), dbType)
-                && !StringUtils.equals(DbType.HDFS.getDb(), dbType)
-                && !StringUtils.equals(DbType.REDIS.getDb(), dbType)
-                && !StringUtils.equals(DbType.RABBITMQ.getDb(), dbType)
-                && !StringUtils.equals(DbType.OSS_ALIYUN.getDb(), dbType)) {
-            if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
-                throw new DataQueryException("db.error.datasource.config.auth", "Datasource configuration must include username and password");
-            }
+        if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
+            throw new DataQueryException("db.error.datasource.config.auth", "Datasource configuration must include username and password");
         }
     }
 
@@ -361,7 +300,6 @@ public class DbQueryProperty implements Serializable {
             case POSTGRE_SQL:
             case SQL_SERVER:
             case SQL_SERVER2008:
-            case OTHER:
                 return "DELETE FROM " + tableName + ""; // Generic truncate statement (MySQL, MariaDB, PostgreSQL, SQLServer, etc.)
             case ORACLE:
             case ORACLE_12C:

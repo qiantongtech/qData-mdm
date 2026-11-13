@@ -1,14 +1,14 @@
 /*
- * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -160,7 +160,6 @@ public class QueryWrapperX<T> extends QueryWrapper<T> {
     /**
      * 设置只返回最后一条
      *
-     * TODO 芋艿：不是完美解，需要在思考下。如果使用多数据源，并且数据源是多种类型时，可能会存在问题：实现之返回一条的语法不同
      *
      * @return this
      */

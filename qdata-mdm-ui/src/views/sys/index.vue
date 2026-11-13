@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -18,6 +18,7 @@
 
 <template>
   <div class="app-container stagingIndex">
+    <guide-tip tip-id="index"/>
     <el-row :gutter="15" class="home-layout">
       <el-col :xs="24" :sm="24" :md="18" :lg="18" class="home-gutter">
         <div class="userInfo module-1">
@@ -703,7 +704,7 @@ const formatNumber = (value) => Number(value ?? 0).toLocaleString('zh-CN');
 const entranceList = [
   {
     name: '权威主数据',
-    path: '/model/base',
+    path: '/master/instance',
     query: {},
     perm: ['mdm:modelBase:list'],
     icon: masterAsset('entry-authority.svg')
@@ -716,36 +717,36 @@ const entranceList = [
     icon: masterAsset('entry-model.svg')
   },
   {
-    name: '任务中心',
-    path: '/merge/manage',
+    name: '整改任务',
+    path: '/quality/qualityIssueTask',
     query: {},
     perm: ['mdm:mergeManage:list'],
     icon: masterAsset('entry-task.svg')
   },
   {
     name: '参考数据',
-    path: '/model/type',
+    path: '/model/dict/type',
     query: {},
     perm: ['model:dict:type:list'],
     icon: masterAsset('entry-reference.svg')
   },
   {
     name: '数据授权',
-    path: '/model/auth',
+    path: '/authorization/dataAuthorization',
     query: {},
     perm: ['mdm:dataAuth:list'],
     icon: masterAsset('entry-auth.svg')
   },
   {
     name: '操作审计',
-    path: '/monitor/logininfor',
+    path: '/audit/operationLog',
     query: {},
     perm: ['system:logininfor:list'],
     icon: masterAsset('entry-audit.svg')
   },
   {
-    name: '数据追溯',
-    path: '/model/base',
+    name: '来源追溯',
+    path: '/audit/sourceTrace',
     query: {},
     perm: ['mdm:modelBase:list'],
     icon: masterAsset('entry-trace.svg')
@@ -780,21 +781,21 @@ const xljtcont = ref('');
 
 function getxljtcont() {
   let xljtlist = [
-    {value: '统一管理，沉淀可信的权威主数据。'},
-    {value: '按主数据域梳理模型与目录，让业务对象各有所属、清晰可查。'},
-    {value: '用模型定义业务，用字段规范数据。'},
-    {value: '从模型修订到版本发布，让主数据结构随业务有序演进。'},
-    {value: '统一编码规则，让数据标识有规可循。'},
-    {value: '维护参考数据与字典，让字段取值有依据、业务口径更一致。'},
-    {value: '接入多源数据，汇聚业务信息。'},
-    {value: '识别重复记录，确认合并结果，沉淀一致的主数据。'},
-    {value: '及时处理质量问题，提升主数据质量。'},
-    {value: '合并结果经质量检测与审批后入库，让权威主数据有据可依。'},
-    {value: '数据维护先申请，正式变更经审批。'},
-    {value: '追溯数据来源，对照历史版本，让每一次变更清晰可查。'},
-    {value: '按业务需要授权，让主数据有序共享。'},
-    {value: '通过分发任务连接业务系统，让主数据更新及时传递。'},
-    {value: '从任务进度到运行结果，掌握主数据处理动态。'}
+    {value: "统一管理，沉淀可信的权威主数据。"},
+    {value: "按主数据域梳理模型与目录，让业务对象各有所属、清晰可查。"},
+    {value: "用模型定义业务，用字段规范数据。"},
+    {value: "从模型修订到版本发布，让主数据结构随业务有序演进。"},
+    {value: "统一编码规则，让数据标识有规可循。"},
+    {value: "维护参考数据与字典，让字段取值有依据、业务口径更一致。"},
+    {value: "接入多源数据，汇聚业务信息。"},
+    {value: "识别重复记录，确认合并结果，沉淀一致的主数据。"},
+    {value: "及时处理质量问题，提升主数据质量。"},
+    {value: "合并结果经质量检测与审批后入库，让权威主数据有据可依。"},
+    {value: "数据维护先申请，正式变更经审批。"},
+    {value: "追溯数据来源，对照历史版本，让每一次变更清晰可查。"},
+    {value: "按业务需要授权，让主数据有序共享。"},
+    {value: "通过分发任务连接业务系统，让主数据更新及时传递。"},
+    {value: "从任务进度到运行结果，掌握主数据处理动态。"},
   ];
   const num = Math.floor(Math.random() * xljtlist.length);
   xljtcont.value = xljtlist[num].value;
@@ -901,7 +902,7 @@ function noticeIcon(item) {
 function initModule6() {
   let query = {
     pageNum: 1,
-    pageSize: 7
+    pageSize: 8
   };
   sortListNotice(query)
       .then((response) => {
@@ -2428,7 +2429,7 @@ onActivated(() => {
   .module-6 {
     margin-bottom: 0;
     flex-shrink: 0;
-    height: 315px !important;
+    height: 360px !important;
 
     .border-item-body {
       height: calc(100% - 46px);
@@ -2480,10 +2481,8 @@ onActivated(() => {
 
   .module-summary {
     flex: 1;
-    height: 275px !important;
 
     .summary-list {
-      height: calc(100% - 46px);
       padding: 0 20px;
     }
 

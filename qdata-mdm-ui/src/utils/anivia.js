@@ -1,14 +1,14 @@
 /*
  * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -16,10 +16,9 @@
  * See the LICENSE file in the project root for full license information.
  */
 
-/**
- * Universal js method encapsulation processing
- * Copyright (c) 2019 qData
- */
+
+
+import auth from '@/plugins/auth'
 
 // date formatting
 export function parseTime(time, pattern) {
@@ -268,6 +267,42 @@ export function getNormalPath(p) {
 // Verify if it is in blob format
 export function blobValidate(data) {
   return data.type !== 'application/json';
+}
+
+// 空标题和占位符不提供详情入口，数字 0 仍是有效标题。
+export function getDisplayTitle(value) {
+  if (value == null || String(value).trim() === '' || value === '-' || value === '—') return undefined;
+  return String(value);
+}
+
+// QtTable 将 link 的属性传给 el-link，将当前行传给 external。
+export function tableTitleLink(open, permission) {
+  if (permission && !auth.hasPermi(permission)) return undefined
+  return {
+    external: open,
+    class: 'qt-detail-link text-ellipsis',
+    role: 'link',
+    tabindex: 0,
+    onClick: event => event.stopPropagation(),
+    onKeydown(event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      event.stopPropagation()
+      event.currentTarget.click()
+    },
+    onMouseenter(event) {
+      event.currentTarget.title = event.currentTarget.textContent
+    }
+  }
+}
+
+// 即使必填标题遇到历史空值，也只显示一个不可聚焦的占位符。
+// null 和 undefined 的短横线由 QtTable 自身渲染。
+export function titleCellClass({ column, row }) {
+  if (column.className !== 'title-column') return
+  const value = row[column.property]
+  if (value == null) return 'title-null'
+  if (!getDisplayTitle(value)) return 'title-placeholder'
 }
 
 // Format return value

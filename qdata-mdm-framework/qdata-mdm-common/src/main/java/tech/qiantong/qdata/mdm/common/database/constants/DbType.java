@@ -1,14 +1,14 @@
 /*
- * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -91,15 +91,7 @@ public enum DbType {
             "LEN",
             "SELECT COUNT(1) FROM {tableName}",
             "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC OFFSET {pageNo} ROWS FETCH NEXT {pageSize} ROWS ONLY"),
-    /**
-     * UNKONWN DB
-     */
-    OTHER("8",
-            "其他数据库",
-            "",
-            "LENGTH",
-            "SELECT COUNT(1) FROM {tableName}",
-            ""),
+
     /**
      * DM8 (Dameng8)
      */
@@ -118,72 +110,6 @@ public enum DbType {
             "LENGTH",
             "SELECT COUNT(1) FROM {tableName}",
             "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT {pageSize} OFFSET ({pageNo}-1)*{pageSize} "),
-    /**
-     * KingbaseES database
-     */
-    HIVE("Hive",
-            "Hive on HBase",
-            "jdbc:hive2://${host}:${port}/${dbName}",
-            "LENGTH",
-            null,
-            null),
-    /**
-     * HDFS database
-     */
-    HDFS("HDFS",
-            "HDFS数据库",
-            "jdbc:kingbase8://${host}:${port}",
-            "LENGTH",
-            null,
-            null),
-    /**
-     * Kafka
-     */
-    KAFKA("Kafka",
-            "人大金仓数据库",
-            "${host}:${port}",
-            "LENGTH",
-            "SELECT COUNT(1) FROM {tableName}",
-            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT {pageSize} OFFSET ({pageNo}-1)*{pageSize}"),
-
-    /**
-     * Phoenix(HBase)
-     */
-    PHOENIX("Phoenix",
-            "Phoenix数据库",
-            "jdbc:phoenix:${host}:${port}:/${dbName}",
-            "LENGTH",
-            "SELECT COUNT(1) FROM {tableName}",
-            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT ({pageNo}-1)*{pageSize},{pageSize}"),
-
-    /**
-     * Doris
-     */
-    DORIS("Doris",
-            "Doris数据库",
-            "jdbc:mysql://${host}:${port}/${dbName}?useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&rewriteBatchedStatements=true&useServerPrepStmts=true&serverTimezone=GMT%2B8",
-            "LENGTH",
-            "SELECT COUNT(1) FROM {tableName}",
-            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT ({pageNo}-1)*{pageSize},{pageSize}"),
-
-    /**
-     * ClickHouse
-     */
-    CLICK_HOUSE("ClickHouse",
-            "ClickHouse数据库",
-            "jdbc:clickhouse://${host}:${port}/${dbName}",
-            "LENGTH",
-            "SELECT COUNT(1) FROM {tableName}",
-            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT {pageSize} OFFSET ({pageNo}-1)*{pageSize}"),
-    /**
-     * MongoDB (official Java Driver)
-     */
-    MONGODB("MongoDB",
-            "MongoDB数据库",
-            "mongodb://${user}:${password}@${host}:${port}/${dbName}?authSource=${authDb}",
-            "",
-            "",
-            ""),
 
     /**
      * OSCAR database (official Java Driver)
@@ -204,22 +130,50 @@ public enum DbType {
             "LENGTH",
             "SELECT COUNT(1) FROM {tableName}",
             "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (ORDER BY 1) AS rownum FROM {tableName} ORDER BY {orderBy} DESC) AS temp_table WHERE rownum BETWEEN  ( {pageNo} - 1 ) * {pageSize} AND ( {pageNo} - 1 ) * {pageSize} + {pageSize})"),
-    /**
-     * Redis
-     */
-    REDIS("Redis", "Redis", "", "", "", ""),
-    /**
-     * RabbitMQ
-     */
-    RABBITMQ("RabbitMQ", "RabbitMQ消息队列", "", "", "", ""),
-    /**
-     * FTP
-     */
-    FTP("FTP", "FTP", "", "", "", ""),
-    /**
-     * FTP
-     */
-    OSS_ALIYUN("OSS-ALIYUN", "OSS(阿里云)", "", "", "", "");
+
+    OPEN_GAUSS("openGauss",
+            "openGauss数据库",
+            "jdbc:opengauss://${host}:${port}/${dbName}",
+            "LENGTH",
+            "SELECT COUNT(1) FROM {tableName}",
+            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT {pageSize} OFFSET ({pageNo}-1)*{pageSize}"),
+    GBASE8C("GBase 8c",
+            "GBase 8c数据库",
+            "jdbc:gbase8c://${host}:${port}/${dbName}",
+            "LENGTH",
+            "SELECT COUNT(1) FROM {tableName}",
+            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT {pageSize} OFFSET ({pageNo}-1)*{pageSize}"),
+    GAUSS_DB("GaussDB",
+            "GaussDB(DWS)数据库",
+            "jdbc:gaussdb://${host}:${port}/${dbName}",
+            "LENGTH",
+            "SELECT COUNT(1) FROM {tableName}",
+            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT {pageSize} OFFSET ({pageNo}-1)*{pageSize}"),
+    GBase("GBase",
+            "GBase 8s",
+            "jdbc:gbasedbt-sqli://${host}:${port}/${dbName}:GBASEDBTSERVER=gbase01;DB_LOCALE=zh_CN.utf8;CLIENT_LOCALE=zh_CN.utf8;DELIMIDENT=y;IGNORECASE=TRUE",
+            "LENGTH",
+            "SELECT COUNT(1) FROM {tableName}",
+            "SELECT {tableFieldName} FROM {tableName} SKIP ({pageNo}-1)*{pageSize} LIMIT {pageSize} "),
+
+    OCEAN_BASE("OCEANBASE",
+            "OceanBase分布式数据库【MySQL兼容租户】",
+            "jdbc:oceanbase://${host}:${port}/${dbName}?useUnicode=true&characterEncoding=utf8&rewriteBatchedStatements=true&useSSL=false",
+            "LENGTH",
+            "SELECT COUNT(1) FROM {tableName}",
+            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT ({pageNo}-1)*{pageSize},{pageSize}"),
+    OCEAN_BASE_ORACLE("OCEANBASE_ORACLE",
+            "OceanBase分布式数据库【Oracle兼容租户】",
+            "jdbc:oceanbase:oracle://${host}:${port}/${dbName}?useUnicode=true&characterEncoding=utf8&useSSL=false",
+            "LENGTH",
+            "SELECT COUNT(1) FROM {tableName}",
+            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC OFFSET {pageNo} ROWS FETCH NEXT {pageSize} ROWS ONLY"),
+    TIDB("TIDB",
+            "TiDB分布式数据库",
+            "jdbc:mysql://${host}:${port}/${dbName}?useUnicode=true&characterEncoding=utf8&rewriteBatchedStatements=true&useSSL=false&serverTimezone=Asia/Shanghai",
+            "LENGTH",
+            "SELECT COUNT(1) FROM {tableName}",
+            "SELECT {tableFieldName} FROM {tableName} ORDER BY {orderBy} DESC LIMIT ({pageNo}-1)*{pageSize},{pageSize}");
 
     /**
      * Database name

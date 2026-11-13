@@ -161,14 +161,34 @@ $spacing-xs: 2px;
   font-size: 18px;
   display: block;
   object-fit: contain;
+
+  // 补偿主题域图标两侧的留白。
+  &--domain {
+    color: var(--el-color-primary);
+    transform: scaleX(1.1);
+  }
+
+  &--directory {
+    background-color: var(--el-color-primary);
+    mask: url('@/assets/common/icons/tree/folder-close.svg') center / contain no-repeat;
+
+    &.is-expanded {
+      mask-image: url('@/assets/common/icons/tree/folder-open.svg');
+    }
+  }
+
+  &--layer {
+    background-color: #ffb800;
+  }
+
+  &--model {
+    background-color: #8737a3;
+    mask: url('@/assets/common/icons/model/model.svg') center / contain no-repeat;
+  }
 }
 
 .colorxz {
   color: $icon-selected;
-}
-
-.colorwxz {
-  color: #2665fb;
 }
 
 .treelabel {

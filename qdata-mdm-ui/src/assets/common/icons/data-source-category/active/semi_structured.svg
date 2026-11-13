@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="18px" height="18px" viewBox="0 0 18 18" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>半结构化存储</title>
+    <g id="半结构化存储" stroke="none" fill="none" opacity="0.75" fill-rule="evenodd" stroke-width="1">
+        <g id="编组">
+            <polygon id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linejoin="round" points="16.5 10.875 1.5 10.875 1.5 15.75 16.5 15.75"></polygon>
+            <path d="M13.3125,14.25 C13.8302625,14.25 14.25,13.8302625 14.25,13.3125 C14.25,12.7947375 13.8302625,12.375 13.3125,12.375 C12.7947375,12.375 12.375,12.7947375 12.375,13.3125 C12.375,13.8302625 12.7947375,14.25 13.3125,14.25 Z" id="路径" fill="#2666fb"></path>
+            <polyline id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linejoin="round" points="1.5 10.874925 3.38938875 1.8746325 14.6326875 1.8746325 16.5 10.874925"></polyline>
+            <line x1="3.75" y1="13.3125" x2="10.125" y2="13.3125" id="路径" stroke="#2666fb" stroke-width="1.5" stroke-linecap="round"></line>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>高级操作能力</title>
+    <g id="后台管理系统" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="qDate-新增数据连接备份" transform="translate(-606, -880)" fill="#FFBB00">
+            <g id="高级操作能力" transform="translate(606, 880)">
+                <rect id="矩形-3备份-13" fill-opacity="0.06" x="0" y="0" width="32" height="32" rx="4"></rect>
+                <g id="tucengshuliang" transform="translate(4, 4)">
+                    <g id="编组" transform="translate(1.44, 2.4)">
+                        <path d="M0,4.97376 L10.77264,9.6 L21.12,4.97376 L11.1792,0 L0,4.97376 Z M10.77264,16.1328 L3.69696,13.02312 L0,14.70624 L10.77264,19.44 L21.12,14.70624 L17.70792,12.96 L10.77264,16.1328 Z" id="形状" fill-rule="nonzero"></path>
+                        <polygon id="路径" points="10.77264 11.5728 3.69696 8.46312 0 10.14624 10.77264 14.88 21.12 10.14624 17.70792 8.4"></polygon>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

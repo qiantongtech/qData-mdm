@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.master.dal.mapper.change.MasterExecuteTaskMapper">
+
+    <select id="selectByRequestId" resultType="tech.qiantong.qdata.mdm.master.dal.dataobject.change.MasterExecuteTaskDO">
+        SELECT *
+        FROM MASTER_EXECUTE_TASK
+        WHERE REQUEST_ID = #{requestId}
+          AND DEL_FLAG = '0'
+    </select>
+
+    <select id="selectByExecutionId" resultType="tech.qiantong.qdata.mdm.master.dal.dataobject.change.MasterExecuteTaskDO">
+        SELECT *
+        FROM MASTER_EXECUTE_TASK
+        WHERE EXECUTION_ID = #{executionId}
+          AND DEL_FLAG = '0'
+    </select>
+
+    <select id="selectPendingTasks" resultType="tech.qiantong.qdata.mdm.master.dal.dataobject.change.MasterExecuteTaskDO">
+        SELECT *
+        FROM MASTER_EXECUTE_TASK
+        WHERE DEL_FLAG = '0'
+          AND TASK_STATUS = '0'
+          AND (NEXT_EXECUTE_TIME IS NULL OR NEXT_EXECUTE_TIME &lt;= CURRENT_TIMESTAMP)
+          AND EXISTS (
+              SELECT 1 FROM MASTER_CHANGE_REQUEST r
+              WHERE r.ID = MASTER_EXECUTE_TASK.REQUEST_ID
+                AND ((r.CHANGE_TYPE IN ('CREATE', 'UPDATE') AND r.ITEM_COUNT = 1)
+                  OR (r.CHANGE_TYPE IN ('BATCH_UPDATE', 'STATUS_CHANGE', 'BATCH_IMPORT') AND r.ITEM_COUNT BETWEEN 1 AND 500))
+                AND r.STATUS = '1'
+                AND r.EXECUTE_STATUS = '0'
+                AND r.VALID_FLAG = '1'
+                AND r.DEL_FLAG = '0'
+          )
+        ORDER BY ID ASC
+    </select>
+
+    <update id="claimPending">
+        UPDATE MASTER_EXECUTE_TASK
+        SET TASK_STATUS = '1',
+            WORKER_ID = #{workerId},
+            START_TIME = CURRENT_TIMESTAMP,
+            LEASE_UNTIL = #{leaseUntil},
+            UPDATE_TIME = CURRENT_TIMESTAMP
+        WHERE ID = #{id}
+          AND DEL_FLAG = '0'
+          AND TASK_STATUS = '0'
+          AND (NEXT_EXECUTE_TIME IS NULL OR NEXT_EXECUTE_TIME &lt;= CURRENT_TIMESTAMP)
+    </update>
+
+    <update id="markSuccess">
+        UPDATE MASTER_EXECUTE_TASK
+        SET TASK_STATUS = '2',
+            SUCCESS_COUNT = #{successCount},
+            FAIL_COUNT = 0,
+            FINISH_TIME = #{finishTime},
+            WORKER_ID = NULL,
+            LEASE_UNTIL = NULL,
+            ERROR_MESSAGE = NULL,
+            UPDATE_TIME = CURRENT_TIMESTAMP
+        WHERE ID = #{id}
+          AND DEL_FLAG = '0'
+          AND TASK_STATUS = '1'
+          AND WORKER_ID = #{workerId}
+    </update>
+
+    <update id="markFailure">
+        UPDATE MASTER_EXECUTE_TASK
+        SET TASK_STATUS = #{taskStatus},
+            FAIL_COUNT = #{failCount},
+            RETRY_COUNT = #{retryCount},
+            NEXT_EXECUTE_TIME = #{nextExecuteTime},
+            ERROR_MESSAGE = #{errorMessage},
+            WORKER_ID = NULL,
+            LEASE_UNTIL = NULL,
+            UPDATE_TIME = CURRENT_TIMESTAMP
+        WHERE ID = #{id}
+          AND DEL_FLAG = '0'
+          AND TASK_STATUS = '1'
+          AND WORKER_ID = #{workerId}
+    </update>
+</mapper>

@@ -1,0 +1,587 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.base.ModelBaseMapper">
+
+    <select id="selectAvailableSubmodels" resultMap="ModelBaseResult">
+        SELECT ID, CODE, NAME, PUBLISHED_INSTANCE_ID
+        FROM MODEL_BASE
+        WHERE PARENT_ID = #{parentId}
+          AND (VALID_FLAG IS NULL OR VALID_FLAG = '1') AND DEL_FLAG = '0'
+          AND EXISTS (SELECT 1 FROM MODEL_VERSION v WHERE v.ID = MODEL_BASE.VERSION_ID
+              AND v.MODEL_ID = MODEL_BASE.ID AND v.DEL_FLAG = '0' AND v.STATUS IN (0, 1, 2))
+        ORDER BY ID
+    </select>
+
+    <resultMap type="ModelBaseDO" id="ModelBaseResult">
+        <result property="id" column="ID"/>
+        <result property="code" column="CODE"/>
+        <result property="name" column="NAME"/>
+        <result property="icon" column="ICON"/>
+        <result property="responsibleUserId" column="RESPONSIBLE_USER_ID"/>
+        <result property="projectId" column="PROJECT_ID"/>
+        <result property="layerId" column="LAYER_ID"/>
+        <result property="type" column="TYPE"/>
+        <result property="versionId" column="VERSION_ID"/>
+        <result property="description" column="DESCRIPTION"/>
+        <result property="parentId" column="PARENT_ID"/>
+        <result property="delFlag" column="DEL_FLAG"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updaterId" column="UPDATER_ID"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="publishedInstanceId" column="PUBLISHED_INSTANCE_ID"/>
+    </resultMap>
+
+    <sql id="selectModelBaseVo">
+        select ID,
+               CODE,
+               NAME,
+               ICON,
+               RESPONSIBLE_USER_ID,
+               PROJECT_ID,
+               LAYER_ID,
+               TYPE,
+               VERSION_ID,
+               PUBLISHED_INSTANCE_ID,
+               DESCRIPTION,
+               PARENT_ID,
+               DEL_FLAG,
+               CREATE_BY,
+               CREATOR_ID,
+               CREATE_TIME,
+               UPDATE_BY,
+               UPDATER_ID,
+               UPDATE_TIME
+        from MODEL_BASE
+    </sql>
+
+    <!-- 列表和详情共用的主模型映射：包含版本、发布版本和主模型字段。 -->
+    <resultMap id="ModelBaseGraphBaseResult" type="ModelBaseDO">
+        <result property="id" column="ID"/>
+        <result property="code" column="CODE"/>
+        <result property="name" column="NAME"/>
+        <result property="icon" column="ICON"/>
+        <result property="responsibleUserId" column="RESPONSIBLE_USER_ID"/>
+        <result property="projectId" column="PROJECT_ID"/>
+        <result property="layerId" column="LAYER_ID"/>
+        <result property="type" column="TYPE"/>
+        <result property="versionId" column="VERSION_ID"/>
+        <result property="description" column="DESCRIPTION"/>
+        <result property="parentId" column="PARENT_ID"/>
+        <result property="delFlag" column="DEL_FLAG"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updaterId" column="UPDATER_ID"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="publishedInstanceId" column="PUBLISHED_INSTANCE_ID"/>
+        <association property="version" resultMap="ModelVersionNestedResult" columnPrefix="VERSION_"/>
+        <association property="releaseVersion" resultMap="ModelVersionNestedResult" columnPrefix="RELEASE_VERSION_"/>
+        <collection property="fields" column="ID" select="selectFieldsByModelId"/>
+    </resultMap>
+
+    <!-- 列表批量装配专用映射：不触发字段、子模型嵌套查询。 -->
+    <resultMap id="ModelBaseFlatListResult" type="ModelBaseDO">
+        <id property="id" column="ID"/>
+        <result property="code" column="CODE"/>
+        <result property="name" column="NAME"/>
+        <result property="icon" column="ICON"/>
+        <result property="responsibleUserId" column="RESPONSIBLE_USER_ID"/>
+        <result property="projectId" column="PROJECT_ID"/>
+        <result property="layerId" column="LAYER_ID"/>
+        <result property="type" column="TYPE"/>
+        <result property="versionId" column="VERSION_ID"/>
+        <result property="description" column="DESCRIPTION"/>
+        <result property="parentId" column="PARENT_ID"/>
+        <result property="delFlag" column="DEL_FLAG"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updaterId" column="UPDATER_ID"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="publishedInstanceId" column="PUBLISHED_INSTANCE_ID"/>
+        <association property="version" resultMap="ModelVersionNestedResult" columnPrefix="VERSION_"/>
+        <association property="releaseVersion" resultMap="ModelVersionNestedResult" columnPrefix="RELEASE_VERSION_"/>
+    </resultMap>
+
+    <!-- 详情查询加载子模型的版本、发布版本和字段。 -->
+    <resultMap id="ModelBaseDetailGraphResult" type="ModelBaseDO" extends="ModelBaseGraphBaseResult">
+        <result property="publishedInstanceId" column="PUBLISHED_INSTANCE_ID"/>
+        <collection property="subModels" column="ID" select="selectSubModelsByParentId"/>
+    </resultMap>
+
+    <!-- 子模型补充当前版本、发布版本和字段，但不继续递归查询下级子模型。 -->
+    <resultMap id="ModelBaseSubModelGraphResult" type="ModelBaseDO" extends="ModelBaseResult">
+        <result property="publishedInstanceId" column="PUBLISHED_INSTANCE_ID"/>
+        <association property="version" resultMap="ModelVersionNestedResult" columnPrefix="CURRENT_VERSION_"/>
+        <association property="releaseVersion" resultMap="ModelVersionNestedResult" columnPrefix="RELEASE_VERSION_"/>
+        <collection property="fields" column="ID" select="selectFieldsByModelId"/>
+    </resultMap>
+
+    <resultMap id="ModelVersionNestedResult" type="ModelVersionDO">
+        <id property="id" column="ID"/>
+        <result property="modelId" column="MODEL_ID"/>
+        <result property="baseVersionId" column="BASE_VERSION_ID"/>
+        <result property="versionNo" column="VERSION_NO"/>
+        <result property="description" column="DESCRIPTION"/>
+        <result property="changeData" column="CHANGE_DATA"/>
+        <result property="validFlag" column="VALID_FLAG"/>
+        <result property="delFlag" column="DEL_FLAG"/>
+        <result property="status" column="STATUS"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updaterId" column="UPDATER_ID"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+    </resultMap>
+    <resultMap id="ModelColumnGraphResult" type="ModelColumnDO">
+        <id property="id" column="COLUMN_ID"/>
+        <result property="modelId" column="COLUMN_MODEL_ID"/>
+        <result property="name" column="COLUMN_NAME"/>
+        <result property="code" column="COLUMN_CODE"/>
+        <result property="columnCategory" column="COLUMN_COLUMN_CATEGORY"/>
+        <result property="dataType" column="COLUMN_DATA_TYPE"/>
+        <result property="dataLength" column="COLUMN_DATA_LENGTH"/>
+        <result property="dataScale" column="COLUMN_DATA_SCALE"/>
+        <result property="primaryKeyFlag" column="COLUMN_PRIMARY_KEY_FLAG"/>
+        <result property="requiredFlag" column="COLUMN_REQUIRED_FLAG"/>
+        <result property="uniqueFlag" column="COLUMN_UNIQUE_FLAG"/>
+        <result property="nameFlag" column="COLUMN_NAME_FLAG"/>
+        <result property="defaultValue" column="COLUMN_DEFAULT_VALUE"/>
+        <result property="dictTypeId" column="COLUMN_DICT_TYPE_ID"/>
+        <result property="encodingVersionId" column="COLUMN_ENCODING_VERSION_ID"/>
+        <result property="encodingMode" column="COLUMN_ENCODING_MODE"/>
+        <result property="encodingRuleConfig" column="COLUMN_ENCODING_RULE_CONFIG"/>
+        <result property="description" column="COLUMN_DESCRIPTION"/>
+        <result property="delFlag" column="COLUMN_DEL_FLAG"/>
+        <result property="relatedModelId" column="COLUMN_RELATED_MODEL_ID"/>
+        <result property="relatedModelName" column="COLUMN_RELATED_MODEL_NAME"/>
+        <result property="relatedProjectId" column="COLUMN_RELATED_PROJECT_ID"/>
+        <result property="relatedLayerId" column="COLUMN_RELATED_LAYER_ID"/>
+        <result property="relatedCode" column="COLUMN_RELATED_CODE"/>
+        <result property="displayCode" column="COLUMN_DISPLAY_CODE"/>
+        <result property="nodeRule" column="COLUMN_NODE_RULE"/>
+        <result property="displayMode" column="COLUMN_DISPLAY_MODE"/>
+    </resultMap>
+
+    <!-- 正式版本取主模型最近成功的发布实例；子模型共用主模型的正式版本，修订来源仍保留在 BASE_VERSION_ID。 -->
+    <sql id="joinPublishedVersionSql">
+        left join MODEL_BASE published_model
+            on published_model.ID = case when mb.PARENT_ID is null or mb.PARENT_ID = 0 then mb.ID else mb.PARENT_ID end
+            and published_model.DEL_FLAG = '0'
+        left join MODEL_INSTANCE published_instance
+            on published_instance.ID = published_model.PUBLISHED_INSTANCE_ID
+            and published_instance.MODEL_ID = published_model.ID
+            and published_instance.STATUS = 'SUCCEEDED'
+        left join MODEL_VERSION rv
+            on rv.ID = published_instance.MODEL_VERSION_ID
+            and rv.MODEL_ID = published_model.ID
+            and rv.DEL_FLAG = '0'
+    </sql>
+
+    <!-- 主表单独分页，版本对象通过 JOIN 结果映射，字段和子模型通过独立查询装配。 -->
+    <sql id="selectModelBaseWithVersionsSql">
+        select mb.ID,
+        mb.CODE,
+        mb.NAME,
+        mb.ICON,
+        mb.RESPONSIBLE_USER_ID,
+        mb.PROJECT_ID,
+        mb.LAYER_ID,
+        mb.TYPE,
+        mb.VERSION_ID as MODEL_VERSION_ID,
+        mb.PUBLISHED_INSTANCE_ID,
+        mb.DESCRIPTION,
+        mb.PARENT_ID,
+        mb.DEL_FLAG,
+        mb.CREATE_BY,
+        mb.CREATOR_ID,
+        mb.CREATE_TIME,
+        mb.UPDATE_BY,
+        mb.UPDATER_ID,
+        mb.UPDATE_TIME,
+        v.ID as VERSION_ID,
+        v.MODEL_ID as VERSION_MODEL_ID,
+        v.BASE_VERSION_ID as VERSION_BASE_VERSION_ID,
+        v.VERSION_NO as VERSION_VERSION_NO,
+        v.DESCRIPTION as VERSION_DESCRIPTION,
+        v.CHANGE_DATA as VERSION_CHANGE_DATA,
+        v.VALID_FLAG as VERSION_VALID_FLAG,
+        v.DEL_FLAG as VERSION_DEL_FLAG,
+        v.STATUS as VERSION_STATUS,
+        rv.ID as RELEASE_VERSION_ID,
+        rv.MODEL_ID as RELEASE_VERSION_MODEL_ID,
+        rv.BASE_VERSION_ID as RELEASE_VERSION_BASE_VERSION_ID,
+        rv.VERSION_NO as RELEASE_VERSION_VERSION_NO,
+        rv.DESCRIPTION as RELEASE_VERSION_DESCRIPTION,
+        rv.CHANGE_DATA as RELEASE_VERSION_CHANGE_DATA,
+        rv.VALID_FLAG as RELEASE_VERSION_VALID_FLAG,
+        rv.DEL_FLAG as RELEASE_VERSION_DEL_FLAG,
+        rv.STATUS as RELEASE_VERSION_STATUS
+        from MODEL_BASE mb
+        left join MODEL_VERSION v on v.ID = mb.VERSION_ID and v.DEL_FLAG = '0'
+        <include refid="joinPublishedVersionSql"/>
+    </sql>
+
+    <sql id="selectModelBaseFlatSql">
+        <include refid="selectModelBaseWithVersionsSql"/>
+        <where>
+            mb.DEL_FLAG = '0'
+            and
+            (mb.PARENT_ID is null or mb.PARENT_ID = 0)
+            <if test="req.id != null">and mb.ID = #{req.id}</if>
+            <if test="req.code != null and req.code != ''">and mb.CODE = #{req.code}</if>
+            <if test="req.name != null and req.name != ''">and mb.NAME like concat('%', #{req.name}, '%')</if>
+            <if test="req.projectId != null">and mb.PROJECT_ID = #{req.projectId}</if>
+            <if test="req.responsibleUserId != null">and mb.RESPONSIBLE_USER_ID = #{req.responsibleUserId}</if>
+            <choose>
+                <when test="req.scopeLayerIds != null and req.scopeLayerIds.size() > 0">
+                    and mb.LAYER_ID in
+                    <foreach collection="req.scopeLayerIds" item="scopeLayerId" open="(" separator="," close=")">
+                        #{scopeLayerId}
+                    </foreach>
+                </when>
+                <otherwise>
+                    <if test="req.layerId != null">and mb.LAYER_ID = #{req.layerId}</if>
+                </otherwise>
+            </choose>
+            <if test="req.type != null and req.type != ''">and mb.TYPE = #{req.type}</if>
+            <if test="req.status != null">and v.STATUS = #{req.status}</if>
+        </where>
+        order by mb.CREATE_TIME desc, mb.ID desc
+    </sql>
+
+    <!-- 引用情况包含主模型及子模型，版本与列表使用同一 JOIN 规则。 -->
+    <select id="selectModelsWithVersionsByIds" resultMap="ModelBaseFlatListResult">
+        <include refid="selectModelBaseWithVersionsSql"/>
+        where mb.DEL_FLAG = '0'
+        <choose>
+            <when test="modelIds != null and modelIds.size() > 0">
+                and mb.ID in
+                <foreach collection="modelIds" item="modelId" open="(" separator="," close=")">
+                    #{modelId}
+                </foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+    </select>
+
+    <select id="selectModelBaseFlatByXml" resultMap="ModelBaseFlatListResult">
+        <include refid="selectModelBaseFlatSql"/>
+    </select>
+
+    <select id="selectModelBaseFlatByXmlNoPage" resultMap="ModelBaseFlatListResult">
+        <include refid="selectModelBaseFlatSql"/>
+    </select>
+
+    <!-- 详情查询与分页查询使用相同的关联和结果映射，仅按模型 ID 返回单条数据。 -->
+    <select id="selectModelBaseFlatById" resultMap="ModelBaseDetailGraphResult">
+        select mb.ID,
+               mb.CODE,
+               mb.NAME,
+               mb.ICON,
+               mb.RESPONSIBLE_USER_ID,
+               mb.PROJECT_ID,
+               mb.LAYER_ID,
+               mb.TYPE,
+               mb.VERSION_ID as MODEL_VERSION_ID,
+               mb.PUBLISHED_INSTANCE_ID,
+               mb.DESCRIPTION,
+               mb.PARENT_ID,
+               mb.DEL_FLAG,
+               mb.CREATE_BY,
+               mb.CREATOR_ID,
+               mb.CREATE_TIME,
+               mb.UPDATE_BY,
+               mb.UPDATER_ID,
+               mb.UPDATE_TIME,
+               v.ID as VERSION_ID,
+               v.MODEL_ID as VERSION_MODEL_ID,
+               v.BASE_VERSION_ID as VERSION_BASE_VERSION_ID,
+               v.VERSION_NO as VERSION_VERSION_NO,
+               v.DESCRIPTION as VERSION_DESCRIPTION,
+               v.CHANGE_DATA as VERSION_CHANGE_DATA,
+               v.VALID_FLAG as VERSION_VALID_FLAG,
+               v.DEL_FLAG as VERSION_DEL_FLAG,
+               v.STATUS as VERSION_STATUS,
+               rv.ID as RELEASE_VERSION_ID,
+               rv.MODEL_ID as RELEASE_VERSION_MODEL_ID,
+               rv.BASE_VERSION_ID as RELEASE_VERSION_BASE_VERSION_ID,
+               rv.VERSION_NO as RELEASE_VERSION_VERSION_NO,
+               rv.DESCRIPTION as RELEASE_VERSION_DESCRIPTION,
+               rv.CHANGE_DATA as RELEASE_VERSION_CHANGE_DATA,
+               rv.VALID_FLAG as RELEASE_VERSION_VALID_FLAG,
+               rv.DEL_FLAG as RELEASE_VERSION_DEL_FLAG,
+               rv.STATUS as RELEASE_VERSION_STATUS
+        from MODEL_BASE mb
+                 left join MODEL_VERSION v on v.ID = mb.VERSION_ID and v.DEL_FLAG = '0'
+                 <include refid="joinPublishedVersionSql"/>
+        where mb.ID = #{id} and mb.DEL_FLAG = '0'
+    </select>
+
+    <select id="selectFieldsByModelId" resultMap="ModelColumnGraphResult">
+        select mc.ID                   as COLUMN_ID,
+               mc.MODEL_ID             as COLUMN_MODEL_ID,
+               mc.NAME                 as COLUMN_NAME,
+               mc.CODE                 as COLUMN_CODE,
+               mc.COLUMN_CATEGORY      as COLUMN_COLUMN_CATEGORY,
+               mc.DATA_TYPE            as COLUMN_DATA_TYPE,
+               mc.DATA_LENGTH          as COLUMN_DATA_LENGTH,
+               mc.DATA_SCALE           as COLUMN_DATA_SCALE,
+               mc.PRIMARY_KEY_FLAG     as COLUMN_PRIMARY_KEY_FLAG,
+               mc.REQUIRED_FLAG        as COLUMN_REQUIRED_FLAG,
+               mc.UNIQUE_FLAG          as COLUMN_UNIQUE_FLAG,
+               mc.NAME_FLAG            as COLUMN_NAME_FLAG,
+               mc.DEFAULT_VALUE        as COLUMN_DEFAULT_VALUE,
+               mc.DICT_TYPE_ID         as COLUMN_DICT_TYPE_ID,
+               mc.ENCODING_MODE        as COLUMN_ENCODING_MODE,
+               mc.ENCODING_VERSION_ID  as COLUMN_ENCODING_VERSION_ID,
+               mc.ENCODING_RULE_CONFIG as COLUMN_ENCODING_RULE_CONFIG,
+               mc.DESCRIPTION          as COLUMN_DESCRIPTION,
+               mc.DEL_FLAG             as COLUMN_DEL_FLAG,
+               mc.RELATED_MODEL_ID     as COLUMN_RELATED_MODEL_ID,
+               related_model.NAME      as COLUMN_RELATED_MODEL_NAME,
+               related_model.PROJECT_ID as COLUMN_RELATED_PROJECT_ID,
+               related_model.LAYER_ID   as COLUMN_RELATED_LAYER_ID,
+               mc.RELATED_CODE         as COLUMN_RELATED_CODE,
+               mc.DISPLAY_CODE         as COLUMN_DISPLAY_CODE,
+               mc.NODE_RULE            as COLUMN_NODE_RULE,
+               mc.DISPLAY_MODE         as COLUMN_DISPLAY_MODE
+        from MODEL_COLUMN mc
+                 left join MODEL_BASE related_model
+                           on mc.COLUMN_CATEGORY in ('RELATION', 'CLASS')
+                               and related_model.ID = mc.RELATED_MODEL_ID
+                               and related_model.DEL_FLAG = '0'
+        where mc.MODEL_ID = #{value} and mc.DEL_FLAG = '0'
+        order by mc.ID
+    </select>
+
+    <!-- 列表场景批量加载字段，返回内容与原逐模型查询保持一致。 -->
+    <select id="selectFieldsByModelIds" resultMap="ModelColumnGraphResult">
+        select mc.ID                    as COLUMN_ID,
+               mc.MODEL_ID              as COLUMN_MODEL_ID,
+               mc.NAME                  as COLUMN_NAME,
+               mc.CODE                  as COLUMN_CODE,
+               mc.COLUMN_CATEGORY       as COLUMN_COLUMN_CATEGORY,
+               mc.DATA_TYPE             as COLUMN_DATA_TYPE,
+               mc.DATA_LENGTH           as COLUMN_DATA_LENGTH,
+               mc.DATA_SCALE            as COLUMN_DATA_SCALE,
+               mc.PRIMARY_KEY_FLAG      as COLUMN_PRIMARY_KEY_FLAG,
+               mc.REQUIRED_FLAG         as COLUMN_REQUIRED_FLAG,
+               mc.UNIQUE_FLAG           as COLUMN_UNIQUE_FLAG,
+               mc.NAME_FLAG             as COLUMN_NAME_FLAG,
+               mc.DEFAULT_VALUE         as COLUMN_DEFAULT_VALUE,
+               mc.DICT_TYPE_ID          as COLUMN_DICT_TYPE_ID,
+               mc.ENCODING_MODE         as COLUMN_ENCODING_MODE,
+               mc.ENCODING_VERSION_ID   as COLUMN_ENCODING_VERSION_ID,
+               mc.ENCODING_RULE_CONFIG  as COLUMN_ENCODING_RULE_CONFIG,
+               mc.DESCRIPTION           as COLUMN_DESCRIPTION,
+               mc.DEL_FLAG              as COLUMN_DEL_FLAG,
+               mc.RELATED_MODEL_ID      as COLUMN_RELATED_MODEL_ID,
+               related_model.NAME       as COLUMN_RELATED_MODEL_NAME,
+               related_model.PROJECT_ID as COLUMN_RELATED_PROJECT_ID,
+               related_model.LAYER_ID   as COLUMN_RELATED_LAYER_ID,
+               mc.RELATED_CODE          as COLUMN_RELATED_CODE,
+               mc.DISPLAY_CODE          as COLUMN_DISPLAY_CODE,
+               mc.NODE_RULE             as COLUMN_NODE_RULE,
+               mc.DISPLAY_MODE          as COLUMN_DISPLAY_MODE
+        from MODEL_COLUMN mc
+                 left join MODEL_BASE related_model
+                           on mc.COLUMN_CATEGORY in ('RELATION', 'CLASS')
+                               and related_model.ID = mc.RELATED_MODEL_ID
+                               and related_model.DEL_FLAG = '0'
+        where mc.DEL_FLAG = '0'
+          and mc.MODEL_ID in
+        <foreach collection="modelIds" item="modelId" open="(" separator="," close=")">
+            #{modelId}
+        </foreach>
+        order by mc.MODEL_ID, mc.ID
+    </select>
+
+    <!-- 列表场景批量加载直接子模型，返回内容与原逐模型查询保持一致。 -->
+    <select id="selectSubModelsByParentIds" resultMap="ModelBaseResult">
+        <include refid="selectModelBaseVo"/>
+        where DEL_FLAG = '0' and PARENT_ID in
+        <foreach collection="parentIds" item="parentId" open="(" separator="," close=")">
+            #{parentId}
+        </foreach>
+        order by PARENT_ID, ID
+    </select>
+
+    <!-- 详情场景：返回直接子模型，并装配其当前版本、发布版本和字段。 -->
+    <select id="selectSubModelsByParentId" resultMap="ModelBaseSubModelGraphResult">
+        select mb.ID,
+               mb.CODE,
+               mb.NAME,
+               mb.ICON,
+               mb.RESPONSIBLE_USER_ID,
+               mb.PROJECT_ID,
+               mb.LAYER_ID,
+               mb.TYPE,
+               mb.VERSION_ID,
+               mb.PUBLISHED_INSTANCE_ID,
+               mb.DESCRIPTION,
+               mb.PARENT_ID,
+               mb.DEL_FLAG,
+               mb.CREATE_BY,
+               mb.CREATOR_ID,
+               mb.CREATE_TIME,
+               mb.UPDATE_BY,
+               mb.UPDATER_ID,
+               mb.UPDATE_TIME,
+               v.ID as CURRENT_VERSION_ID,
+               v.MODEL_ID as CURRENT_VERSION_MODEL_ID,
+               v.BASE_VERSION_ID as CURRENT_VERSION_BASE_VERSION_ID,
+               v.VERSION_NO as CURRENT_VERSION_VERSION_NO,
+               v.DESCRIPTION as CURRENT_VERSION_DESCRIPTION,
+               v.CHANGE_DATA as CURRENT_VERSION_CHANGE_DATA,
+               v.VALID_FLAG as CURRENT_VERSION_VALID_FLAG,
+               v.DEL_FLAG as CURRENT_VERSION_DEL_FLAG,
+               v.STATUS as CURRENT_VERSION_STATUS,
+               rv.ID as RELEASE_VERSION_ID,
+               rv.MODEL_ID as RELEASE_VERSION_MODEL_ID,
+               rv.BASE_VERSION_ID as RELEASE_VERSION_BASE_VERSION_ID,
+               rv.VERSION_NO as RELEASE_VERSION_VERSION_NO,
+               rv.DESCRIPTION as RELEASE_VERSION_DESCRIPTION,
+               rv.CHANGE_DATA as RELEASE_VERSION_CHANGE_DATA,
+               rv.VALID_FLAG as RELEASE_VERSION_VALID_FLAG,
+               rv.DEL_FLAG as RELEASE_VERSION_DEL_FLAG,
+               rv.STATUS as RELEASE_VERSION_STATUS
+        from MODEL_BASE mb
+                 left join MODEL_VERSION v on v.ID = mb.VERSION_ID and v.DEL_FLAG = '0'
+                 <include refid="joinPublishedVersionSql"/>
+        where mb.PARENT_ID = #{value} and mb.DEL_FLAG = '0'
+        order by mb.ID
+    </select>
+
+    <select id="selectModelBaseList" parameterType="ModelBaseDO" resultMap="ModelBaseResult">
+        <include refid="selectModelBaseVo"/>
+        <where>
+            <if test="code != null  and code != ''">and CODE = #{code}</if>
+            <if test="name != null  and name != ''">and NAME like concat(concat('%', #{name}), '%')</if>
+            <if test="projectId != null ">and PROJECT_ID = #{projectId}</if>
+            <if test="responsibleUserId != null">and RESPONSIBLE_USER_ID = #{responsibleUserId}</if>
+            <if test="layerId != null ">and LAYER_ID = #{layerId}</if>
+            <if test="type != null  and type != ''">and TYPE = #{type}</if>
+            <if test="versionId != null ">and VERSION_ID = #{versionId}</if>
+            <if test="description != null  and description != ''">and DESCRIPTION = #{description}</if>
+            <if test="parentId != null  and parentId != ''">and PARENT_ID = #{parentId}</if>
+            and DEL_FLAG = '0'
+            <if test="createTime != null ">and CREATE_TIME = #{createTime}</if>
+        </where>
+    </select>
+
+    <select id="selectModelBaseById" parameterType="Long" resultMap="ModelBaseResult">
+        <include refid="selectModelBaseVo"/>
+        where ID = #{id} and DEL_FLAG = '0'
+    </select>
+
+    <insert id="insertModelBase" parameterType="ModelBaseDO">
+        insert into MODEL_BASE
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="publishedInstanceId != null">PUBLISHED_INSTANCE_ID,</if>
+            <if test="id != null">ID,</if>
+            <if test="code != null">CODE,</if>
+            <if test="name != null">NAME,</if>
+            <if test="icon != null">ICON,</if>
+            <if test="responsibleUserId != null">RESPONSIBLE_USER_ID,</if>
+            <if test="projectId != null">PROJECT_ID,</if>
+            <if test="layerId != null">LAYER_ID,</if>
+            <if test="type != null">TYPE,</if>
+            <if test="versionId != null">VERSION_ID,</if>
+            <if test="description != null">DESCRIPTION,</if>
+            <if test="parentId != null">PARENT_ID,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="publishedInstanceId != null">#{publishedInstanceId},</if>
+            <if test="id != null">#{id},</if>
+            <if test="code != null">#{code},</if>
+            <if test="name != null">#{name},</if>
+            <if test="icon != null">#{icon},</if>
+            <if test="responsibleUserId != null">#{responsibleUserId},</if>
+            <if test="projectId != null">#{projectId},</if>
+            <if test="layerId != null">#{layerId},</if>
+            <if test="type != null">#{type},</if>
+            <if test="versionId != null">#{versionId},</if>
+            <if test="description != null">#{description},</if>
+            <if test="parentId != null">#{parentId},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+        </trim>
+    </insert>
+
+    <update id="updateModelBase" parameterType="ModelBaseDO">
+        update MODEL_BASE
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="publishedInstanceId != null">PUBLISHED_INSTANCE_ID = #{publishedInstanceId},</if>
+            <if test="code != null">CODE = #{code},</if>
+            <if test="name != null">NAME = #{name},</if>
+            <if test="icon != null">ICON = #{icon},</if>
+            <if test="responsibleUserId != null">RESPONSIBLE_USER_ID = #{responsibleUserId},</if>
+            <if test="projectId != null">PROJECT_ID = #{projectId},</if>
+            <if test="layerId != null">LAYER_ID = #{layerId},</if>
+            <if test="type != null">TYPE = #{type},</if>
+            <if test="versionId != null">VERSION_ID = #{versionId},</if>
+            <if test="description != null">DESCRIPTION = #{description},</if>
+            <if test="parentId != null">PARENT_ID = #{parentId},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+        </trim>
+        where ID = #{id} and DEL_FLAG = '0'
+    </update>
+
+    <delete id="deleteModelBaseById" parameterType="Long">
+        delete
+        from MODEL_BASE
+        where ID = #{id}
+    </delete>
+
+    <delete id="deleteModelBaseByIds" parameterType="String">
+        delete from MODEL_BASE where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

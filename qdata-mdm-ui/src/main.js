@@ -1,14 +1,14 @@
 /*
  * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -77,7 +77,8 @@ import Editor from '@/components/Editor';
 import FileUpload from '@/components/FileUpload2';
 // File upload button component
 import FileUploadbtn from '@/components/FileUploadbtn';
-// Prompt component
+// 提示组件
+import GuideTip from "@/components/GuideTip"
 // Image upload component
 import ImageUpload from '@/components/ImageUpload';
 // Image preview component
@@ -142,6 +143,7 @@ const setupAll = async () => {
   app.component('RightToolbar', RightToolbar);
   app.component('RightToolbar2', RightToolbar2);
   app.component('Editor', Editor);
+  app.component('GuideTip', GuideTip)
   app.component('QtSearchBar', QtSearchBar);
   app.component('QtWrap', QtWrap);
   app.component('QtTable', QtTable);

@@ -1,14 +1,14 @@
 /*
- * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -42,6 +42,76 @@ import java.util.stream.Collectors;
 public class PostgreDialect extends AbstractDbDialect {
 
     @Override
+    public String getColumnType(DbColumn column) {
+        return column == null ? null : column.getDataType();
+    }
+
+    @Override
+    public DbColumn toStandardColumn(DbColumn column) {
+        String type = normalizeTypeName(column == null ? null : column.getDataType());
+        switch (type) {
+            case "CHAR":
+            case "CHARACTER":
+            case "BPCHAR":
+                return toStandardColumn(column, "CHAR");
+            case "VARCHAR":
+            case "CHARACTER VARYING":
+            case "CHAR VARYING":
+            case "NAME":
+                return toStandardColumn(column, "VARCHAR2");
+            case "TEXT":
+            case "XML":
+                return toStandardColumn(column, "TEXT");
+            case "INT2":
+            case "INT4":
+            case "INT8":
+            case "SMALLINT":
+            case "INT":
+            case "INTEGER":
+            case "BIGINT":
+            case "SERIAL":
+            case "SERIAL2":
+            case "SERIAL4":
+            case "SERIAL8":
+            case "BIGSERIAL":
+            case "SMALLSERIAL":
+            case "NUMERIC":
+            case "DECIMAL":
+            case "MONEY":
+                return toStandardColumn(column, "NUMBER");
+            case "REAL":
+            case "FLOAT4":
+                return toStandardColumn(column, "FLOAT");
+            case "DOUBLE PRECISION":
+            case "FLOAT8":
+                return toStandardColumn(column, "DOUBLE");
+            case "BOOLEAN":
+            case "BOOL":
+                return toStandardColumn(column, "TINYINT");
+            case "DATE":
+                return toStandardColumn(column, "DATE");
+            case "TIME":
+            case "TIME WITHOUT TIME ZONE":
+            case "TIME WITH TIME ZONE":
+                return toStandardColumn(column, "TIMESTAMP");
+            case "TIMESTAMP":
+            case "TIMESTAMP WITHOUT TIME ZONE":
+            case "TIMESTAMP WITH TIME ZONE":
+            case "TIMESTAMPTZ":
+                return toStandardColumn(column, "DATETIME");
+            case "BYTEA":
+                return toStandardColumn(column, "BLOB");
+            case "JSON":
+            case "JSONB":
+                return toStandardColumn(column, "TEXT");
+            case "UUID":
+                return toStandardColumn(column, "VARCHAR2");
+            default:
+                return super.toStandardColumn(column);
+        }
+    }
+
+    @Override
     public String columns(String dbName, String tableName) {
         return "SELECT a.attname AS COLNAME," +
                 " CASE " +
@@ -55,22 +125,23 @@ public class PostgreDialect extends AbstractDbDialect {
                 "        WHEN t.typname = 'text' THEN 'TEXT' " +
                 "        ELSE t.typname  " +
                 "    END AS DATATYPE," +
-                "CASE WHEN t.typname IN ('varchar', 'char', 'bpchar', 'text') THEN a.atttypmod - 4 ELSE a.attlen END AS DATALENGTH, " +
-                "CASE WHEN t.typname IN ('numeric', 'decimal', 'float4', 'float8') THEN (a.atttypmod - 4) >> 16 ELSE NULL END AS DATAPRECISION, " +
-                "CASE WHEN t.typname IN ('numeric', 'decimal', 'float4', 'float8') THEN (a.atttypmod - 4) & 65535 ELSE NULL END AS DATASCALE, " +
+                "COALESCE(isc.character_maximum_length, isc.numeric_precision, isc.datetime_precision, NULLIF(a.attlen, -1)) AS DATALENGTH, " +
+                "CASE WHEN t.typname IN ('numeric', 'decimal') THEN isc.numeric_precision ELSE NULL END AS DATAPRECISION, " +
+                "CASE WHEN t.typname IN ('numeric', 'decimal') THEN isc.numeric_scale WHEN t.typname IN ('float4', 'float8') THEN 0 ELSE NULL END AS DATASCALE, " +
                 "CASE WHEN con.contype = 'p' THEN TRUE ELSE FALSE END AS COLKEY, " +
                 "NOT a.attnotnull AS NULLABLE, a.attnum AS COLPOSITION, " +
-                "regexp_replace(pg_get_expr(d.adbin, d.adrelid), '(::[a-zA-Z0-9_]+)+$', '') AS DATADEFAULT," +
+                "regexp_replace(pg_get_expr(d.adbin, d.adrelid), '(::[a-zA-Z0-9_]+( [a-zA-Z0-9_]+)?)+$', '') AS DATADEFAULT," +
                 "col_description(a.attrelid, a.attnum) AS COLCOMMENT " +
                 "FROM pg_attribute a " +
                 "JOIN pg_class c ON a.attrelid = c.oid " +
                 "JOIN pg_type t ON a.atttypid = t.oid " +
                 "LEFT JOIN pg_constraint con ON con.conrelid = c.oid AND a.attnum = ANY(con.conkey) AND con.contype = 'p' " +
                 "LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum " +
+                "LEFT JOIN information_schema.columns isc ON isc.table_schema = 'public' AND isc.table_name = c.relname AND isc.column_name = a.attname " +
                 "WHERE (SELECT current_database()) =  '" + dbName + "'  " +
                 "AND c.relname =  '" + tableName + "'  " +
                 "AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname =  'public' ) " +
-                "AND a.attnum > 0 " +  // Filter out system hidden columns
+                "AND a.attnum > 0 " +  // 过滤掉系统隐藏列
                 "ORDER BY a.attnum";
     }
 
@@ -88,22 +159,23 @@ public class PostgreDialect extends AbstractDbDialect {
                 "        WHEN t.typname = 'text' THEN 'TEXT' " +
                 "        ELSE t.typname  " +
                 "    END AS DATATYPE," +
-                "CASE WHEN t.typname IN ('varchar', 'char', 'bpchar', 'text') THEN a.atttypmod - 4 ELSE a.attlen END AS DATALENGTH, " +
-                "CASE WHEN t.typname IN ('numeric', 'decimal', 'float4', 'float8') THEN (a.atttypmod - 4) >> 16 ELSE NULL END AS DATAPRECISION, " +
-                "CASE WHEN t.typname IN ('numeric', 'decimal', 'float4', 'float8') THEN (a.atttypmod - 4) & 65535 ELSE NULL END AS DATASCALE, " +
+                "COALESCE(isc.character_maximum_length, isc.numeric_precision, isc.datetime_precision, NULLIF(a.attlen, -1)) AS DATALENGTH, " +
+                "CASE WHEN t.typname IN ('numeric', 'decimal') THEN isc.numeric_precision ELSE NULL END AS DATAPRECISION, " +
+                "CASE WHEN t.typname IN ('numeric', 'decimal') THEN isc.numeric_scale WHEN t.typname IN ('float4', 'float8') THEN 0 ELSE NULL END AS DATASCALE, " +
                 "CASE WHEN con.contype = 'p' THEN TRUE ELSE FALSE END AS COLKEY, " +
                 "NOT a.attnotnull AS NULLABLE, a.attnum AS COLPOSITION, " +
-                "regexp_replace(pg_get_expr(d.adbin, d.adrelid), '(::[a-zA-Z0-9_]+)+$', '') AS DATADEFAULT," +
+                "regexp_replace(pg_get_expr(d.adbin, d.adrelid), '(::[a-zA-Z0-9_]+( [a-zA-Z0-9_]+)?)+$', '') AS DATADEFAULT," +
                 "col_description(a.attrelid, a.attnum) AS COLCOMMENT " +
                 "FROM pg_attribute a " +
                 "JOIN pg_class c ON a.attrelid = c.oid " +
                 "JOIN pg_type t ON a.atttypid = t.oid " +
                 "LEFT JOIN pg_constraint con ON con.conrelid = c.oid AND a.attnum = ANY(con.conkey) AND con.contype = 'p' " +
                 "LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum " +
+                "LEFT JOIN information_schema.columns isc ON isc.table_schema = '" + dbQueryProperty.getSid() + "' AND isc.table_name = c.relname AND isc.column_name = a.attname " +
                 "WHERE (SELECT current_database()) =  '" + dbQueryProperty.getDbName() + "'  " +
                 "AND c.relname =  '" + tableName + "'  " +
                 "AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname =  '" + dbQueryProperty.getSid() + "' ) " +
-                "AND a.attnum > 0 " +  // Filter out system hidden columns
+                "AND a.attnum > 0 " +  // 过滤掉系统隐藏列
                 "ORDER BY a.attnum";
     }
 
@@ -115,16 +187,17 @@ public class PostgreDialect extends AbstractDbDialect {
     @Override
     public List<String> someInternalSqlGenerator(DbQueryProperty dbQueryProperty, String tableName, String tableComment, List<DbColumn> dbColumnList) {
         List<String> sqlList = new ArrayList<>();
+        String fullTableName = getTableName(dbQueryProperty, tableName);
 
         List<String> primaryKeys = new ArrayList<>();
         {
             StringBuilder sql = new StringBuilder();
             // Generate CREATE TABLE statement
-            sql.append("CREATE TABLE ").append(tableName).append(" (\n");
+            sql.append("CREATE TABLE ").append(fullTableName).append(" (\n");
 
             for (DbColumn column : dbColumnList) {
                 String columnType = column.getDataType().toUpperCase();
-                sql.append("  ").append(column.getColName()).append(" ");
+                sql.append("  ").append(quoteIdentifier(column.getColName())).append(" ");
 
                 // Convert data types to types supported by PostgreSQL
                 switch (columnType) {
@@ -188,6 +261,7 @@ public class PostgreDialect extends AbstractDbDialect {
                 }
 
                 // Check if required
+                sql.append(identityColumnClause(column));
                 if (!column.getNullable()) {
                     sql.append(" NOT NULL");
                 }
@@ -217,7 +291,7 @@ public class PostgreDialect extends AbstractDbDialect {
             if (!primaryKeys.isEmpty()) {
                 sql.append(", PRIMARY KEY (");
                 for (String pk : primaryKeys) {
-                    sql.append(pk).append(", ");
+                    sql.append(quoteIdentifier(pk)).append(", ");
                 }
                 sql.setLength(sql.length() - 2); // Remove final comma and space
                 sql.append(")");
@@ -230,7 +304,7 @@ public class PostgreDialect extends AbstractDbDialect {
         // Add table notes
         if (StringUtils.isNotEmpty(tableComment)) {
             StringBuilder sql = new StringBuilder();
-            sql.append("COMMENT ON TABLE ").append(tableName).append(" IS '").append(DatabaseUtil.escapeSingleQuotes(tableComment)).append("'\n");
+            sql.append("COMMENT ON TABLE ").append(fullTableName).append(" IS '").append(DatabaseUtil.escapeSingleQuotes(tableComment)).append("'\n");
             sqlList.add(sql.toString());
         }
 
@@ -238,8 +312,8 @@ public class PostgreDialect extends AbstractDbDialect {
         for (DbColumn column : dbColumnList) {
             if (StringUtils.isNotEmpty(column.getColComment())) {
                 StringBuilder sql = new StringBuilder();
-                sql.append("COMMENT ON COLUMN ").append(tableName).append(".")
-                        .append(column.getColName()).append(" IS '")
+                sql.append("COMMENT ON COLUMN ").append(fullTableName).append(".")
+                        .append(quoteIdentifier(column.getColName())).append(" IS '")
                         .append(DatabaseUtil.escapeSingleQuotes(column.getColComment())).append("'\n");
                 sqlList.add(sql.toString());
             }
@@ -441,8 +515,13 @@ public class PostgreDialect extends AbstractDbDialect {
     }
 
     @Override
+    public String getSchemaName(DbQueryProperty property) {
+        return property.getSid();
+    }
+
+    @Override
     public String getTableName(DbQueryProperty property, String tableName) {
-        return property.getDbName() + "." + property.getSid() + "." + tableName;
+        return quoteIdentifier(property.getSid()) + "." + quoteIdentifier(tableName);
     }
 
     @Override
@@ -480,7 +559,7 @@ public class PostgreDialect extends AbstractDbDialect {
     @Override
     public String dropColumn(DbQueryProperty dbQueryProperty, String tableName, String colName) {
         String fullTableName = getTableName(dbQueryProperty, tableName);
-        return "ALTER TABLE " + fullTableName + " DROP COLUMN " + colName;
+        return "ALTER TABLE " + fullTableName + " DROP COLUMN " + quoteIdentifier(colName);
     }
 
     @Override
@@ -490,13 +569,13 @@ public class PostgreDialect extends AbstractDbDialect {
 
         if (Boolean.TRUE.equals(column.getColKey())) {
             StringBuilder sql = new StringBuilder();
-            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT PK_").append(tableName).append("_").append(column.getColName());
-            sql.append(" PRIMARY KEY (").append(column.getColName()).append(")");
+            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT ").append(quoteIdentifier("PK_" + tableName + "_" + column.getColName()));
+            sql.append(" PRIMARY KEY (").append(quoteIdentifier(column.getColName())).append(")");
             sqlList.add(sql.toString());
         } else {
             StringBuilder sql = new StringBuilder();
             sql.append("ALTER TABLE ").append(fullTableName).append(" ALTER COLUMN ");
-            sql.append(column.getColName()).append(" TYPE ");
+            sql.append(quoteIdentifier(column.getColName())).append(" TYPE ");
 
             String columnType = column.getDataType().toUpperCase();
             switch (columnType) {
@@ -559,20 +638,20 @@ public class PostgreDialect extends AbstractDbDialect {
             sqlList.add(sql.toString());
 
             if (!column.getNullable()) {
-                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + column.getColName() + " SET NOT NULL");
+                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quoteIdentifier(column.getColName()) + " SET NOT NULL");
             } else {
-                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + column.getColName() + " DROP NOT NULL");
+                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quoteIdentifier(column.getColName()) + " DROP NOT NULL");
             }
 
             if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + column.getColName() + " SET DEFAULT " + column.getDataDefault());
+                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quoteIdentifier(column.getColName()) + " SET DEFAULT " + column.getDataDefault());
             } else {
-                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + column.getColName() + " DROP DEFAULT");
+                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quoteIdentifier(column.getColName()) + " DROP DEFAULT");
             }
         }
 
         if (StringUtils.isNotEmpty(column.getColComment())) {
-            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + column.getColName()
+            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + quoteIdentifier(column.getColName())
                     + " IS '" + DatabaseUtil.escapeSingleQuotes(column.getColComment()) + "'");
         }
 
@@ -587,7 +666,7 @@ public class PostgreDialect extends AbstractDbDialect {
         if (Boolean.TRUE.equals(column.getColKey())) {
             StringBuilder sql = new StringBuilder();
             sql.append("ALTER TABLE ").append(fullTableName).append(" ADD COLUMN ");
-            sql.append(column.getColName()).append(" ");
+            sql.append(quoteIdentifier(column.getColName())).append(" ");
 
             String columnType = column.getDataType().toUpperCase();
             switch (columnType) {
@@ -646,6 +725,8 @@ public class PostgreDialect extends AbstractDbDialect {
                     sql.append(columnType);
                     break;
             }
+
+            sql.append(identityColumnClause(column));
 
             if (!column.getNullable()) {
                 sql.append(" NOT NULL");
@@ -658,13 +739,13 @@ public class PostgreDialect extends AbstractDbDialect {
             sqlList.add(sql.toString());
 
             sql = new StringBuilder();
-            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT PK_").append(tableName).append("_").append(column.getColName());
-            sql.append(" PRIMARY KEY (").append(column.getColName()).append(")");
+            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT ").append(quoteIdentifier("PK_" + tableName + "_" + column.getColName()));
+            sql.append(" PRIMARY KEY (").append(quoteIdentifier(column.getColName())).append(")");
             sqlList.add(sql.toString());
         } else {
             StringBuilder sql = new StringBuilder();
             sql.append("ALTER TABLE ").append(fullTableName).append(" ADD COLUMN ");
-            sql.append(column.getColName()).append(" ");
+            sql.append(quoteIdentifier(column.getColName())).append(" ");
 
             String columnType = column.getDataType().toUpperCase();
             switch (columnType) {
@@ -723,6 +804,8 @@ public class PostgreDialect extends AbstractDbDialect {
                     sql.append(columnType);
                     break;
             }
+
+            sql.append(identityColumnClause(column));
 
             if (!column.getNullable()) {
                 sql.append(" NOT NULL");
@@ -736,10 +819,38 @@ public class PostgreDialect extends AbstractDbDialect {
         }
 
         if (StringUtils.isNotEmpty(column.getColComment())) {
-            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + column.getColName()
+            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + quoteIdentifier(column.getColName())
                     + " IS '" + DatabaseUtil.escapeSingleQuotes(column.getColComment()) + "'");
         }
 
         return sqlList;
+    }
+
+    @Override
+    public String castToText(String expression) {
+        return "CAST(" + expression + " AS TEXT)";
+    }
+
+    @Override
+    protected String identityColumnClause() { return " GENERATED BY DEFAULT AS IDENTITY"; }
+
+    @Override
+    public java.util.Map<String, Boolean> readIdentityColumns(java.sql.Connection connection,
+            String schemaName, String tableName) throws java.sql.SQLException {
+        // openGauss等兼容驱动可能将GENERATED IDENTITY的isAutoIncrement返回为false。
+        String sql = "SELECT a.attname FROM pg_catalog.pg_attribute a "
+                + "JOIN pg_catalog.pg_class c ON c.oid=a.attrelid "
+                + "JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace "
+                + "WHERE n.nspname=COALESCE(?,current_schema()) AND c.relname=? AND a.attidentity IN ('a','d')";
+        java.util.Map<String, Boolean> columns = new java.util.LinkedHashMap<>();
+        try (java.sql.PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setQueryTimeout(30);
+            statement.setString(1, schemaName == null || schemaName.trim().isEmpty() ? null : schemaName);
+            statement.setString(2, tableName);
+            try (java.sql.ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) columns.put(rows.getString(1), true);
+            }
+        }
+        return columns;
     }
 }

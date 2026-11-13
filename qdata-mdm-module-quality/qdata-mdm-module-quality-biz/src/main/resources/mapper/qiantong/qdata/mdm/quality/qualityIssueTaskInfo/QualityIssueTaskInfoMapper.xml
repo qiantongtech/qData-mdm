@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.quality.dal.mapper.qualityIssueTaskInfo.QualityIssueTaskInfoMapper">
+    <select id="selectRelatedByIssueInfoId" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTaskInfo.QualityIssueTaskInfoDO">
+        SELECT ID, TASK_ID, ISSUE_ID, ISSUE_INFO_ID, QUALITY_RULE_ID,
+               MASTER_RECORD_ID, STATUS, RECTIFICATION_TIME, VALID_FLAG
+        FROM QUALITY_ISSUE_TASK_INFO
+        WHERE DEL_FLAG = 0 AND ISSUE_INFO_ID = #{issueInfoId}
+        ORDER BY ID
+    </select>
+    <select id="lockInfo" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTaskInfo.QualityIssueTaskInfoDO">
+        SELECT ID, TASK_ID, ISSUE_ID, MASTER_RECORD_ID, STATUS, REQUIREMENT,
+               RECTIFICATION_TIME, VALID_FLAG, DEL_FLAG, QUALITY_RULE_ID, ISSUE_INFO_ID
+        FROM QUALITY_ISSUE_TASK_INFO
+        WHERE ID = #{id} AND DEL_FLAG = 0 FOR UPDATE
+    </select>
+    <select id="selectByTaskId" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTaskInfo.QualityIssueTaskInfoDO">
+        SELECT ID, TASK_ID, ISSUE_ID, MASTER_RECORD_ID, STATUS, REQUIREMENT,
+               RECTIFICATION_TIME, VALID_FLAG, DEL_FLAG, QUALITY_RULE_ID, ISSUE_INFO_ID
+        FROM QUALITY_ISSUE_TASK_INFO
+        WHERE TASK_ID = #{taskId} AND DEL_FLAG = 0
+        ORDER BY ID
+    </select>
+    <update id="updateInfoStatus">
+        UPDATE QUALITY_ISSUE_TASK_INFO
+        SET STATUS = #{status}, UPDATE_TIME = #{updateTime},
+            UPDATER_ID = #{updaterId}, UPDATE_BY = #{updateBy}
+            <if test="requirement != null">, REQUIREMENT = #{requirement}</if>
+            <if test="rectificationTime != null">, RECTIFICATION_TIME = #{rectificationTime}</if>
+        WHERE ID = #{id} AND DEL_FLAG = 0 AND STATUS = #{oldStatus}
+    </update>
+</mapper>

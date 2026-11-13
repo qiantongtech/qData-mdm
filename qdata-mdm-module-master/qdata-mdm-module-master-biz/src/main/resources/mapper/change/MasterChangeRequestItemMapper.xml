@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.master.dal.mapper.change.MasterChangeRequestItemMapper">
+
+    <select id="selectByRequestIdForExecute"
+            resultType="tech.qiantong.qdata.mdm.master.dal.dataobject.change.MasterChangeRequestItemDO">
+        SELECT *
+        FROM MASTER_CHANGE_REQUEST_ITEM
+        WHERE REQUEST_ID = #{requestId}
+          AND VALID_FLAG = '1'
+          AND DEL_FLAG = '0'
+        ORDER BY ITEM_NO ASC, ID ASC
+    </select>
+
+    <resultMap id="ItemQueryResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterChangeRequestItemQueryDTO">
+        <id property="id" column="ID"/>
+        <result property="itemNo" column="ITEM_NO"/>
+        <result property="requestId" column="REQUEST_ID"/>
+        <result property="masterRecordId" column="MASTER_RECORD_ID"/>
+        <result property="resultMasterRecordId" column="RESULT_MASTER_RECORD_ID"/>
+        <result property="recordId" column="RECORD_ID"/>
+        <result property="requestNo" column="REQUEST_NO"/>
+        <result property="status" column="STATUS"/>
+        <result property="changeType" column="CHANGE_TYPE"/>
+        <result property="beforeStatus" column="BEFORE_STATUS"/>
+        <result property="targetStatus" column="TARGET_STATUS"/>
+        <result property="currentVersionNo" column="CURRENT_VERSION_NO"/>
+        <result property="targetVersionNo" column="TARGET_VERSION_NO"/>
+        <result property="beforeData" column="BEFORE_DATA"/>
+        <result property="proposedData" column="PROPOSED_DATA"/>
+        <result property="executeStatus" column="EXECUTE_STATUS"/>
+        <result property="executeMessage" column="EXECUTE_MESSAGE"/>
+    </resultMap>
+
+    <resultMap id="ApplicationItemResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterChangeRequestItemQueryDTO">
+        <id property="id" column="ID"/>
+        <result property="itemNo" column="ITEM_NO"/>
+        <result property="masterRecordId" column="MASTER_RECORD_ID"/>
+        <result property="resultMasterRecordId" column="RESULT_MASTER_RECORD_ID"/>
+        <result property="changeType" column="CHANGE_TYPE"/>
+        <result property="beforeStatus" column="BEFORE_STATUS"/>
+        <result property="targetStatus" column="TARGET_STATUS"/>
+        <result property="currentVersionNo" column="CURRENT_VERSION_NO"/>
+        <result property="targetVersionNo" column="TARGET_VERSION_NO"/>
+        <result property="beforeData" column="BEFORE_DATA"/>
+        <result property="proposedData" column="PROPOSED_DATA"/>
+        <result property="executeStatus" column="EXECUTE_STATUS"/>
+        <result property="executeMessage" column="EXECUTE_MESSAGE"/>
+    </resultMap>
+
+    <!-- 申请详情的全部有效明细。 -->
+    <select id="selectApplicationItems" resultMap="ApplicationItemResult">
+        SELECT ID, ITEM_NO, MASTER_RECORD_ID, RESULT_MASTER_RECORD_ID, CHANGE_TYPE,
+               BEFORE_STATUS, TARGET_STATUS, CURRENT_VERSION_NO, TARGET_VERSION_NO,
+               BEFORE_DATA, PROPOSED_DATA, EXECUTE_STATUS, EXECUTE_MESSAGE
+        FROM MASTER_CHANGE_REQUEST_ITEM
+        WHERE REQUEST_ID = #{requestId} AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+        ORDER BY ITEM_NO ASC, ID ASC
+    </select>
+
+    <!-- 申请详情中仅属于指定原记录或结果记录的有效明细。 -->
+    <select id="selectApplicationItemsForRecord" resultMap="ItemQueryResult">
+        SELECT ID, ITEM_NO, MASTER_RECORD_ID, RESULT_MASTER_RECORD_ID, CHANGE_TYPE,
+               BEFORE_STATUS, TARGET_STATUS, CURRENT_VERSION_NO, TARGET_VERSION_NO,
+               BEFORE_DATA, PROPOSED_DATA, EXECUTE_STATUS, EXECUTE_MESSAGE
+        FROM MASTER_CHANGE_REQUEST_ITEM
+        WHERE REQUEST_ID = #{requestId}
+          AND (MASTER_RECORD_ID = #{masterRecordId} OR RESULT_MASTER_RECORD_ID = #{masterRecordId})
+          AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+        ORDER BY ITEM_NO ASC, ID ASC
+    </select>
+
+    <!-- 一页申请的有效明细，用于批量构造目标摘要。 -->
+    <select id="selectItemsForRequests" resultMap="ItemQueryResult">
+        SELECT REQUEST_ID, CHANGE_TYPE, BEFORE_STATUS, TARGET_STATUS,
+               CURRENT_VERSION_NO, TARGET_VERSION_NO
+        FROM MASTER_CHANGE_REQUEST_ITEM
+        WHERE REQUEST_ID IN
+        <foreach collection="requestIds" item="requestId" open="(" separator="," close=")">
+            #{requestId}
+        </foreach>
+          AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+        ORDER BY REQUEST_ID, ITEM_NO, ID
+    </select>
+
+    <!-- 审批中、待执行、执行中及执行结果待确认，均禁止再次维护同一记录。 -->
+    <sql id="PendingMaintenanceCondition">
+        (r.STATUS = '0' OR (r.STATUS = '1' AND r.EXECUTE_STATUS IN ('0', '1')))
+    </sql>
+    <select id="selectPendingCountForRecord" resultType="long">
+        SELECT COUNT(1)
+        FROM MASTER_CHANGE_REQUEST_ITEM i
+        INNER JOIN MASTER_CHANGE_REQUEST r ON r.ID = i.REQUEST_ID
+        WHERE r.MODEL_ID = #{modelId} AND <include refid="PendingMaintenanceCondition"/>
+          AND r.SUBMIT_TIME IS NOT NULL
+          AND r.VALID_FLAG = '1' AND r.DEL_FLAG = '0'
+          AND i.VALID_FLAG = '1' AND i.DEL_FLAG = '0'
+          AND COALESCE(i.RESULT_MASTER_RECORD_ID, i.MASTER_RECORD_ID) = #{masterRecordId}
+    </select>
+
+    <!-- 主数据列表批量补充最近申请；未完成的维护申请优先，再按提交时间和申请 ID 倒序。 -->
+    <select id="selectLatestApprovals" resultMap="ItemQueryResult">
+        SELECT COALESCE(i.RESULT_MASTER_RECORD_ID, i.MASTER_RECORD_ID) AS RECORD_ID,
+               r.ID AS REQUEST_ID, r.REQUEST_NO, r.STATUS, r.EXECUTE_STATUS, i.CHANGE_TYPE
+        FROM MASTER_CHANGE_REQUEST_ITEM i
+        INNER JOIN MASTER_CHANGE_REQUEST r ON r.ID = i.REQUEST_ID
+        WHERE r.MODEL_ID = #{modelId} AND r.SUBMIT_TIME IS NOT NULL
+          AND r.VALID_FLAG = '1' AND r.DEL_FLAG = '0'
+          AND i.VALID_FLAG = '1' AND i.DEL_FLAG = '0'
+          AND COALESCE(i.RESULT_MASTER_RECORD_ID, i.MASTER_RECORD_ID) IN
+          <foreach collection="recordIds" item="recordId" open="(" separator="," close=")">
+              #{recordId}
+          </foreach>
+        ORDER BY CASE WHEN <include refid="PendingMaintenanceCondition"/> THEN 0 ELSE 1 END,
+                 COALESCE(r.SUBMIT_TIME, r.CREATE_TIME) DESC, r.ID DESC
+    </select>
+
+    <!-- 主数据列表审批筛选使用每条记录最近一条已提交申请的状态。 -->
+    <select id="selectLatestApprovalRecordIds" resultType="long">
+        SELECT approval_ranked.RECORD_ID
+        FROM (
+            SELECT COALESCE(i.RESULT_MASTER_RECORD_ID, i.MASTER_RECORD_ID) AS RECORD_ID,
+                   r.STATUS AS APPROVAL_STATUS,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY COALESCE(i.RESULT_MASTER_RECORD_ID, i.MASTER_RECORD_ID)
+                       ORDER BY CASE WHEN <include refid="PendingMaintenanceCondition"/> THEN 0 ELSE 1 END,
+                                r.SUBMIT_TIME DESC, r.ID DESC
+                   ) AS RN
+            FROM MASTER_CHANGE_REQUEST_ITEM i
+            INNER JOIN MASTER_CHANGE_REQUEST r ON r.ID = i.REQUEST_ID
+            WHERE r.MODEL_ID = #{modelId}
+              AND r.SUBMIT_TIME IS NOT NULL
+              AND r.VALID_FLAG = '1'
+              AND r.DEL_FLAG = '0'
+              AND i.VALID_FLAG = '1'
+              AND i.DEL_FLAG = '0'
+        ) approval_ranked
+        WHERE approval_ranked.RN = 1
+          AND approval_ranked.APPROVAL_STATUS = #{approvalStatus}
+    </select>
+
+    <resultMap id="MasterChangeStatusResult"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterChangeStatusDTO">
+        <id property="itemId" column="ITEM_ID"/>
+        <result property="changeType" column="CHANGE_TYPE"/>
+        <result property="beforeStatus" column="BEFORE_STATUS"/>
+        <result property="targetStatus" column="TARGET_STATUS"/>
+        <result property="executeTime" column="EXECUTE_TIME"/>
+        <result property="applicantId" column="APPLICANT_ID"/>
+        <result property="requestNo" column="REQUEST_NO"/>
+        <result property="applyReason" column="APPLY_REASON"/>
+        <result property="approvalStatus" column="APPROVAL_STATUS"/>
+    </resultMap>
+
+    <select id="selectStatusPage" resultMap="MasterChangeStatusResult">
+        SELECT i.ID AS ITEM_ID,
+               i.CHANGE_TYPE,
+               i.BEFORE_STATUS,
+               i.TARGET_STATUS,
+               i.EXECUTE_TIME,
+               q.APPLICANT_ID,
+               q.REQUEST_NO,
+               q.APPLY_REASON,
+               q.STATUS AS APPROVAL_STATUS
+        FROM MASTER_CHANGE_REQUEST_ITEM i
+                 INNER JOIN MASTER_CHANGE_REQUEST q ON q.ID = i.REQUEST_ID
+        WHERE q.MODEL_ID = #{modelId}
+          AND i.MASTER_RECORD_ID = #{masterDataId}
+          AND q.CHANGE_SOURCE = 'MANUAL'
+          AND q.STATUS = '1'
+          AND q.EXECUTE_STATUS IN ('2', '3')
+          AND i.EXECUTE_STATUS = '2'
+          AND i.CHANGE_TYPE IN ('FREEZE', 'UNFREEZE', 'INVALIDATE', 'RECOVER', 'ARCHIVE')
+          AND i.BEFORE_STATUS IS NOT NULL
+          AND i.TARGET_STATUS IS NOT NULL
+          AND i.BEFORE_STATUS &lt;&gt; i.TARGET_STATUS
+          AND q.VALID_FLAG = '1'
+          AND q.DEL_FLAG = '0'
+          AND i.VALID_FLAG = '1'
+          AND i.DEL_FLAG = '0'
+        <choose>
+            <when test="req != null and req.orderByColumn == 'id'">
+                ORDER BY i.ID
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <when test="req != null and req.orderByColumn == 'executeTime'">
+                ORDER BY i.EXECUTE_TIME
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>, i.ID
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                ORDER BY i.EXECUTE_TIME DESC, i.ID DESC
+            </otherwise>
+        </choose>
+    </select>
+
+</mapper>

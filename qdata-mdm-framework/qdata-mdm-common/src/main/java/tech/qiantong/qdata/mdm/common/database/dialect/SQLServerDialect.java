@@ -1,14 +1,14 @@
 /*
- * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -45,7 +45,7 @@ public class SQLServerDialect extends SQLServer2008Dialect {
                 "(CASE WHEN (SELECT ic.column_id FROM sys.indexes idx INNER JOIN sys.index_columns ic ON idx.object_id = ic.object_id AND idx.index_id = ic.index_id WHERE idx.is_primary_key = 1 AND columns.column_id = ic.column_id AND columns.object_id = ic.object_id)  IS NOT NULL THEN '1' ELSE '0' END) AS COLKEY " +
                 "from sys.tables tables " +
                 "JOIN sys.columns columns ON tables.object_id = columns.object_id " +
-                "LEFT JOIN sys.types types ON columns.user_type_id = types.user_type_id AND columns.system_type_id = types.system_type_id " +
+                "LEFT JOIN sys.types types ON columns.user_type_id = types.user_type_id " +
                 "LEFT JOIN syscomments e ON columns.default_object_id= e.id " +
                 "LEFT JOIN sys.extended_properties ep ON ep.major_id = columns.object_id AND ep.minor_id = columns.column_id AND ep.name = 'MS_Description' " +
                 "where tables.name = '" + tableName + "' " +
@@ -59,11 +59,11 @@ public class SQLServerDialect extends SQLServer2008Dialect {
                 "(CASE WHEN (SELECT ic.column_id FROM sys.indexes idx INNER JOIN sys.index_columns ic ON idx.object_id = ic.object_id AND idx.index_id = ic.index_id WHERE idx.is_primary_key = 1 AND columns.column_id = ic.column_id AND columns.object_id = ic.object_id)  IS NOT NULL THEN '1' ELSE '0' END) AS COLKEY " +
                 "from sys.tables tables " +
                 "JOIN sys.columns columns ON tables.object_id = columns.object_id " +
-                "LEFT JOIN sys.types types ON columns.user_type_id = types.user_type_id AND columns.system_type_id = types.system_type_id " +
+                "LEFT JOIN sys.types types ON columns.user_type_id = types.user_type_id " +
                 "LEFT JOIN syscomments e ON columns.default_object_id= e.id " +
                 "LEFT JOIN sys.extended_properties ep ON ep.major_id = columns.object_id AND ep.minor_id = columns.column_id AND ep.name = 'MS_Description' " +
                 "where tables.name = '" + tableName + "' " +
-                "AND SCHEMA_NAME(tables.schema_id) = '" + dbQueryProperty.getSid() + "' " +
+                "AND SCHEMA_NAME(tables.schema_id) = '" + DatabaseUtil.escapeSingleQuotes(getSchemaName(dbQueryProperty)) + "' " +
                 "order by columns.column_id ";
     }
 
@@ -83,32 +83,37 @@ public class SQLServerDialect extends SQLServer2008Dialect {
 
     @Override
     public String generateCheckTableExistsSQL(DbQueryProperty dbQueryProperty, String tableName) {
-        return "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = '" + dbQueryProperty.getDbName() + "' AND TABLE_SCHEMA = '" + dbQueryProperty.getSid() + "' AND TABLE_NAME = '" + tableName + "';";
+        return "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = '" + dbQueryProperty.getDbName() + "' AND TABLE_SCHEMA = '" + DatabaseUtil.escapeSingleQuotes(getSchemaName(dbQueryProperty)) + "' AND TABLE_NAME = '" + tableName + "';";
     }
 
     @Override
     public List<String> someInternalSqlGenerator(DbQueryProperty dbQueryProperty, String tableName, String tableComment, List<DbColumn> dbColumnList) {
         List<String> sqlList = new ArrayList<>();
+        String fullTableName = getTableName(dbQueryProperty, tableName);
 
         List<String> primaryKeys = new ArrayList<>();
         {
             StringBuilder sql = new StringBuilder();
-            // Generate CREATE TABLE statement
-            sql.append("CREATE TABLE ").append(tableName).append(" (\n");
+            // 生成CREATE TABLE语句
+            sql.append("CREATE TABLE ").append(fullTableName).append(" (\n");
 
             for (DbColumn column : dbColumnList) {
                 String columnType = column.getDataType().toUpperCase();
-                sql.append("  ").append(column.getColName()).append(" ");
+                sql.append("  ").append(quoteIdentifier(column.getColName())).append(" ");
 
-                // Convert data types to types supported by SQL Server
+                // 转换数据类型为SQL Server支持的类型
                 switch (columnType) {
+                    case "NVARCHAR":
+                    case "NVARCHAR(MAX)":
+                        sql.append(unicodeColumnType(column));
+                        break;
                     case "VARCHAR":
-                    case "VARCHAR2": // SQL Server does not support VARCHAR2, mapping to VARCHAR
+                    case "VARCHAR2": // SQL Server不支持VARCHAR2，映射为VARCHAR
                         sql.append("VARCHAR");
                         if (StringUtils.isNotEmpty(column.getDataLength())) {
                             sql.append("(").append(column.getDataLength()).append(")");
                         } else {
-                            sql.append("(MAX)"); // VARCHAR in SQL Server supports maximum length by default
+                            sql.append("(MAX)"); // SQL Server中的VARCHAR默认支持最大长度
                         }
                         break;
                     case "CHAR":
@@ -128,7 +133,7 @@ public class SQLServerDialect extends SQLServer2008Dialect {
                         sql.append("BIGINT");
                         break;
                     case "TINYINT":
-                        sql.append("TINYINT");
+                        sql.append("SMALLINT");
                         break;
                     case "DECIMAL":
                         sql.append("DECIMAL");
@@ -144,7 +149,7 @@ public class SQLServerDialect extends SQLServer2008Dialect {
                         sql.append("FLOAT");
                         break;
                     case "DOUBLE":
-                        sql.append("FLOAT"); // There is no DOUBLE in SQL Server, use FLOAT
+                        sql.append("FLOAT"); // SQL Server中没有DOUBLE，使用FLOAT
                         break;
                     case "DATE":
                         sql.append("DATE");
@@ -156,25 +161,20 @@ public class SQLServerDialect extends SQLServer2008Dialect {
                         sql.append("TIME");
                         break;
                     default:
-                        sql.append(columnType); // Handle unknown types by default
+                        sql.append(columnType); // 默认处理未知类型
                         break;
                 }
 
-                // Check if required
+                // 检查是否必填
+                sql.append(identityColumnClause(column));
                 if (!column.getNullable()) {
                     sql.append(" NOT NULL");
                 }
 
-                // Default value handling
-                if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                    if (columnType.equals("VARCHAR") || columnType.equals("CHAR") || columnType.equals("TEXT")) {
-                        sql.append(" DEFAULT '").append(column.getDataDefault()).append("'");
-                    } else {
-                        sql.append(" DEFAULT ").append(column.getDataDefault());
-                    }
-                }
+                // 默认值处理
+                appendSqlServerDefaultClause(sql, columnType, column.getDataDefault());
 
-                // Add the field to the primary key list, if it is a primary key
+                // 加入字段到主键列表，如果是主键
                 if (column.getColKey()) {
                     primaryKeys.add(column.getColName());
                 }
@@ -182,17 +182,17 @@ public class SQLServerDialect extends SQLServer2008Dialect {
                 sql.append(",\n");
             }
 
-            // Remove final comma and newline
+            // 移除最后的逗号和换行
             sql.setLength(sql.length() - 2);
             sql.append("\n");
 
-            // Add primary key constraints
+            // 添加主键约束
             if (!primaryKeys.isEmpty()) {
                 sql.append(", PRIMARY KEY (");
                 for (String pk : primaryKeys) {
-                    sql.append(pk).append(", ");
+                    sql.append(quoteIdentifier(pk)).append(", ");
                 }
-                sql.setLength(sql.length() - 2); // Remove final comma and space
+                sql.setLength(sql.length() - 2); // 移除最后的逗号和空格
                 sql.append(")");
             }
 
@@ -200,21 +200,25 @@ public class SQLServerDialect extends SQLServer2008Dialect {
             sqlList.add(sql.toString());
         }
 
-        // Add table comments (SQL Server does not directly support table comments, but you can use extended attributes, etc.)
+        // 注释与建表必须使用同一个Schema，不能把非dbo的表注释写到dbo下面。
+        String schema = DatabaseUtil.escapeSingleQuotes(StringUtils.defaultIfBlank(dbQueryProperty.getSid(), "dbo"));
+        // 添加表备注（SQL Server不直接支持表备注，但可以使用扩展属性等方式）
         if (StringUtils.isNotEmpty(tableComment)) {
             StringBuilder sql = new StringBuilder();
             sql.append("EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'")
-                    .append(DatabaseUtil.escapeSingleQuotes(tableComment)).append("', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'")
+                    .append(DatabaseUtil.escapeSingleQuotes(tableComment)).append("', @level0type = N'SCHEMA', @level0name = N'")
+                    .append(schema).append("', @level1type = N'TABLE', @level1name = N'")
                     .append(tableName).append("'\n");
             sqlList.add(sql.toString());
         }
 
-        // Add field notes
+        // 添加字段备注
         for (DbColumn column : dbColumnList) {
             if (StringUtils.isNotEmpty(column.getColComment())) {
                 StringBuilder sql = new StringBuilder();
                 sql.append("EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'")
-                        .append(DatabaseUtil.escapeSingleQuotes(column.getColComment())).append("', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'")
+                        .append(DatabaseUtil.escapeSingleQuotes(column.getColComment())).append("', @level0type = N'SCHEMA', @level0name = N'")
+                        .append(schema).append("', @level1type = N'TABLE', @level1name = N'")
                         .append(tableName).append("', @level2type = N'COLUMN', @level2name = N'")
                         .append(column.getColName()).append("'\n");
                 sqlList.add(sql.toString());
@@ -307,11 +311,6 @@ public class SQLServerDialect extends SQLServer2008Dialect {
                 .replace("${username}", property.getUsername())
                 .replace("${password}", property.getPassword());
         return sql;
-    }
-
-    @Override
-    public String getTableName(DbQueryProperty property, String tableName) {
-        return property.getDbName() + "." + property.getSid() + "." + tableName;
     }
 
     @Override

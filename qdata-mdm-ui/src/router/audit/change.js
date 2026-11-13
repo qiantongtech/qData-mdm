@@ -1,0 +1,42 @@
+/*
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
+ *
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+import Layout from "@/layout/index.vue";
+import { checkPermi } from "@/utils/permission";
+
+// 仅登记菜单之外的变更历史详情路由；列表入口由后端菜单管理提供。
+export default [
+  {
+    path: "/audit/changeHistory/detail",
+    component: Layout,
+    hidden: true,
+    beforeEnter: () => checkPermi(["audit:change:list"]) || "/401",
+    children: [
+      {
+        path: "",
+        component: () => import("@/views/audit/changeHistory/detail/index.vue"),
+        name: "auditChangeHistoryDetail",
+        meta: {
+          title: "变更历史详情",
+          activeMenu: "/audit/changeHistory",
+          noCache: true,
+        },
+      },
+    ],
+  },
+];

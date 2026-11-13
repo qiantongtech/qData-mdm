@@ -13,7 +13,7 @@
     <description>qData开源主数据平台</description>
 
     <properties>
-        <qdata-mdm.version>0.6.0</qdata-mdm.version>
+        <qdata-mdm.version>1.0.0</qdata-mdm.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <java.version>1.8</java.version>
@@ -24,7 +24,7 @@
         <bitwalker.version>1.21</bitwalker.version>
         <swagger.version>3.0.0</swagger.version>
         <kaptcha.version>2.3.3</kaptcha.version>
-        <pagehelper.boot.version>1.4.7</pagehelper.boot.version>
+        <pagehelper.boot.version>2.1.0</pagehelper.boot.version>
         <fastjson.version>2.0.43</fastjson.version>
         <oshi.version>6.6.1</oshi.version>
         <commons.io.version>2.13.0</commons.io.version>
@@ -46,6 +46,7 @@
         <docker.build.skip>true</docker.build.skip>
         <!-- Whether to skip the image push (skipped by default to prevent test images from being pushed accidentally) -->
         <docker.push.skip>true</docker.push.skip>
+        <easyexcel.version>3.3.4</easyexcel.version>
     </properties>
 
     <!-- Dependency declarations -->
@@ -197,12 +198,26 @@
                 <version>${qdata-mdm.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>easyexcel</artifactId>
+                <version>${easyexcel.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <modules>
         <module>qdata-mdm-framework</module>
         <module>qdata-mdm-module-system</module>
+        <module>qdata-mdm-module-model</module>
+        <module>qdata-mdm-module-rule</module>
+        <module>qdata-mdm-module-master</module>
+        <module>qdata-mdm-module-ingest</module>
+        <module>qdata-mdm-module-merge</module>
+        <module>qdata-mdm-module-quality</module>
+        <module>qdata-mdm-module-dist</module>
+        <module>qdata-mdm-module-auth</module>
+        <module>qdata-mdm-module-audit</module>
         <module>qdata-mdm-server</module>
     </modules>
     <packaging>pom</packaging>

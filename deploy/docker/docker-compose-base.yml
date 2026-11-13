@@ -1,0 +1,59 @@
+# Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+#
+# This file is part of qData-mdm Master Data Platform (Open Source Edition).
+#
+# qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+# You may use qData-mdm for commercial purposes, but you may not remove, hide,
+# modify, or replace the qData-mdm logo, copyright notices, license notices,
+# or attribution information without a separate commercial license.
+#
+# White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+# another product requires separate commercial authorization from
+# Jiangsu Qiantong Technology Co., Ltd.
+#
+# Business License: https://community.qdata.tech/business/policy.html
+# See the LICENSE file in the project root for full license information.
+
+services:
+  redis:
+    image: redis:6-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    command: [redis-server, --appendonly, 'yes', --requirepass, '${REDIS_PASSWORD}']
+    ports:
+      - "${EXPOSE_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [qdatamdmnet]
+
+  dm8:
+    image: ${QDATA_HUB}/dm8:mixed
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      CASE_SENSITIVE: ${CASE_SENSITIVE:-0}
+      SYSDBA_PWD: ${SYSDBA_PWD}
+      SYSAUDITOR_PWD: ${SYSAUDITOR_PWD}
+      QDATA_USER: ${QDATA_USER:-QDATA_MDM}
+      QDATA_PWD: ${QDATA_PWD}
+    ports:
+      - "${EXPOSE_DM8_PORT:-5236}:5236"
+    volumes:
+      - dm8-data:/home/dmdba/data
+      - ./database/dm8/init.sql:/home/dmdba/initdata/init.sql:ro
+      - ./database/dm8/entrypoint.sh:/entrypoint.sh:ro
+      - ./database/dm8/entrypoint-arm64.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    healthcheck:
+      test: [CMD, bash, -c, 'echo > /dev/tcp/127.0.0.1/5236']
+      interval: 20s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+    networks: [qdatamdmnet]

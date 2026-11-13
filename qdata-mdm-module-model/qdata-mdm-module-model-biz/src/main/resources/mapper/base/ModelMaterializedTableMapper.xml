@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.base.ModelMaterializedTableMapper">
+
+    <!-- 只按已经确定的成功实例读取，不因停用就遗漏真实保留的表。 -->
+    <select id="selectPublishedTables" resultMap="ModelMaterializedTableResult">
+        <include refid="selectModelMaterializedTableVo"/>
+        WHERE INSTANCE_ID = #{instanceId} ORDER BY ID
+    </select>
+
+    <resultMap id="ModelMaterializedTableResult"
+               type="tech.qiantong.qdata.mdm.model.dal.dataobject.base.ModelMaterializedTableDO">
+        <id property="id" column="ID"/>
+        <result property="instanceId" column="INSTANCE_ID"/>
+        <result property="modelId" column="MODEL_ID"/>
+        <result property="parentId" column="PARENT_ID"/>
+        <result property="tableRole" column="TABLE_ROLE"/>
+        <result property="parentTableId" column="PARENT_TABLE_ID"/>
+        <result property="datasourceId" column="DATASOURCE_ID"/>
+        <result property="tableName" column="TABLE_NAME"/>
+        <result property="tableComment" column="TABLE_COMMENT"/>
+        <result property="indexDefinition" column="INDEX_DEFINITION"/>
+        <result property="enabledFlag" column="ENABLED_FLAG"/>
+        <result property="verifiedTime" column="VERIFIED_TIME"/>
+        <result property="validFlag" column="VALID_FLAG"/>
+        <result property="delFlag" column="DEL_FLAG"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updaterId" column="UPDATER_ID"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="remark" column="REMARK"/>
+    </resultMap>
+
+    <sql id="selectModelMaterializedTableVo">
+        SELECT ID,
+               INSTANCE_ID,
+               MODEL_ID,
+               PARENT_ID,
+               TABLE_ROLE,
+               PARENT_TABLE_ID,
+               DATASOURCE_ID,
+               TABLE_NAME,
+               TABLE_COMMENT,
+               INDEX_DEFINITION,
+               ENABLED_FLAG,
+               VERIFIED_TIME,
+               VALID_FLAG,
+               DEL_FLAG,
+               CREATOR_ID,
+               CREATE_BY,
+               CREATE_TIME,
+               UPDATER_ID,
+               UPDATE_BY,
+               UPDATE_TIME,
+               REMARK
+        FROM MODEL_MATERIALIZED_TABLE
+    </sql>
+
+
+    <!-- 此处只做已执行表结构的绑定迁移；正式模型配置快照读取由后续公共服务实现。 -->
+    <sql id="availableAuthorityBinding">
+        FROM MODEL_MATERIALIZED_TABLE t
+        INNER JOIN MODEL_INSTANCE i ON i.ID = t.INSTANCE_ID AND i.STATUS = 'SUCCEEDED'
+        INNER JOIN MODEL_BASE b ON b.ID = i.MODEL_ID AND b.PUBLISHED_INSTANCE_ID = i.ID
+        WHERE b.DEL_FLAG = '0'
+          AND EXISTS (SELECT 1 FROM MODEL_VERSION v WHERE v.ID = b.VERSION_ID
+              AND v.MODEL_ID = b.ID AND v.DEL_FLAG = '0' AND v.STATUS IN (1, 2))
+          AND t.VALID_FLAG = '1' AND t.DEL_FLAG = '0' AND t.ENABLED_FLAG = '1'
+          AND t.TABLE_ROLE = 'AUTHORITY'
+          AND ((t.PARENT_ID = 0 AND t.MODEL_ID = b.ID)
+            OR (t.PARENT_ID = b.ID AND EXISTS (
+                SELECT 1 FROM MODEL_BASE child
+                INNER JOIN MODEL_VERSION cv ON cv.ID = child.VERSION_ID AND cv.MODEL_ID = child.ID
+                WHERE child.ID = t.MODEL_ID AND child.PARENT_ID = b.ID AND child.DEL_FLAG = '0'
+                  AND cv.DEL_FLAG = '0' AND cv.STATUS IN (0, 1, 2)
+            ) AND EXISTS (
+                SELECT 1 FROM MODEL_MATERIALIZED_TABLE p
+                WHERE p.ID = t.PARENT_TABLE_ID AND p.INSTANCE_ID = t.INSTANCE_ID
+                  AND p.MODEL_ID = b.ID AND p.PARENT_ID = 0
+                  AND p.TABLE_ROLE = t.TABLE_ROLE AND p.ENABLED_FLAG = '1'
+                  AND p.VALID_FLAG = '1' AND p.DEL_FLAG = '0'
+            )))
+    </sql>
+
+    <select id="selectAvailableMainPageByXml" resultMap="ModelMaterializedTableResult">
+        SELECT t.*
+        <include refid="availableAuthorityBinding"/>
+        AND t.PARENT_ID = 0 AND b.TYPE IN ('NORMAL', 'CATEGORY')
+        <if test="req.projectId != null">AND b.PROJECT_ID = #{req.projectId}</if>
+        <if test="req.layerId != null">AND b.LAYER_ID = #{req.layerId}</if>
+        <if test="req.name != null and req.name != ''">AND b.NAME LIKE CONCAT(CONCAT('%', #{req.name}), '%')</if>
+        <if test="req.type != null and req.type != ''">AND b.TYPE = #{req.type}</if>
+        ORDER BY t.ID DESC
+    </select>
+
+    <select id="selectDuplicateActiveMainModelIds" resultType="long">
+        SELECT t.MODEL_ID
+        <include refid="availableAuthorityBinding"/>
+        AND t.PARENT_ID = 0
+        GROUP BY t.MODEL_ID HAVING COUNT(1) &gt; 1
+    </select>
+
+    <select id="selectAvailableMainInstances" resultMap="ModelMaterializedTableResult">
+        SELECT t.*
+        <include refid="availableAuthorityBinding"/>
+        AND t.PARENT_ID = 0 AND t.MODEL_ID = #{modelId}
+        ORDER BY t.ID DESC
+    </select>
+
+    <select id="selectAvailableMainByInstanceId" resultMap="ModelMaterializedTableResult">
+        SELECT t.*
+        <include refid="availableAuthorityBinding"/>
+        AND t.PARENT_ID = 0 AND t.INSTANCE_ID = #{instanceId}
+        ORDER BY t.ID DESC
+    </select>
+
+    <select id="selectAvailableSubmodelInstances" resultMap="ModelMaterializedTableResult">
+        SELECT t.*
+        <include refid="availableAuthorityBinding"/>
+        AND t.PARENT_ID = b.ID AND t.MODEL_ID = #{submodelId} AND t.INSTANCE_ID = #{instanceId}
+        ORDER BY t.ID DESC
+    </select>
+
+</mapper>

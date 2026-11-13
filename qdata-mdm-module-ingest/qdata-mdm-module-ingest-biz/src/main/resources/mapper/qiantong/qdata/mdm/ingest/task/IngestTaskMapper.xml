@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.ingest.dal.mapper.task.IngestTaskMapper">
+
+    <resultMap id="IngestTaskRespResult" autoMapping="true"
+               type="tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestTaskRespVO">
+        <result property="sourceId" column="source_id"/>
+    </resultMap>
+
+    <select id="selectDetail" resultMap="IngestTaskRespResult">
+        SELECT t.*,
+               t.SOURCE_SYSTEM_ID                 source_id,
+               s.NAME                             source_name,
+               s.CODE                             source_code,
+               s.ICON                             source_icon,
+               m.ICON                             model_icon,
+               m.TYPE                             model_type,
+               m.NAME                             model_name,
+               m.CODE                             model_code,
+               v.STATUS                           model_version_status,
+               COALESCE(rv.VERSION_NO, v.VERSION_NO)                     model_version_no,
+               COALESCE(u.NICK_NAME, u.USER_NAME) responsible_person_name,
+               u.PHONENUMBER                      responsible_person_phone,
+               cu.PHONENUMBER                     createPhoneNumber
+        FROM INGEST_TASK t
+                 LEFT JOIN INGEST_SOURCE_SYSTEM s ON s.ID = t.SOURCE_SYSTEM_ID
+                 LEFT JOIN MODEL_BASE m ON m.ID = t.MODEL_ID
+                 LEFT JOIN MODEL_BASE parent ON parent.ID = m.PARENT_ID AND parent.DEL_FLAG = '0'
+                 LEFT JOIN MODEL_VERSION v ON v.ID = COALESCE(m.VERSION_ID, parent.VERSION_ID) AND v.DEL_FLAG = '0'
+                 LEFT JOIN MODEL_BASE published_model
+                           ON published_model.ID = CASE WHEN m.PARENT_ID IS NULL OR m.PARENT_ID = 0 THEN m.ID ELSE m.PARENT_ID END
+                               AND published_model.DEL_FLAG = '0'
+                 LEFT JOIN MODEL_INSTANCE published_instance
+                           ON published_instance.ID = published_model.PUBLISHED_INSTANCE_ID
+                               AND published_instance.MODEL_ID = published_model.ID
+                               AND published_instance.STATUS = 'SUCCEEDED'
+                 LEFT JOIN MODEL_VERSION rv
+                           ON rv.ID = published_instance.MODEL_VERSION_ID
+                               AND rv.MODEL_ID = published_model.ID
+                               AND rv.DEL_FLAG = '0'
+                 LEFT JOIN SYSTEM_USER u ON u.USER_ID = t.RESPONSIBLE_USER_ID AND u.DEL_FLAG = '0'
+                 LEFT JOIN SYSTEM_USER cu ON cu.USER_ID = t.CREATOR_ID AND cu.DEL_FLAG = '0'
+        WHERE t.ID = #{id}
+          AND t.DEL_FLAG = '0'
+    </select>
+
+    <select id="selectPageRows" resultMap="IngestTaskRespResult">
+        SELECT t.*,
+        t.SOURCE_SYSTEM_ID source_id,
+        s.NAME source_name,
+        s.CODE source_code,
+        s.ICON source_icon,
+        m.ICON model_icon,
+        m.TYPE model_type,
+        m.DESCRIPTION model_description,
+        v.STATUS model_version_status,
+        COALESCE(rv.VERSION_NO, v.VERSION_NO) model_version_no,
+        s.TRUST_SCORE source_trust_score,
+        m.NAME model_name,
+        m.CODE model_code,
+        d.DATASOURCE_NAME datasource_name,
+        c.SOURCE_OBJECT fetch_source_object,
+        f.FILE_NAME fetch_file_name,
+        a.URL fetch_api_url,
+        a.HTTP_METHOD fetch_http_method,
+        latest.START_TIME last_run_time,
+        latest.STATUS last_run_status,
+        latest.END_TIME last_run_end_time,
+        COALESCE(u.NICK_NAME, u.USER_NAME) responsible_person_name,
+        u.PHONENUMBER responsible_person_phone,
+        cu.PHONENUMBER createPhoneNumber
+        FROM INGEST_TASK t
+        LEFT JOIN INGEST_SOURCE_SYSTEM s ON s.ID=t.SOURCE_SYSTEM_ID
+        LEFT JOIN MODEL_BASE m ON m.ID=t.MODEL_ID
+        LEFT JOIN MODEL_VERSION v ON v.ID=m.VERSION_ID AND v.DEL_FLAG='0'
+        LEFT JOIN MODEL_BASE published_model
+            ON published_model.ID=CASE WHEN m.PARENT_ID IS NULL OR m.PARENT_ID=0 THEN m.ID ELSE m.PARENT_ID END
+            AND published_model.DEL_FLAG='0'
+        LEFT JOIN MODEL_INSTANCE published_instance
+            ON published_instance.ID=published_model.PUBLISHED_INSTANCE_ID
+            AND published_instance.MODEL_ID=published_model.ID
+            AND published_instance.STATUS='SUCCEEDED'
+        LEFT JOIN MODEL_VERSION rv
+            ON rv.ID=published_instance.MODEL_VERSION_ID
+            AND rv.MODEL_ID=published_model.ID
+            AND rv.DEL_FLAG='0'
+        LEFT JOIN SYSTEM_USER u ON u.USER_ID=t.RESPONSIBLE_USER_ID AND u.DEL_FLAG='0'
+        LEFT JOIN SYSTEM_USER cu ON cu.USER_ID=t.CREATOR_ID AND cu.DEL_FLAG='0'
+        LEFT JOIN INGEST_TASK_DB_CONFIG c ON c.TASK_ID=t.ID AND c.DEL_FLAG='0' AND t.TYPE='DATABASE'
+        LEFT JOIN INGEST_DATASOURCE d ON d.ID=c.DATASOURCE_ID
+        LEFT JOIN INGEST_TASK_FILE_CONFIG f ON f.TASK_ID=t.ID AND f.DEL_FLAG='0' AND t.TYPE='FILE'
+        LEFT JOIN INGEST_TASK_API_CONFIG a ON a.TASK_ID=t.ID AND a.DEL_FLAG='0' AND t.TYPE='API'
+        LEFT JOIN (
+        SELECT TASK_ID, START_TIME, END_TIME, STATUS,
+        ROW_NUMBER() OVER (PARTITION BY TASK_ID ORDER BY START_TIME DESC, ID DESC) rn
+        FROM INGEST_TASK_INSTANCE
+        WHERE DEL_FLAG='0'
+        ) latest ON latest.TASK_ID=t.ID AND latest.rn=1
+        WHERE t.DEL_FLAG='0'
+        <if test="q.keyword != null and q.keyword != ''">
+            <bind name="keywordPattern" value="'%' + q.keyword + '%'"/>
+            AND (t.NAME LIKE #{keywordPattern} OR t.CODE LIKE #{keywordPattern})
+        </if>
+        <if test="q.name != null and q.name != ''">
+            <bind name="namePattern" value="'%' + q.name + '%'"/>
+            AND t.NAME LIKE #{namePattern}
+        </if>
+        <if test="q.code != null and q.code != ''">
+            <bind name="codePattern" value="'%' + q.code + '%'"/>
+            AND t.CODE LIKE #{codePattern}
+        </if>
+        <if test="q.sourceId != null">
+            AND t.SOURCE_SYSTEM_ID=#{q.sourceId}
+        </if>
+        <if test="q.modelId != null">
+            AND t.MODEL_ID=#{q.modelId}
+        </if>
+        <if test="q.type != null and q.type != ''">
+            AND t.TYPE=#{q.type}
+        </if>
+        <if test="q.status != null and q.status != ''">
+            AND t.STATUS=#{q.status}
+        </if>
+        <choose>
+            <when test="q.orderByColumn == 'id'">
+                ORDER BY t.ID
+                <choose>
+                    <when test="q.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <when test="q.orderByColumn == 'create_time'">
+                ORDER BY t.CREATE_TIME
+                <choose>
+                    <when test="q.isAsc == 'asc'">ASC, t.ID ASC</when>
+                    <otherwise>DESC, t.ID DESC</otherwise>
+                </choose>
+            </when>
+            <otherwise>ORDER BY t.UPDATE_TIME DESC</otherwise>
+        </choose>
+    </select>
+</mapper>

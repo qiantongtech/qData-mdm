@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.master.dal.mapper.change.MasterChangeMapper">
+
+    <resultMap id="MasterChangeRecordResult" type="tech.qiantong.qdata.mdm.master.dal.dto.change.MasterChangeRecordDTO">
+        <result column="ID" property="id"/>
+        <result column="CHANGE_TIME" property="changeTime"/>
+        <result column="TYPE" property="type"/>
+        <result column="SOURCE" property="source"/>
+        <result column="OPERATOR_NAME" property="operatorName"/>
+        <result column="BEFORE_VERSION_NO" property="beforeVersionNo"/>
+        <result column="AFTER_VERSION_NO" property="afterVersionNo"/>
+        <result column="REQUEST_NO" property="requestNo"/>
+        <result column="CHANGE_REASON" property="changeReason"/>
+    </resultMap>
+
+    <!-- 查询一条主数据已生效的业务变更；申请单为可选关联，缺失时仍保留变更记录。
+         默认按变更时间和 ID 倒序，支持按 ID、变更时间升降序。 -->
+    <select id="selectEffectiveChangePage" resultMap="MasterChangeRecordResult">
+        SELECT c.ID, c.CHANGE_TIME, c.TYPE, c.SOURCE, c.OPERATOR_NAME,
+               c.BEFORE_VERSION_NO, c.AFTER_VERSION_NO, c.CHANGE_REASON, q.REQUEST_NO
+        FROM MASTER_CHANGE c
+        LEFT JOIN MASTER_CHANGE_REQUEST q ON q.ID = c.REQUEST_ID AND q.MODEL_ID = c.MODEL_ID
+            AND q.VALID_FLAG = '1' AND q.DEL_FLAG = '0'
+        WHERE c.MODEL_ID = #{modelId} AND c.MASTER_RECORD_ID = #{masterRecordId}
+          AND c.TYPE IN ('UPDATE', 'RESTORE', 'MERGE') AND c.PROCESS_RESULT = '1'
+          AND c.AFTER_VERSION_ID IS NOT NULL AND c.VALID_FLAG = '1' AND c.DEL_FLAG = '0'
+        <choose>
+            <when test="req != null and req.orderByColumn == 'id'">
+                ORDER BY c.ID
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <when test="req != null and req.orderByColumn == 'changeTime'">
+                ORDER BY c.CHANGE_TIME
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>, c.ID
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <otherwise>ORDER BY c.CHANGE_TIME DESC, c.ID DESC</otherwise>
+        </choose>
+    </select>
+</mapper>

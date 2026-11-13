@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>保存规则</title>
+  <g fill="none" stroke="currentColor" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M192 160h512l160 160v512a32 32 0 0 1-32 32H192a32 32 0 0 1-32-32V192a32 32 0 0 1 32-32Z"/>
+    <path d="M320 864V576a32 32 0 0 1 32-32h320a32 32 0 0 1 32 32v288"/>
+  </g>
+</svg>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="44px" height="44px" viewBox="0 0 44 44" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>yxy_yhqdsq_48_48</title>
+    <defs>
+        <circle id="path-1" cx="12.7" cy="12.7" r="12.7"></circle>
+        <circle id="path-3" cx="12.7" cy="12.7" r="10.16"></circle>
+    </defs>
+    <g id="qData-主数据平台" style="stroke: none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="数据资产" transform="translate(-1068, -347)">
+            <g id="yxy_yhqdsq_48_48" transform="translate(1068, 347)">
+                <rect id="Rectangle-19-Copy-2备份-4" fill-opacity="0.1" fill="#FFBB00" x="0" y="0" width="44" height="44" rx="6"></rect>
+                <g id="编组-12" transform="translate(9.25, 7.5)">
+                    <path d="M7.08,19.4733333 L18.32,19.4733333 C19.4245695,19.4733333 20.32,20.3687638 20.32,21.4733333 L20.32,27.3058178 C20.32,28.4103873 19.4245695,29.3058178 18.32,29.3058178 C18.1101054,29.3058178 17.9015191,29.2727772 17.7018997,29.2079093 L13.5046006,27.8439623 C13.1128078,27.716646 12.6912577,27.7134221 12.2975635,27.8347313 L7.6689367,29.2609523 C6.61334245,29.586213 5.49393829,28.9941608 5.16867753,27.9385665 C5.10989052,27.7477804 5.08,27.5492676 5.08,27.3496298 L5.08,21.4733333 C5.08,20.3687638 5.9754305,19.4733333 7.08,19.4733333 Z" id="Rectangle-94备份" fill="#FFBB00" opacity="0.401674107"></path>
+                    <mask id="mask-2" fill="white">
+                        <use xlink:href="#path-1"></use>
+                    </mask>
+                    <use id="Mask" fill="#FFBB00" xlink:href="#path-1"></use>
+                    <mask id="mask-4" fill="white">
+                        <use xlink:href="#path-3"></use>
+                    </mask>
+                    <use id="Mask" fill="#FFEBB6" xlink:href="#path-3"></use>
+                    <path d="M15.9139467,16.8686327 L9.98728005,16.8686327 L9.98728005,15.1752994 L14.22028,15.1749661 L14.2206134,5.86196606 L15.9139467,5.86196606 L15.9139467,16.8686327 Z" id="形状结合" fill="#FFBB00" mask="url(#mask-4)" transform="translate(12.9506, 11.3653) rotate(-315) translate(-12.9506, -11.3653)"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.encoding.ModelEncodingItemMapper">
+
+    <resultMap type="ModelEncodingItemDO" id="ModelEncodingItemResult">
+        <result property="id"    column="ID"    />
+        <result property="encodingVersionId"    column="ENCODING_VERSION_ID"    />
+        <result property="type"    column="TYPE"    />
+        <result property="sortOrder"    column="SORT_ORDER"    />
+        <result property="fixedValue"    column="FIXED_VALUE"    />
+        <result property="sequenceLength"    column="SEQUENCE_LENGTH"    />
+        <result property="sequenceStart"    column="SEQUENCE_START"    />
+        <result property="padChar"    column="PAD_CHAR"    />
+        <result property="config"    column="CONFIG"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="resetMethod"    column="RESET_METHOD"    />
+        <result property="stepSize"    column="STEP_SIZE"    />
+        <result property="validFlag"    column="VALID_FLAG"    />
+    </resultMap>
+
+    <sql id="selectModelEncodingItemVo">
+        select ID, ENCODING_VERSION_ID, TYPE, SORT_ORDER, FIXED_VALUE, SEQUENCE_LENGTH, SEQUENCE_START, PAD_CHAR, CONFIG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DEL_FLAG, RESET_METHOD, STEP_SIZE, VALID_FLAG from MODEL_ENCODING_ITEM
+    </sql>
+
+    <select id="selectModelEncodingItemList" parameterType="ModelEncodingItemDO" resultMap="ModelEncodingItemResult">
+        <include refid="selectModelEncodingItemVo"/>
+        <where>
+            <if test="encodingVersionId != null "> and ENCODING_VERSION_ID = #{encodingVersionId}</if>
+            <if test="type != null  and type != ''"> and TYPE = #{type}</if>
+            <if test="sortOrder != null "> and SORT_ORDER = #{sortOrder}</if>
+            <if test="fixedValue != null  and fixedValue != ''"> and FIXED_VALUE = #{fixedValue}</if>
+            <if test="sequenceLength != null "> and SEQUENCE_LENGTH = #{sequenceLength}</if>
+            <if test="sequenceStart != null "> and SEQUENCE_START = #{sequenceStart}</if>
+            <if test="padChar != null  and padChar != ''"> and PAD_CHAR = #{padChar}</if>
+            <if test="config != null  and config != ''"> and CONFIG = #{config}</if>
+            <if test="createTime != null "> and CREATE_TIME = #{createTime}</if>
+            <if test="resetMethod != null  and resetMethod != ''"> and RESET_METHOD = #{resetMethod}</if>
+            <if test="stepSize != null "> and STEP_SIZE = #{stepSize}</if>
+        </where>
+    </select>
+
+    <select id="selectModelEncodingItemById" parameterType="Long" resultMap="ModelEncodingItemResult">
+        <include refid="selectModelEncodingItemVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertModelEncodingItem" parameterType="ModelEncodingItemDO">
+        insert into MODEL_ENCODING_ITEM
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="encodingVersionId != null">ENCODING_VERSION_ID,</if>
+            <if test="type != null">TYPE,</if>
+            <if test="sortOrder != null">SORT_ORDER,</if>
+            <if test="fixedValue != null">FIXED_VALUE,</if>
+            <if test="sequenceLength != null">SEQUENCE_LENGTH,</if>
+            <if test="sequenceStart != null">SEQUENCE_START,</if>
+            <if test="padChar != null">PAD_CHAR,</if>
+            <if test="config != null">CONFIG,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="resetMethod != null">RESET_METHOD,</if>
+            <if test="stepSize != null">STEP_SIZE,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="encodingVersionId != null">#{encodingVersionId},</if>
+            <if test="type != null">#{type},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="fixedValue != null">#{fixedValue},</if>
+            <if test="sequenceLength != null">#{sequenceLength},</if>
+            <if test="sequenceStart != null">#{sequenceStart},</if>
+            <if test="padChar != null">#{padChar},</if>
+            <if test="config != null">#{config},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="resetMethod != null">#{resetMethod},</if>
+            <if test="stepSize != null">#{stepSize},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+         </trim>
+    </insert>
+
+    <update id="updateModelEncodingItem" parameterType="ModelEncodingItemDO">
+        update MODEL_ENCODING_ITEM
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="encodingVersionId != null">ENCODING_VERSION_ID = #{encodingVersionId},</if>
+            <if test="type != null">TYPE = #{type},</if>
+            <if test="sortOrder != null">SORT_ORDER = #{sortOrder},</if>
+            <if test="fixedValue != null">FIXED_VALUE = #{fixedValue},</if>
+            <if test="sequenceLength != null">SEQUENCE_LENGTH = #{sequenceLength},</if>
+            <if test="sequenceStart != null">SEQUENCE_START = #{sequenceStart},</if>
+            <if test="padChar != null">PAD_CHAR = #{padChar},</if>
+            <if test="config != null">CONFIG = #{config},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="resetMethod != null">RESET_METHOD = #{resetMethod},</if>
+            <if test="stepSize != null">STEP_SIZE = #{stepSize},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteModelEncodingItemById" parameterType="Long">
+        delete from MODEL_ENCODING_ITEM where ID = #{id}
+    </delete>
+
+    <delete id="deleteModelEncodingItemByIds" parameterType="String">
+        delete from MODEL_ENCODING_ITEM where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.master.dal.mapper.source.MasterFieldSourceRelMapper">
+
+    <!-- 只取指定模型、主记录、主版本的有效字段来源；采集记录须同模型，采集版本须属于该记录，
+         三张关联表也须有效且未删除。按字段路径及关系 ID 排序，供来源详情页展示。 -->
+    <resultMap id="FieldSourceResultMap"
+               type="tech.qiantong.qdata.mdm.master.dal.dto.source.MasterFieldSourceDTO">
+        <result column="FIELD_PATH" property="fieldPath"/>
+        <result column="SOURCE_FIELD_PATH" property="sourceFieldPath"/>
+        <result column="SYSTEM_NAME" property="sourceSystemName"/>
+        <result column="RECORD_ID" property="sourceRecordId"/>
+        <result column="VERSION_ID" property="sourceVersionId"/>
+    </resultMap>
+
+    <select id="selectFieldSources" resultMap="FieldSourceResultMap">
+        SELECT f.FIELD_PATH, f.SOURCE_FIELD_PATH, s.NAME AS SYSTEM_NAME,
+               d.ID AS RECORD_ID, v.ID AS VERSION_ID
+        FROM MASTER_FIELD_SOURCE_REL f
+        JOIN INGEST_SOURCE_DATA d ON d.ID = f.SOURCE_RECORD_ID AND d.MODEL_ID = f.MODEL_ID
+            AND d.VALID_FLAG = '1' AND d.DEL_FLAG = '0'
+        JOIN INGEST_SOURCE_SYSTEM s ON s.ID = d.SOURCE_SYSTEM_ID
+            AND s.VALID_FLAG = '1' AND s.DEL_FLAG = '0'
+        JOIN INGEST_SOURCE_DATA_VERSION v ON v.ID = f.SOURCE_VERSION_ID AND v.SOURCE_RECORD_ID = d.ID
+            AND v.VALID_FLAG = '1' AND v.DEL_FLAG = '0'
+        WHERE f.MODEL_ID = #{modelId} AND f.MASTER_RECORD_ID = #{masterRecordId}
+            AND f.MASTER_VERSION_ID = #{masterVersionId}
+            AND f.STATUS = '1' AND f.VALID_FLAG = '1' AND f.DEL_FLAG = '0'
+        ORDER BY f.FIELD_PATH, f.ID
+    </select>
+</mapper>

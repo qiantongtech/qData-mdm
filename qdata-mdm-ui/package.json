@@ -1,9 +1,9 @@
 {
   "name": "qdata-mdm-ui",
-  "version": "0.6.0",
+  "version": "1.0.0",
   "description": "qData开源主数据平台",
   "author": "qData",
-  "license": "MIT",
+  "license": "Apache 2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,9 +13,14 @@
     "eslint:lint": "eslint src",
     "eslint:fix": "eslint src --fix"
   },
+  "docker": {
+    "registry": "crpi-kf13onfj0v8f6jax.cn-shanghai.personal.cr.aliyuncs.com/qiantongkeji",
+    "image": "qdata-mdm-ui-ce",
+    "platforms": "linux/amd64,linux/arm64"
+  },
   "repository": {
     "type": "git",
-    "url": "https://gitee.com/qiantongtech/qData.git"
+    "url": "https://gitee.com/qiantongtech/qData-mdm.git"
   },
   "dependencies": {
     "@antv/layout": "^0.3.25",
@@ -48,6 +53,7 @@
     "codemirror-editor-vue3": "^2.8.0",
     "cronstrue": "^2.54.0",
     "crypto-js": "^4.2.0",
+    "dagre": "^0.8.5",
     "echarts": "5.5.1",
     "element-plus": "2.7.6",
     "file-saver": "2.0.5",

@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.ingest.dal.mapper.source.IngestSourceMapper">
+
+    <resultMap id="IngestSourceTaskResult"
+               type="tech.qiantong.qdata.mdm.ingest.controller.admin.source.vo.IngestSourceTaskRespVO">
+        <id property="id" column="ID"/>
+        <result property="code" column="CODE"/>
+        <result property="name" column="NAME"/>
+        <result property="type" column="TYPE"/>
+        <result property="modelId" column="MODEL_ID"/>
+        <result property="status" column="STATUS"/>
+        <result property="lastRunTime" column="LAST_RUN_TIME"/>
+    </resultMap>
+
+    <resultMap id="IngestSourceModelNameResult"
+               type="tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceModelNameRow">
+        <result property="sourceId" column="SOURCE_SYSTEM_ID"/>
+        <result property="modelName" column="MODEL_NAME"/>
+        <result property="modelCode" column="MODEL_CODE"/>
+        <result property="description" column="DESCRIPTION"/>
+        <result property="versionNo" column="VERSION_NO"/>
+        <result property="versionStatus" column="VERSION_STATUS"/>
+        <result property="responsibleUserId" column="RESPONSIBLE_USER_ID"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="modelId" column="MODEL_ID"/>
+        <result property="icon" column="ICON"/>
+        <result property="type" column="TYPE"/>
+        <result property="parentId" column="PARENT_ID"/>
+        <result property="duplicateTaskCount" column="DUPLICATE_TASK_COUNT"/>
+        <result property="qualityTaskCount" column="QUALITY_TASK_COUNT"/>
+    </resultMap>
+
+    <resultMap id="IngestSourceResponsibleUserResult"
+               type="tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceResponsibleUserRow">
+        <id property="userId" column="USER_ID"/>
+        <result property="name" column="NAME"/>
+        <result property="phone" column="PHONE"/>
+    </resultMap>
+
+    <resultMap id="IngestSourceResult"
+               type="tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceDO">
+        <id property="id" column="ID"/>
+        <result property="code" column="CODE"/>
+        <result property="name" column="NAME"/>
+        <result property="icon" column="ICON"/>
+        <result property="responsibleUserId" column="RESPONSIBLE_USER_ID"/>
+        <result property="description" column="DESCRIPTION"/>
+        <result property="trustScore" column="TRUST_SCORE"/>
+        <result property="validFlag" column="VALID_FLAG"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updaterId" column="UPDATER_ID"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="delFlag" column="DEL_FLAG"/>
+        <result property="remark" column="REMARK"/>
+    </resultMap>
+
+    <select id="selectSourceIdsByDatasourceKeyword" resultType="java.lang.Long">
+        SELECT DISTINCT r.SOURCE_SYSTEM_ID
+        FROM INGEST_SYSTEM_DATASOURCE_REL r
+                 INNER JOIN INGEST_DATASOURCE d ON d.ID = r.DATASOURCE_ID AND d.DEL_FLAG = '0'
+        WHERE r.DEL_FLAG = '0'
+          AND d.DATASOURCE_NAME LIKE #{keyword}
+    </select>
+
+    <select id="countByCode" resultType="java.lang.Long">
+        SELECT COUNT(1)
+        FROM INGEST_SOURCE_SYSTEM
+        WHERE CODE = #{code}
+          AND DEL_FLAG = '0'
+    </select>
+
+    <select id="selectReferencedSourceIds" resultType="java.lang.Long">
+        SELECT DISTINCT SOURCE_SYSTEM_ID
+        FROM INGEST_TASK
+        WHERE DEL_FLAG = '0'
+          AND SOURCE_SYSTEM_ID IS NOT NULL
+    </select>
+
+    <select id="countTaskBySourceId" resultType="java.lang.Long">
+        SELECT COUNT(1)
+        FROM INGEST_TASK
+        WHERE SOURCE_SYSTEM_ID = #{sourceId}
+          AND DEL_FLAG = '0'
+    </select>
+
+    <select id="selectTaskSourceIdsBySourceIds" resultType="java.lang.Long">
+        SELECT SOURCE_SYSTEM_ID
+        FROM INGEST_TASK
+        WHERE DEL_FLAG = '0'
+        AND SOURCE_SYSTEM_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectTaskListBySourceId" resultMap="IngestSourceTaskResult">
+        SELECT t.ID,
+               t.CODE,
+               t.NAME,
+               t.TYPE,
+               t.MODEL_ID,
+               t.STATUS,
+               latest.START_TIME AS LAST_RUN_TIME
+        FROM INGEST_TASK t
+                 LEFT JOIN (SELECT TASK_ID,
+                                   START_TIME,
+                                   ROW_NUMBER() OVER (PARTITION BY TASK_ID ORDER BY START_TIME DESC, ID DESC) AS rn
+                            FROM INGEST_TASK_INSTANCE
+                            WHERE DEL_FLAG = '0') latest ON latest.TASK_ID = t.ID AND latest.rn = 1
+        WHERE t.SOURCE_SYSTEM_ID = #{sourceId}
+          AND t.DEL_FLAG = '0'
+        ORDER BY t.CREATE_TIME DESC, t.ID DESC
+    </select>
+
+    <select id="selectModelNamesBySourceIds" resultMap="IngestSourceModelNameResult">
+        SELECT t.SOURCE_SYSTEM_ID,
+        m.NAME AS MODEL_NAME, m.ID AS MODEL_ID, m.ICON, m.TYPE, m.PARENT_ID,
+        m.CODE AS MODEL_CODE, m.DESCRIPTION, m.RESPONSIBLE_USER_ID,
+        m.CREATOR_ID, m.CREATE_BY, m.CREATE_TIME, m.UPDATE_TIME,
+        COALESCE(rv.VERSION_NO, v.VERSION_NO) AS VERSION_NO, v.STATUS AS VERSION_STATUS,
+        (SELECT COUNT(*) FROM MERGE_DUPLICATE_TASK d WHERE d.MODEL_ID = m.ID AND d.DEL_FLAG = '0') AS
+        DUPLICATE_TASK_COUNT,
+        (SELECT COUNT(*) FROM QUALITY_TASK q WHERE q.MODEL_ID = m.ID AND q.DEL_FLAG = '0') AS QUALITY_TASK_COUNT
+        FROM (
+        SELECT DISTINCT SOURCE_SYSTEM_ID, MODEL_ID
+        FROM INGEST_TASK
+        WHERE DEL_FLAG = '0' AND SOURCE_SYSTEM_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ) t
+        INNER JOIN MODEL_BASE m ON m.ID = t.MODEL_ID AND m.DEL_FLAG = '0'
+        LEFT JOIN MODEL_BASE parent ON parent.ID = m.PARENT_ID AND parent.DEL_FLAG = '0'
+        LEFT JOIN MODEL_VERSION v ON v.ID = COALESCE(m.VERSION_ID, parent.VERSION_ID) AND v.DEL_FLAG = '0'
+        LEFT JOIN MODEL_BASE published_model
+            ON published_model.ID = CASE WHEN m.PARENT_ID IS NULL OR m.PARENT_ID = 0 THEN m.ID ELSE m.PARENT_ID END
+            AND published_model.DEL_FLAG = '0'
+        LEFT JOIN MODEL_INSTANCE published_instance
+            ON published_instance.ID = published_model.PUBLISHED_INSTANCE_ID
+            AND published_instance.MODEL_ID = published_model.ID
+            AND published_instance.STATUS = 'SUCCEEDED'
+        LEFT JOIN MODEL_VERSION rv
+            ON rv.ID = published_instance.MODEL_VERSION_ID
+            AND rv.MODEL_ID = published_model.ID
+            AND rv.DEL_FLAG = '0'
+        ORDER BY t.SOURCE_SYSTEM_ID, m.NAME
+    </select>
+
+    <select id="selectResponsibleUserIdsByKeyword" resultType="java.lang.Long">
+        SELECT USER_ID
+        FROM SYSTEM_USER
+        WHERE DEL_FLAG = '0'
+          AND (NICK_NAME LIKE #{keyword}
+            OR USER_NAME LIKE #{keyword}
+            OR PHONENUMBER LIKE #{keyword})
+    </select>
+
+    <select id="selectResponsibleUsersByIds" resultMap="IngestSourceResponsibleUserResult">
+        SELECT USER_ID,
+        COALESCE(NICK_NAME, USER_NAME) AS NAME,
+        PHONENUMBER AS PHONE
+        FROM SYSTEM_USER
+        WHERE DEL_FLAG = '0'
+        AND USER_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectByIdsForSourceData" resultMap="IngestSourceResult">
+        SELECT ID,
+        CODE,
+        NAME,
+        ICON,
+        RESPONSIBLE_USER_ID,
+        DESCRIPTION,
+        TRUST_SCORE,
+        VALID_FLAG,
+        CREATE_BY,
+        CREATOR_ID,
+        CREATE_TIME,
+        UPDATE_BY,
+        UPDATER_ID,
+        UPDATE_TIME,
+        DEL_FLAG,
+        REMARK
+        FROM INGEST_SOURCE_SYSTEM
+        WHERE DEL_FLAG = '0'
+        AND ID IN
+        <foreach collection="sourceSystemIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>

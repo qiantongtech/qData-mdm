@@ -1,0 +1,36 @@
+/*
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
+ *
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
+ * or attribution information without a separate commercial license.
+ *
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+ * another product requires separate commercial authorization from
+ * Jiangsu Qiantong Technology Co., Ltd.
+ *
+ * Business License: https://community.qdata.tech/business/policy.html
+ * See the LICENSE file in the project root for full license information.
+ */
+
+package tech.qiantong.qdata.mdm.merge.service.detect;
+
+/**
+ * 重复检测任务与 Quartz 调度同步。
+ *
+ * @author chentangwen
+ */
+public interface IMergeDetectScheduleService {
+
+    /** 在当前配置事务提交后同步 Quartz 触发器。 */
+    void syncAfterCommit(Long taskId);
+
+    /** 锁定任务并创建、更新或移除对应调度。 */
+    void synchronize(Long taskId);
+
+    /** 校正数据库任务配置和 Quartz 触发器。 */
+    void reconcile();
+}

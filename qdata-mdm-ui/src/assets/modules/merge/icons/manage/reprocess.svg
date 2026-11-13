@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>重新处理</title>
+    <g fill="none" stroke="currentColor" stroke-width="1.16666667" stroke-linecap="butt" stroke-linejoin="round">
+        <path d="M12.25,7 A5.25,5.25 0 0 1 2.33333333,9.40562612 M2.33333333,7.07229279 V9.40562612 H4.66666667"></path>
+        <path d="M1.75,7 A5.25,5.25 0 0 1 11.6666667,4.59437388 M11.6666667,6.92770721 V4.59437388 H9.33333333"></path>
+        <circle cx="7" cy="7" r="0.58333333"></circle>
+    </g>
+</svg>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.base.ModelInstanceLogMapper">
+
+    <resultMap id="ModelInstanceLogResult" type="tech.qiantong.qdata.mdm.model.dal.dataobject.base.ModelInstanceLogDO">
+        <id property="id" column="ID"/>
+        <result property="instanceId" column="INSTANCE_ID"/>
+        <result property="sequenceNo" column="SEQUENCE_NO"/>
+        <result property="stage" column="STAGE"/>
+        <result property="status" column="STATUS"/>
+        <result property="stepNo" column="STEP_NO"/>
+        <result property="executionDirection" column="EXECUTION_DIRECTION"/>
+        <result property="attemptNo" column="ATTEMPT_NO"/>
+        <result property="logContent" column="LOG_CONTENT"/>
+        <result property="startedTime" column="STARTED_TIME"/>
+        <result property="finishedTime" column="FINISHED_TIME"/>
+        <result property="validFlag" column="VALID_FLAG"/>
+        <result property="delFlag" column="DEL_FLAG"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updaterId" column="UPDATER_ID"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="remark" column="REMARK"/>
+    </resultMap>
+
+    <sql id="selectModelInstanceLogVo">
+        SELECT ID,
+               INSTANCE_ID,
+               SEQUENCE_NO,
+               STAGE,
+               STATUS,
+               STEP_NO,
+               EXECUTION_DIRECTION,
+               ATTEMPT_NO,
+               LOG_CONTENT,
+               STARTED_TIME,
+               FINISHED_TIME,
+               VALID_FLAG,
+               DEL_FLAG,
+               CREATOR_ID,
+               CREATE_BY,
+               CREATE_TIME,
+               UPDATER_ID,
+               UPDATE_BY,
+               UPDATE_TIME,
+               REMARK
+        FROM MODEL_INSTANCE_LOG
+    </sql>
+
+    <!-- 每个发布实例只有一条全流程日志，不再通过最大序号新增阶段日志。 -->
+    <select id="selectByInstanceId" resultMap="ModelInstanceLogResult">
+        <include refid="selectModelInstanceLogVo"/>
+        WHERE INSTANCE_ID = #{instanceId}
+    </select>
+</mapper>

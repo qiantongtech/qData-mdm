@@ -1,0 +1,56 @@
+# Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+#
+# This file is part of qData-mdm Master Data Platform (Open Source Edition).
+#
+# qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+# You may use qData-mdm for commercial purposes, but you may not remove, hide,
+# modify, or replace the qData-mdm logo, copyright notices, license notices,
+# or attribution information without a separate commercial license.
+#
+# White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+# another product requires separate commercial authorization from
+# Jiangsu Qiantong Technology Co., Ltd.
+#
+# Business License: https://community.qdata.tech/business/policy.html
+# See the LICENSE file in the project root for full license information.
+
+# 主数据应用服务（达梦），由部署入口通过 include 引入。
+services:
+  qdata-mdm-ui:
+    image: ${QDATA_HUB}/qdata-mdm-ui-ce:${QDATA_TAG}
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${EXPOSE_NGINX_PORT:-80}:80"
+    volumes:
+      - ./qdata-mdm-ui/logs:/var/log/nginx
+      - ./qdata-mdm-ui/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./qdata-mdm-ui/sites:/etc/nginx/http_vhost:ro
+    depends_on:
+      qdata-mdm-api:
+        condition: service_started
+    networks: [qdatamdmnet]
+
+  qdata-mdm-api:
+    image: ${QDATA_HUB}/qdata-mdm-server-ce:${QDATA_TAG}
+    # application.yml 从 classpath 导入 prod 配置，将挂载的配置目录加入 Java 类路径。
+    entrypoint: [java, -Xms512m, -Xmx2g, -cp, '/usr/app/jar/config:/usr/app/jar/qdata-mdm-server.jar', org.springframework.boot.loader.JarLauncher]
+    command: [--server.port=8080]
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_TYPE: dm8
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ./qdata-mdm-server/logs:/usr/app/jar/logs
+      - ./qdata-mdm-server/upload:/usr/app/jar/upload
+      - ./qdata-mdm-server/application-prod.yml:/usr/app/jar/config/application-prod.yml:ro
+    depends_on:
+      dm8:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [qdatamdmnet]

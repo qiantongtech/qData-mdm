@@ -15,6 +15,7 @@
 .pb5 {
   padding-bottom: 5px;
 }
+
 .pb15 {
   padding-bottom: 15px !important;
 }
@@ -31,6 +32,10 @@
   margin-right: 5px;
 }
 
+.mb2 {
+  margin-bottom: 2px;
+}
+
 .mb5 {
   margin-bottom: 5px;
 }
@@ -45,6 +50,10 @@
 
 .mt10 {
   margin-top: 10px;
+}
+
+.mt15 {
+  margin-top: 15px;
 }
 
 .mr10 {
@@ -213,6 +222,49 @@ h6 {
 .card-box {
   padding: 0;
   margin-bottom: 15px;
+}
+
+// 表格“更多”操作 Popover 通用样式 (基于 handle-popover 扩展)
+.el-popover.el-popper {
+  padding: 12px 0;
+  min-width: 120px !important;
+
+  .task-action-list {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    box-sizing: border-box;
+
+    .el-button {
+      width: 100%;
+      box-sizing: border-box;
+      justify-content: center;
+      margin-left: 0;
+      padding: 8px 12px;
+      text-align: center;
+      border: none;
+      border-radius: 0;
+
+      &:hover {
+        background-color: var(--el-fill-color-light);
+      }
+
+      .action-icon {
+        width: 14px;
+        height: 14px;
+        margin-right: 5px;
+        flex: 0 0 14px;
+      }
+    }
+
+    .btn-icon-offset {
+      .el-icon, span {
+        position: relative;
+        left: -14px;
+      }
+    }
+  }
 }
 
 /* button color */
@@ -389,8 +441,9 @@ h6 {
 .column-form {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  row-gap: 16px;
+  row-gap: 15px;
   column-gap: 20px;
+  align-items: start;
 
   .row-full {
     grid-column: span 2;

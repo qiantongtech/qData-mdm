@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.base.ModelColumnMapper">
+
+    <!-- 专门恢复原逻辑删除记录；普通MyBatis-Plus更新会排除已删除行，不能完成恢复。 -->
+    <update id="restoreDeletedField">
+        UPDATE MODEL_COLUMN SET DEL_FLAG = '0'
+        WHERE ID = #{id} AND MODEL_ID = #{modelId} AND CODE = #{code} AND DEL_FLAG = '1'
+    </update>
+
+    <resultMap type="ModelColumnDO" id="ModelColumnResult">
+        <result property="id"    column="ID"    />
+        <result property="modelId"    column="MODEL_ID"    />
+        <result property="name"    column="NAME"    />
+        <result property="code"    column="CODE"    />
+        <result property="columnCategory"    column="COLUMN_CATEGORY"    />
+        <result property="dataType"    column="DATA_TYPE"    />
+        <result property="dataLength"    column="DATA_LENGTH"    />
+        <result property="dataScale"    column="DATA_SCALE"    />
+        <result property="sortOrder"    column="SORT_ORDER"    />
+        <result property="primaryKeyFlag"    column="PRIMARY_KEY_FLAG"    />
+        <result property="requiredFlag"    column="REQUIRED_FLAG"    />
+        <result property="uniqueFlag"    column="UNIQUE_FLAG"    />
+        <result property="nameFlag"    column="NAME_FLAG"    />
+        <result property="defaultValue"    column="DEFAULT_VALUE"    />
+        <result property="dictTypeId"    column="DICT_TYPE_ID"    />
+        <result property="encodingVersionId"    column="ENCODING_VERSION_ID"    />
+        <result property="encodingMode"    column="ENCODING_MODE"    />
+        <result property="encodingRuleConfig"    column="ENCODING_RULE_CONFIG"    />
+        <result property="description"    column="DESCRIPTION"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="creatorId"    column="CREATOR_ID"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updaterId"    column="UPDATER_ID"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="relatedModelId"    column="RELATED_MODEL_ID"    />
+        <result property="relatedCode"    column="RELATED_CODE"    />
+        <result property="displayCode"    column="DISPLAY_CODE"    />
+        <result property="nodeRule"    column="NODE_RULE"    />
+        <result property="displayMode"    column="DISPLAY_MODE"    />
+    </resultMap>
+
+    <sql id="selectModelColumnVo">
+        select ID, MODEL_ID, NAME, CODE, COLUMN_CATEGORY, DATA_TYPE, DATA_LENGTH, DATA_SCALE, SORT_ORDER, PRIMARY_KEY_FLAG, REQUIRED_FLAG, UNIQUE_FLAG, NAME_FLAG, DEFAULT_VALUE, DICT_TYPE_ID, ENCODING_VERSION_ID, ENCODING_MODE, ENCODING_RULE_CONFIG, DESCRIPTION, DEL_FLAG, CREATE_BY, CREATOR_ID, CREATE_TIME, UPDATE_BY, UPDATER_ID, UPDATE_TIME, RELATED_MODEL_ID, RELATED_CODE, DISPLAY_CODE, NODE_RULE, DISPLAY_MODE from MODEL_COLUMN
+    </sql>
+
+    <!-- 仅供恢复比较读取原记录，正常字段查询仍排除逻辑删除数据。 -->
+    <select id="selectDeletedField" resultMap="ModelColumnResult">
+        <include refid="selectModelColumnVo"/>
+        WHERE ID = #{id} AND MODEL_ID = #{modelId} AND CODE = #{code} AND DEL_FLAG = '1'
+    </select>
+
+    <select id="selectModelColumnList" parameterType="ModelColumnDO" resultMap="ModelColumnResult">
+        <include refid="selectModelColumnVo"/>
+        <where>
+            <if test="modelId != null "> and MODEL_ID = #{modelId}</if>
+            <if test="name != null  and name != ''"> and NAME like concat(concat('%', #{name}), '%')</if>
+            <if test="code != null  and code != ''"> and CODE = #{code}</if>
+            <if test="columnCategory != null  and columnCategory != ''"> and COLUMN_CATEGORY = #{columnCategory}</if>
+            <if test="dataType != null  and dataType != ''"> and DATA_TYPE = #{dataType}</if>
+            <if test="dataLength != null "> and DATA_LENGTH = #{dataLength}</if>
+            <if test="dataScale != null "> and DATA_SCALE = #{dataScale}</if>
+            <if test="primaryKeyFlag != null"> and PRIMARY_KEY_FLAG = #{primaryKeyFlag}</if>
+            <if test="requiredFlag != null"> and REQUIRED_FLAG = #{requiredFlag}</if>
+            <if test="uniqueFlag != null"> and UNIQUE_FLAG = #{uniqueFlag}</if>
+            <if test="nameFlag != null"> and NAME_FLAG = #{nameFlag}</if>
+            <if test="defaultValue != null  and defaultValue != ''"> and DEFAULT_VALUE = #{defaultValue}</if>
+            <if test="dictTypeId != null "> and DICT_TYPE_ID = #{dictTypeId}</if>
+            <if test="encodingVersionId != null "> and ENCODING_VERSION_ID = #{encodingVersionId}</if>
+            <if test="description != null  and description != ''"> and DESCRIPTION = #{description}</if>
+            <if test="createTime != null "> and CREATE_TIME = #{createTime}</if>
+            <if test="relatedModelId != null "> and RELATED_MODEL_ID = #{relatedModelId}</if>
+            <if test="relatedCode != null  and relatedCode != ''"> and RELATED_CODE = #{relatedCode}</if>
+            <if test="displayCode != null  and displayCode != ''"> and DISPLAY_CODE = #{displayCode}</if>
+            <if test="nodeRule != null  and nodeRule != ''"> and NODE_RULE = #{nodeRule}</if>
+            <if test="displayMode != null  and displayMode != ''"> and DISPLAY_MODE = #{displayMode}</if>
+        </where>
+    </select>
+
+    <select id="selectModelColumnById" parameterType="Long" resultMap="ModelColumnResult">
+        <include refid="selectModelColumnVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertModelColumn" parameterType="ModelColumnDO">
+        insert into MODEL_COLUMN
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="modelId != null">MODEL_ID,</if>
+            <if test="name != null">NAME,</if>
+            <if test="code != null">CODE,</if>
+            <if test="columnCategory != null">COLUMN_CATEGORY,</if>
+            <if test="dataType != null">DATA_TYPE,</if>
+            <if test="dataLength != null">DATA_LENGTH,</if>
+            <if test="dataScale != null">DATA_SCALE,</if>
+            <if test="primaryKeyFlag != null">PRIMARY_KEY_FLAG,</if>
+            <if test="requiredFlag != null">REQUIRED_FLAG,</if>
+            <if test="uniqueFlag != null">UNIQUE_FLAG,</if>
+            <if test="nameFlag != null">NAME_FLAG,</if>
+            <if test="defaultValue != null">DEFAULT_VALUE,</if>
+            <if test="dictTypeId != null">DICT_TYPE_ID,</if>
+            <if test="encodingVersionId != null">ENCODING_VERSION_ID,</if>
+            <if test="encodingMode != null">ENCODING_MODE,</if>
+            <if test="encodingRuleConfig != null">ENCODING_RULE_CONFIG,</if>
+            <if test="description != null">DESCRIPTION,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="relatedModelId != null">RELATED_MODEL_ID,</if>
+            <if test="relatedCode != null">RELATED_CODE,</if>
+            <if test="displayCode != null">DISPLAY_CODE,</if>
+            <if test="nodeRule != null">NODE_RULE,</if>
+            <if test="displayMode != null">DISPLAY_MODE,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="modelId != null">#{modelId},</if>
+            <if test="name != null">#{name},</if>
+            <if test="code != null">#{code},</if>
+            <if test="columnCategory != null">#{columnCategory},</if>
+            <if test="dataType != null">#{dataType},</if>
+            <if test="dataLength != null">#{dataLength},</if>
+            <if test="dataScale != null">#{dataScale},</if>
+            <if test="primaryKeyFlag != null">#{primaryKeyFlag},</if>
+            <if test="requiredFlag != null">#{requiredFlag},</if>
+            <if test="uniqueFlag != null">#{uniqueFlag},</if>
+            <if test="nameFlag != null">#{nameFlag},</if>
+            <if test="defaultValue != null">#{defaultValue},</if>
+            <if test="dictTypeId != null">#{dictTypeId},</if>
+            <if test="encodingVersionId != null">#{encodingVersionId},</if>
+            <if test="encodingMode != null">#{encodingMode},</if>
+            <if test="encodingRuleConfig != null">#{encodingRuleConfig},</if>
+            <if test="description != null">#{description},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="relatedModelId != null">#{relatedModelId},</if>
+            <if test="relatedCode != null">#{relatedCode},</if>
+            <if test="displayCode != null">#{displayCode},</if>
+            <if test="nodeRule != null">#{nodeRule},</if>
+            <if test="displayMode != null">#{displayMode},</if>
+         </trim>
+    </insert>
+
+    <update id="updateModelColumn" parameterType="ModelColumnDO">
+        update MODEL_COLUMN
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="modelId != null">MODEL_ID = #{modelId},</if>
+            <if test="name != null">NAME = #{name},</if>
+            <if test="code != null">CODE = #{code},</if>
+            <if test="columnCategory != null">COLUMN_CATEGORY = #{columnCategory},</if>
+            <if test="dataType != null">DATA_TYPE = #{dataType},</if>
+            <if test="dataLength != null">DATA_LENGTH = #{dataLength},</if>
+            <if test="dataScale != null">DATA_SCALE = #{dataScale},</if>
+            <if test="primaryKeyFlag != null">PRIMARY_KEY_FLAG = #{primaryKeyFlag},</if>
+            <if test="requiredFlag != null">REQUIRED_FLAG = #{requiredFlag},</if>
+            <if test="uniqueFlag != null">UNIQUE_FLAG = #{uniqueFlag},</if>
+            <if test="nameFlag != null">NAME_FLAG = #{nameFlag},</if>
+            <if test="defaultValue != null">DEFAULT_VALUE = #{defaultValue},</if>
+            <if test="dictTypeId != null">DICT_TYPE_ID = #{dictTypeId},</if>
+            <if test="encodingVersionId != null">ENCODING_VERSION_ID = #{encodingVersionId},</if>
+            <if test="encodingMode != null">ENCODING_MODE = #{encodingMode},</if>
+            <if test="encodingRuleConfig != null">ENCODING_RULE_CONFIG = #{encodingRuleConfig},</if>
+            <if test="description != null">DESCRIPTION = #{description},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="relatedModelId != null">RELATED_MODEL_ID = #{relatedModelId},</if>
+            <if test="relatedCode != null">RELATED_CODE = #{relatedCode},</if>
+            <if test="displayCode != null">DISPLAY_CODE = #{displayCode},</if>
+            <if test="nodeRule != null">NODE_RULE = #{nodeRule},</if>
+            <if test="displayMode != null">DISPLAY_MODE = #{displayMode},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteModelColumnById" parameterType="Long">
+        delete from MODEL_COLUMN where ID = #{id}
+    </delete>
+
+    <delete id="deleteModelColumnByIds" parameterType="String">
+        delete from MODEL_COLUMN where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

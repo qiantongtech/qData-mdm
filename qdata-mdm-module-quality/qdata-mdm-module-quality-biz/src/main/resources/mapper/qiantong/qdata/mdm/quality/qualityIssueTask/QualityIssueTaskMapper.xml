@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.quality.dal.mapper.qualityIssueTask.QualityIssueTaskMapper">
+    <select id="lockIssue" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssue.QualityIssueDO">
+        SELECT ID, MODEL_ID, MASTER_RECORD_ID, STATUS, VALID_FLAG
+        FROM QUALITY_ISSUE
+        WHERE ID = #{id} AND DEL_FLAG = 0 FOR UPDATE
+    </select>
+    <select id="selectIssueItemsByIds" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueInfo.QualityIssueInfoDO">
+        SELECT ID, ISSUE_ID FROM QUALITY_ISSUE_INFO WHERE DEL_FLAG = 0 AND ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY ID
+    </select>
+    <select id="lockIssueItem" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueInfo.QualityIssueInfoDO">
+        SELECT ID, ISSUE_ID, QUALITY_RULE_ID, MODEL_COLUMN_ID, STATUS, VALID_FLAG, LAST_CHECK_INSTANCE_ID, LAST_FOUND_TIME
+        FROM QUALITY_ISSUE_INFO WHERE ID = #{id} AND DEL_FLAG = 0 FOR UPDATE
+    </select>
+    <update id="markIssueDispatched">
+        UPDATE QUALITY_ISSUE SET STATUS = '2', UPDATE_TIME = CURRENT_TIMESTAMP,
+            UPDATER_ID = #{userId}, UPDATE_BY = #{userName}
+        WHERE ID = #{id} AND DEL_FLAG = 0 AND STATUS IN ('1', '2')
+    </update>
+    <update id="restoreUndispatchedIssue">
+        UPDATE QUALITY_ISSUE SET STATUS = '1', UPDATE_TIME = CURRENT_TIMESTAMP,
+            UPDATER_ID = #{userId}, UPDATE_BY = #{userName}
+        WHERE ID = #{id} AND DEL_FLAG = 0 AND STATUS = '2'
+          AND NOT EXISTS (
+              SELECT 1 FROM QUALITY_ISSUE_TASK_INFO d
+              JOIN QUALITY_ISSUE_TASK t ON t.ID = d.TASK_ID AND t.DEL_FLAG = 0
+              WHERE d.ISSUE_ID = #{id} AND d.DEL_FLAG = 0
+          )
+    </update>
+    <select id="selectIssueItemsForUpdate" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueInfo.QualityIssueInfoDO">
+        SELECT ID, ISSUE_ID, QUALITY_RULE_ID, STATUS, VALID_FLAG, LAST_CHECK_INSTANCE_ID, LAST_FOUND_TIME
+        FROM QUALITY_ISSUE_INFO
+        WHERE ISSUE_ID = #{issueId} AND QUALITY_RULE_ID = #{ruleId} AND DEL_FLAG = 0 FOR UPDATE
+    </select>
+    <select id="lockTask" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTask.QualityIssueTaskDO">
+        SELECT ID, TASK_NO, TASK_NAME, MODEL_ID, MODEL_VERSION, ASSIGNEE_ID, STATUS,
+               REQUIREMENT, RECTIFICATION_TIME, VALID_FLAG, DEL_FLAG, CREATE_BY,
+               CREATOR_ID, CREATE_TIME, UPDATE_BY, UPDATER_ID, UPDATE_TIME, REMARK
+        FROM QUALITY_ISSUE_TASK WHERE ID = #{id} AND DEL_FLAG = 0 FOR UPDATE
+    </select>
+    <update id="updateApprovalStatus">
+        UPDATE QUALITY_ISSUE_TASK
+        SET STATUS = #{targetStatus}, UPDATE_TIME = #{updateTime},
+            UPDATER_ID = #{updaterId}, UPDATE_BY = #{updateBy}
+        WHERE ID = #{id} AND DEL_FLAG = 0 AND STATUS = #{expectedStatus}
+    </update>
+    <update id="markReadyForApproval">
+        UPDATE QUALITY_ISSUE_TASK
+        SET STATUS = '1', UPDATE_TIME = #{updateTime},
+            UPDATER_ID = #{updaterId}, UPDATE_BY = #{updateBy}
+        WHERE ID = #{id} AND DEL_FLAG = 0 AND STATUS = '5'
+    </update>
+    <update id="revertToRectifying">
+        UPDATE QUALITY_ISSUE_TASK
+        SET STATUS = '5', UPDATE_TIME = #{updateTime},
+            UPDATER_ID = #{updaterId}, UPDATE_BY = #{updateBy}
+        WHERE ID = #{id} AND DEL_FLAG = 0 AND STATUS IN ('1', '2')
+    </update>
+    <sql id="displayColumns">
+        t.ID, t.TASK_NO, t.TASK_NAME, t.PRIORITY, t.MODEL_ID, t.MODEL_VERSION, t.ASSIGNEE_ID,
+        t.STATUS, t.REQUIREMENT, t.RECTIFICATION_TIME, t.VALID_FLAG, t.DEL_FLAG,
+        t.CREATE_BY, t.CREATOR_ID, t.CREATE_TIME, t.UPDATE_BY, t.UPDATER_ID,
+        t.UPDATE_TIME, t.REMARK
+    </sql>
+    <sql id="displayFrom">
+        FROM QUALITY_ISSUE_TASK t
+    </sql>
+    <sql id="displayFilters">
+        t.DEL_FLAG = 0
+        <if test="req.id != null">AND t.ID = #{req.id}</if>
+        <if test="req.ids != null and req.ids.size() > 0">
+            AND t.ID IN
+            <foreach collection="req.ids" item="taskId" open="(" separator="," close=")">#{taskId}</foreach>
+        </if>
+        <if test="req.modelId != null">AND t.MODEL_ID = #{req.modelId}</if>
+        <if test="req.assigneeId != null">AND t.ASSIGNEE_ID = #{req.assigneeId}</if>
+        <if test="req.priority != null">AND t.PRIORITY = #{req.priority}</if>
+        <if test="req.status != null and req.status != ''">AND t.STATUS = #{req.status}</if>
+        <if test="req.taskNo != null and req.taskNo != ''">
+            AND INSTR(LOWER(t.TASK_NO), LOWER(#{req.taskNo})) &gt; 0
+        </if>
+        <if test="req.issueId != null or req.qualityRuleId != null or req.masterRecordId != null">
+            AND EXISTS (
+                SELECT 1 FROM QUALITY_ISSUE_TASK_INFO d
+                WHERE d.TASK_ID = t.ID AND d.DEL_FLAG = 0
+                <if test="req.issueId != null">AND d.ISSUE_ID = #{req.issueId}</if>
+                <if test="req.qualityRuleId != null">AND d.QUALITY_RULE_ID = #{req.qualityRuleId}</if>
+                <if test="req.masterRecordId != null">AND d.MASTER_RECORD_ID = #{req.masterRecordId}</if>
+            )
+        </if>
+        <if test="req.modelVersion != null and req.modelVersion != ''">AND t.MODEL_VERSION = #{req.modelVersion}</if>
+        <if test="req.validFlag != null">AND t.VALID_FLAG = #{req.validFlag}</if>
+        <if test="req.requirement != null and req.requirement != ''">AND t.REQUIREMENT = #{req.requirement}</if>
+        <if test="req.rectificationTime != null">AND t.RECTIFICATION_TIME = #{req.rectificationTime}</if>
+        <if test="req.overdue != null and req.overdue == 1">
+            AND t.RECTIFICATION_TIME IS NOT NULL AND t.RECTIFICATION_TIME &lt; CURRENT_TIMESTAMP
+        </if>
+        <if test="req.overdue != null and req.overdue == 0">
+            AND (t.RECTIFICATION_TIME IS NULL OR t.RECTIFICATION_TIME &gt;= CURRENT_TIMESTAMP)
+        </if>
+        <if test="req.beginTime != null">AND t.CREATE_TIME &gt;= #{req.beginTime}</if>
+        <if test="req.endTime != null">AND t.CREATE_TIME &lt;= #{req.endTime}</if>
+        <if test="req.taskName != null and req.taskName != ''">
+            AND INSTR(LOWER(t.TASK_NAME), LOWER(#{req.taskName})) &gt; 0
+        </if>
+        <if test="req.keyword != null and req.keyword != ''">
+            AND (INSTR(LOWER(t.TASK_NO), LOWER(#{req.keyword})) &gt; 0
+                OR INSTR(LOWER(t.TASK_NAME), LOWER(#{req.keyword})) &gt; 0)
+        </if>
+    </sql>
+    <sql id="displayOrderBy">
+        <choose>
+            <when test="req.orderByColumn == 'id' and (req.isAsc == 'ascending' or req.isAsc == 'asc')">ORDER BY t.ID ASC</when>
+            <when test="req.orderByColumn == 'id'">ORDER BY t.ID DESC</when>
+            <when test="req.orderByColumn == 'rectification_time' and (req.isAsc == 'ascending' or req.isAsc == 'asc')">
+                ORDER BY CASE WHEN t.RECTIFICATION_TIME IS NULL THEN 1 ELSE 0 END, t.RECTIFICATION_TIME ASC, t.ID ASC
+            </when>
+            <when test="req.orderByColumn == 'rectification_time'">
+                ORDER BY CASE WHEN t.RECTIFICATION_TIME IS NULL THEN 1 ELSE 0 END, t.RECTIFICATION_TIME DESC, t.ID DESC
+            </when>
+            <when test="(req.orderByColumn == 'create_time' or req.orderByColumn == 'createTime') and (req.isAsc == 'ascending' or req.isAsc == 'asc')">
+                ORDER BY t.CREATE_TIME ASC, t.ID ASC
+            </when>
+            <otherwise>ORDER BY t.CREATE_TIME DESC, t.ID DESC</otherwise>
+        </choose>
+    </sql>
+    <select id="selectDisplayPage" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTask.QualityIssueTaskDO">
+        SELECT <include refid="displayColumns"/> <include refid="displayFrom"/>
+        WHERE <include refid="displayFilters"/>
+        <include refid="displayOrderBy"/>
+    </select>
+    <select id="selectDisplayList" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTask.QualityIssueTaskDO">
+        SELECT <include refid="displayColumns"/> <include refid="displayFrom"/>
+        WHERE <include refid="displayFilters"/>
+        <include refid="displayOrderBy"/>
+    </select>
+    <select id="selectDisplay" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTask.QualityIssueTaskDO">
+        SELECT <include refid="displayColumns"/> <include refid="displayFrom"/>
+        WHERE t.ID = #{id} AND t.DEL_FLAG = 0
+    </select>
+    <select id="selectDisplayCounts" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTask.QualityIssueTaskDO">
+        SELECT TASK_ID AS ID,
+               COUNT(DISTINCT MASTER_RECORD_ID) AS MASTER_DATA_COUNT,
+               COUNT(*) AS ISSUE_DATA_COUNT,
+               SUM(CASE WHEN STATUS = '3' THEN 1 ELSE 0 END) AS COMPLETED_ISSUE_COUNT
+        FROM QUALITY_ISSUE_TASK_INFO
+        WHERE DEL_FLAG = 0 AND TASK_ID IN
+        <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">#{taskId}</foreach>
+        GROUP BY TASK_ID
+    </select>
+    <select id="selectLastHandledTimes" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTask.QualityIssueTaskDO">
+        SELECT QUALITY_ISSUE_TASK_ID AS ID, MAX(CREATE_TIME) AS LAST_HANDLED_TIME
+        FROM QUALITY_ISSUE_TASK_LOG
+        WHERE DEL_FLAG = 0 AND QUALITY_ISSUE_TASK_ID IN
+        <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">#{taskId}</foreach>
+        GROUP BY QUALITY_ISSUE_TASK_ID
+    </select>
+    <select id="selectTaskIssueItems" resultType="tech.qiantong.qdata.mdm.quality.controller.admin.qualityIssueTask.vo.QualityIssueTaskIssueItemRespVO">
+        SELECT d.ISSUE_INFO_ID AS ID, d.ID AS TASK_INFO_ID, d.ISSUE_ID, q.ISSUE_CODE,
+               d.QUALITY_RULE_ID, d.MASTER_RECORD_ID, i.MODEL_COLUMN_ID,
+               d.STATUS AS TASK_STATUS, i.FAIL_REASON,
+               d.RECTIFICATION_TIME AS RECTIFICATION_TIME, d.REQUIREMENT AS REQUIREMENT, d.UPDATE_BY AS UPDATE_BY,
+               d.UPDATER_ID AS UPDATER_ID
+        FROM QUALITY_ISSUE_TASK_INFO d
+        LEFT JOIN QUALITY_ISSUE q ON q.ID = d.ISSUE_ID AND q.DEL_FLAG = 0
+        LEFT JOIN QUALITY_ISSUE_INFO i ON i.ID = d.ISSUE_INFO_ID AND i.DEL_FLAG = 0
+        WHERE d.TASK_ID = #{id} AND d.DEL_FLAG = 0
+        ORDER BY d.ISSUE_ID, d.ID
+    </select>
+    <select id="selectStatusCounts" resultType="map">
+        SELECT t.STATUS AS "status", COUNT(*) AS "total"
+        FROM QUALITY_ISSUE_TASK t
+        WHERE <include refid="displayFilters"/>
+        GROUP BY t.STATUS
+    </select>
+    <select id="selectIssueFieldId" resultType="long">
+        SELECT MODEL_COLUMN_ID FROM QUALITY_ISSUE_INFO
+        WHERE ID = #{issueInfoId} AND DEL_FLAG = 0
+    </select>
+    <select id="selectSnapshotData" resultType="string">
+        SELECT DBMS_LOB.SUBSTR(SNAPSHOT_DATA, 4000, 1)
+        FROM MASTER_DATA_VERSION
+        WHERE MODEL_ID = #{modelId}
+          AND MASTER_RECORD_ID = #{masterRecordId}
+          AND CURRENT_FLAG = 1
+    </select>
+</mapper>

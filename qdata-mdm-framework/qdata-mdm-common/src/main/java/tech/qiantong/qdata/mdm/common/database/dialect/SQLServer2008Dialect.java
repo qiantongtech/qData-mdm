@@ -1,14 +1,14 @@
 /*
- * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -43,6 +43,13 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class SQLServer2008Dialect extends AbstractDbDialect {
+    private static final long MAX_VARCHAR_LENGTH = 8000L;
+
+    /** 兼容不支持 TRIM 的 SQL Server 版本以及旧式 TEXT/NTEXT 字段。 */
+    @Override
+    public String trimExpression(String expression) {
+        return "LTRIM(RTRIM(CAST(" + expression + " AS NVARCHAR(MAX))))";
+    }
 
     @Override
     public String columns(String dbName, String tableName) {
@@ -69,38 +76,43 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                 "LEFT JOIN syscomments e ON columns.default_object_id= e.id " +
                 "LEFT JOIN sys.extended_properties ep ON ep.major_id = columns.object_id AND ep.minor_id = columns.column_id AND ep.name = 'MS_Description' " +
                 "where tables.name = '" + tableName + "' " +
-                "AND SCHEMA_NAME(tables.schema_id) = '" + dbQueryProperty.getSid() + "' " +
+                "AND SCHEMA_NAME(tables.schema_id) = '" + DatabaseUtil.escapeSingleQuotes(getSchemaName(dbQueryProperty)) + "' " +
                 "order by columns.column_id ";
     }
 
     @Override
     public String generateCheckTableExistsSQL(DbQueryProperty dbQueryProperty, String tableName) {
-        return "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = '" + dbQueryProperty.getDbName() + "' AND TABLE_SCHEMA = '" + dbQueryProperty.getSid() + "' AND TABLE_NAME = '" + tableName + "';";
+        return "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = '" + dbQueryProperty.getDbName() + "' AND TABLE_SCHEMA = '" + DatabaseUtil.escapeSingleQuotes(getSchemaName(dbQueryProperty)) + "' AND TABLE_NAME = '" + tableName + "';";
     }
 
     @Override
     public List<String> someInternalSqlGenerator(DbQueryProperty dbQueryProperty, String tableName, String tableComment, List<DbColumn> dbColumnList) {
         List<String> sqlList = new ArrayList<>();
+        String fullTableName = getTableName(dbQueryProperty, tableName);
 
         List<String> primaryKeys = new ArrayList<>();
         {
             StringBuilder sql = new StringBuilder();
-            // Generate CREATE TABLE statement
-            sql.append("CREATE TABLE ").append(tableName).append(" (\n");
+            // 生成CREATE TABLE语句
+            sql.append("CREATE TABLE ").append(fullTableName).append(" (\n");
 
             for (DbColumn column : dbColumnList) {
                 String columnType = column.getDataType().toUpperCase();
-                sql.append("  ").append(column.getColName()).append(" ");
+                sql.append("  ").append(quoteIdentifier(column.getColName())).append(" ");
 
-                // Convert data types to types supported by SQL Server
+                // 转换数据类型为SQL Server支持的类型
                 switch (columnType) {
+                    case "NVARCHAR":
+                    case "NVARCHAR(MAX)":
+                        sql.append(unicodeColumnType(column));
+                        break;
                     case "VARCHAR":
-                    case "VARCHAR2": // SQL Server does not support VARCHAR2, mapping to VARCHAR
+                    case "VARCHAR2": // SQL Server不支持VARCHAR2，映射为VARCHAR
                         sql.append("VARCHAR");
                         if (StringUtils.isNotEmpty(column.getDataLength())) {
                             sql.append("(").append(column.getDataLength()).append(")");
                         } else {
-                            sql.append("(MAX)"); // VARCHAR in SQL Server supports maximum length by default
+                            sql.append("(MAX)"); // SQL Server中的VARCHAR默认支持最大长度
                         }
                         break;
                     case "CHAR":
@@ -120,7 +132,7 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                         sql.append("BIGINT");
                         break;
                     case "TINYINT":
-                        sql.append("TINYINT");
+                        sql.append("SMALLINT");
                         break;
                     case "DECIMAL":
                         sql.append("DECIMAL");
@@ -136,7 +148,7 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                         sql.append("FLOAT");
                         break;
                     case "DOUBLE":
-                        sql.append("FLOAT"); // There is no DOUBLE in SQL Server, use FLOAT
+                        sql.append("FLOAT"); // SQL Server中没有DOUBLE，使用FLOAT
                         break;
                     case "DATE":
                         sql.append("DATE");
@@ -148,25 +160,20 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                         sql.append("TIME");
                         break;
                     default:
-                        sql.append(columnType); // Handle unknown types by default
+                        sql.append(columnType); // 默认处理未知类型
                         break;
                 }
 
-                // Check if required
+                // 检查是否必填
+                sql.append(identityColumnClause(column));
                 if (!column.getNullable()) {
                     sql.append(" NOT NULL");
                 }
 
-                // Default value handling
-                if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                    if (columnType.equals("VARCHAR") || columnType.equals("CHAR") || columnType.equals("TEXT")) {
-                        sql.append(" DEFAULT '").append(column.getDataDefault()).append("'");
-                    } else {
-                        sql.append(" DEFAULT ").append(column.getDataDefault());
-                    }
-                }
+                // 默认值处理
+                appendSqlServerDefaultClause(sql, columnType, column.getDataDefault());
 
-                // Add the field to the primary key list, if it is a primary key
+                // 加入字段到主键列表，如果是主键
                 if (column.getColKey()) {
                     primaryKeys.add(column.getColName());
                 }
@@ -174,17 +181,17 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                 sql.append(",\n");
             }
 
-            // Remove final comma and newline
+            // 移除最后的逗号和换行
             sql.setLength(sql.length() - 2);
             sql.append("\n");
 
-            // Add primary key constraints
+            // 添加主键约束
             if (!primaryKeys.isEmpty()) {
                 sql.append(", PRIMARY KEY (");
                 for (String pk : primaryKeys) {
-                    sql.append(pk).append(", ");
+                    sql.append(quoteIdentifier(pk)).append(", ");
                 }
-                sql.setLength(sql.length() - 2); // Remove final comma and space
+                sql.setLength(sql.length() - 2); // 移除最后的逗号和空格
                 sql.append(")");
             }
 
@@ -192,23 +199,32 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
             sqlList.add(sql.toString());
         }
 
-        // Add table comments (SQL Server does not directly support table comments, but you can use extended attributes, etc.)
+        // 旧驱动分支也要与实际建表Schema保持一致。
+        String commentSchema = DatabaseUtil.escapeSingleQuotes(StringUtils.defaultIfBlank(dbQueryProperty.getSid(), "dbo"));
+        // 添加表备注（SQL Server不直接支持表备注，但可以使用扩展属性等方式）
         if (StringUtils.isNotEmpty(tableComment)) {
             StringBuilder sql = new StringBuilder();
             sql.append("EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'")
-                    .append(DatabaseUtil.escapeSingleQuotes(tableComment)).append("', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'")
-                    .append(tableName).append("'\n");
+                    .append(DatabaseUtil.escapeSingleQuotes(tableComment))
+                    .append("', @level0type = N'SCHEMA', @level0name = N'")
+                    .append(commentSchema).append("', @level1type = N'TABLE', @level1name = N'")
+                    .append(tableName)
+                    .append("'\n");
             sqlList.add(sql.toString());
         }
 
-        // Add field notes
+        // 添加字段备注
         for (DbColumn column : dbColumnList) {
             if (StringUtils.isNotEmpty(column.getColComment())) {
                 StringBuilder sql = new StringBuilder();
                 sql.append("EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'")
-                        .append(DatabaseUtil.escapeSingleQuotes(column.getColComment())).append("', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'")
-                        .append(tableName).append("', @level2type = N'COLUMN', @level2name = N'")
-                        .append(column.getColName()).append("'\n");
+                        .append(DatabaseUtil.escapeSingleQuotes(column.getColComment()))
+                        .append("', @level0type = N'SCHEMA', @level0name = N'")
+                    .append(commentSchema).append("', @level1type = N'TABLE', @level1name = N'")
+                        .append(tableName)
+                        .append("', @level2type = N'COLUMN', @level2name = N'")
+                        .append(column.getColName())
+                        .append("'\n");
                 sqlList.add(sql.toString());
             }
         }
@@ -216,149 +232,8 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
         return sqlList;
     }
 
-    @Override
-    public List<String> someInternalSqlDorisGenerator(DbQueryProperty dbQueryProperty, String tableName, String tableComment, List<DbColumn> dbColumnList, String partitionRule, String bucketRule, Integer replica) {
-        List<String> sqlList = new ArrayList<>();
-        List<String> primaryKeys = new ArrayList<>();
-        StringBuilder sql = new StringBuilder();
-
-        sql.append("CREATE TABLE ").append(tableName).append(" (\n");
-
-        for (DbColumn column : dbColumnList) {
-            String columnType = column.getDataType();
-            String colName = column.getColName();
-
-            sql.append("  ").append(this.escapeReservedKeyword(colName)).append(" ");
-
-            String columnTypeResolved = "";
-            // Mapping the data types supported by Doris
-            switch (columnType.toUpperCase()) {
-                case "VARCHAR":
-                case "NVARCHAR":
-                    sql.append("VARCHAR");
-                    if (StringUtils.isNotEmpty(column.getDataLength())) {
-                        sql.append("(").append(column.getDataLength()).append(")");
-                    } else {
-                        sql.append("(255)");
-                    }
-                    columnTypeResolved = "VARCHAR";
-                    break;
-                case "CHAR":
-                    sql.append("VARCHAR");
-                    if (StringUtils.isNotEmpty(column.getDataLength())) {
-                        sql.append("(").append(column.getDataLength()).append(")");
-                    } else {
-                        sql.append("(1)");
-                    }
-                    columnTypeResolved = "VARCHAR";
-                    break;
-                case "VARCHAR(MAX)":
-                case "TEXT":
-                    sql.append("STRING");
-                    columnTypeResolved = "STRING";
-                    break;
-                case "SMALLINT":
-                    sql.append("SMALLINT");
-                    columnTypeResolved = "SMALLINT";
-                    break;
-                case "TINYINT":
-                    sql.append("TINYINT");
-                    columnTypeResolved = "TINYINT";
-                    break;
-                case "INT":
-                    sql.append("INT");
-                    columnTypeResolved = "INT";
-                    break;
-                case "BIGINT":
-                    sql.append("BIGINT");
-                    columnTypeResolved = "BIGINT";
-                    break;
-                case "DECIMAL":
-                    sql.append(generateColumnSQLDORIS("DECIMAL", column.getDataLength(), column.getDataScale(), 65, 30));
-                    columnTypeResolved = "DECIMAL";
-                    break;
-                case "REAL":
-                    sql.append("FLOAT");
-                    columnTypeResolved = "FLOAT";
-                    break;
-                case "FLOAT":
-                    sql.append("DOUBLE");
-                    columnTypeResolved = "DOUBLE";
-                    break;
-                case "DATE":
-                case "DATETIMEOFFSET":
-                case "DATETIME":
-                case "DATETIME2":
-                case "TIMESTAMP":
-                    sql.append("DATETIME");
-                    columnTypeResolved = "DATETIME";
-                    break;
-                default:
-                    sql.append("VARCHAR(255)"); // fallback processing
-                    columnTypeResolved = "VARCHAR";
-                    break;
-            }
-            // NOT NULL
-            if (!column.getNullable()) {
-                sql.append(" NOT NULL");
-            }
-
-            String defaultClause = buildDorisDefaultClause(columnTypeResolved, column.getDataDefault());
-            sql.append(defaultClause);
-
-            // Comment
-            if (StringUtils.isNotEmpty(column.getColComment())) {
-                sql.append(" COMMENT '").append(DatabaseUtil.escapeSingleQuotes(column.getColComment())).append("'");
-            }
-
-            if (Boolean.TRUE.equals(column.getColKey())) {
-                primaryKeys.add(colName);
-            }
-
-            sql.append(",\n");
-        }
-
-        // Remove the last comma
-        sql.setLength(sql.length() - 2);
-        sql.append("\n)");
-
-        // Doris must specify the KEY type
-        if (!primaryKeys.isEmpty()) {
-            sql.append("\nUNIQUE KEY (");
-            for (String pk : primaryKeys) {
-                sql.append("`").append(pk).append("`, ");
-            }
-            sql.setLength(sql.length() - 2);
-            sql.append(")");
-        } else {
-            // If there is no primary key, use the first column as DUPLICATE KEY
-            sql.append("\nDUPLICATE KEY (`").append(dbColumnList.get(0).getColName()).append("`)");
-        }
-
-        //Determine whether to add a partition
-        if (StringUtils.isNotBlank(partitionRule)) {
-            sql.append("\n").append(partitionRule);
-        }
-
-        // Bucketing strategy (required)
-        if (StringUtils.isBlank(bucketRule)) {
-            sql.append("\nDISTRIBUTED BY HASH(`").append(dbColumnList.get(0).getColName()).append("`) BUCKETS AUTO");
-        } else {
-            sql.append("\n").append(bucketRule);
-        }
-
-        // Table properties (including table comments)
-        sql.append("\nPROPERTIES (\n");
-        sql.append("  \"replication_num\" = \"" + replica + "\"");
-        sql.append("\n)");
-        sqlList.add(sql.toString());
-        //Table annotation
-        sqlList.add("ALTER TABLE " + tableName + " MODIFY COMMENT '" + tableComment + "'");
-        return sqlList;
-    }
-
-    // Define a set containing common DORIS reserved keywords (all converted to uppercase for easier comparison)
-    private static final String[] DORIS_RESERVED_WORDS = {
+    // SQL 关键字
+    private static final String[] RESERVED_WORDS = {
             "ACCESSIBLE", "ADD", "ALL", "ALTER", "ANALYZE", "AND", "AS", "ASC", "ASENSITIVE",
             "BEFORE", "BETWEEN", "BIGINT", "BINARY", "BLOB", "BOTH", "BY", "CALL", "CASCADE",
             "CASE", "CHANGE", "CHAR", "CHARACTER", "CHECK", "COLLATE", "COLUMN", "CONDITION",
@@ -385,75 +260,16 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
             "VIRTUAL", "WHEN", "WHERE", "WITH", "WRITE", "XOR", "YEAR_MONTH", "ZEROFILL"
     };
 
-    /**
-     * Construct a legal DEFAULT clause for Doris (only legal literals are allowed to prevent table creation failure)
-     *
-     * @param dataType field type, such as VARCHAR, INT, DECIMAL(10,2), etc.
-     * @param defaultValue default value, such as 'abc', 0, 1.23, etc.
-     * @return If legal, return the DEFAULT xxx clause, otherwise return an empty string
-     */
-    public static String buildDorisDefaultClause(String dataType, String defaultValue) {
-        if (StringUtils.isBlank(defaultValue) || StringUtils.isBlank(dataType)) {
-            return "";
-        }
-
-        String type = dataType.trim().toUpperCase();
-        String def = defaultValue.trim();
-
-        boolean isNumeric = def.matches("^-?\\d+(\\.\\d+)?$");
-        boolean isQuoted = def.matches("^'.*'$");
-
-        // Default values cannot be added to numeric types other than the following
-        if (type.matches(".*(TINYINT|SMALLINT|INT|BIGINT|LARGEINT|FLOAT|DOUBLE|DECIMAL|FLOAT|CHAR|VARCHAR|DATE|DATETIME|BOOLEAN).*")) {
-            if (!isQuoted && isNumeric) {
-                return " DEFAULT '" + def + "'";
-            } else if (isQuoted) {
-                return " DEFAULT " + def;
-            }
-        }
-        return ""; // Other illegal situations are filtered out
-    }
-
     public static String escapeReservedKeyword(String colName) {
         if (colName == null || colName.isEmpty()) {
             return colName;
         }
-        for (String reserved : DORIS_RESERVED_WORDS) {
+        for (String reserved : RESERVED_WORDS) {
             if (reserved.equalsIgnoreCase(colName)) {
                 return "`" + colName + "`";
             }
         }
         return colName;
-    }
-
-    public static String generateColumnSQLDORIS(String columnType, String columnLength, String columnScale, int maxLength, int maxScale) {
-        StringBuilder sql = new StringBuilder(columnType);
-
-        // Handle length only if it is a type that requires length and number of decimal places
-        if (columnType.equalsIgnoreCase("DECIMAL") || columnType.equalsIgnoreCase("FLOAT")) {
-            if (StringUtils.isNotEmpty(columnLength)) {
-                int length = Integer.parseInt(columnLength);
-                // Limit the length to no more than the maximum length
-                if (length > maxLength) {
-                    length = maxLength;
-                }
-                sql.append("(").append(length);
-
-                // If the column type is DECIMAL and the number of decimal places is provided, append the decimal places
-                if (columnType.equalsIgnoreCase("DECIMAL") && StringUtils.isNotEmpty(columnScale)) {
-                    int scale = Integer.parseInt(columnScale);
-                    // Limit the number of decimal places to the maximum
-                    if (scale > maxScale) {
-                        scale = maxScale;
-                    }
-                    sql.append(", ").append(scale);
-                }
-
-                sql.append(")");
-            }
-        }
-
-        return sql.toString();
     }
 
     @Override
@@ -586,6 +402,9 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
     public RowMapper<DbColumn> columnMapper() {
         return (ResultSet rs, int rowNum) -> {
             DbColumn entity = new DbColumn();
+            if (DatabaseUtil.hasColumn(rs, "TABLENAME")) {
+                entity.setTableName(rs.getString("TABLENAME"));
+            }
             entity.setColName(rs.getString("COLNAME"));
             entity.setDataType(rs.getString("DATATYPE"));
             entity.setDataLength(rs.getString("DATALENGTH"));
@@ -612,7 +431,7 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
 
     @Override
     public String getTableName(DbQueryProperty property, String tableName) {
-        return property.getDbName() + "." + property.getSid() + "." + tableName;
+        return quoteIdentifier(property.getDbName()) + "." + quoteIdentifier(getSchemaName(property)) + "." + quoteIdentifier(tableName);
     }
 
     @Override
@@ -664,16 +483,20 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
 
         if (Boolean.TRUE.equals(column.getColKey())) {
             StringBuilder sql = new StringBuilder();
-            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT PK_").append(tableName).append("_").append(column.getColName());
-            sql.append(" PRIMARY KEY (").append(column.getColName()).append(")");
+            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT ").append(quoteIdentifier("PK_" + tableName + "_" + column.getColName()));
+            sql.append(" PRIMARY KEY (").append(quoteIdentifier(column.getColName())).append(")");
             sqlList.add(sql.toString());
         } else {
             StringBuilder sql = new StringBuilder();
             sql.append("ALTER TABLE ").append(fullTableName).append(" ALTER COLUMN ");
-            sql.append(column.getColName()).append(" ");
+            sql.append(quoteIdentifier(column.getColName())).append(" ");
 
             String columnType = column.getDataType().toUpperCase();
             switch (columnType) {
+                case "NVARCHAR":
+                case "NVARCHAR(MAX)":
+                    sql.append(unicodeColumnType(column));
+                    break;
                 case "VARCHAR":
                 case "VARCHAR2":
                     sql.append("VARCHAR");
@@ -700,7 +523,7 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                     sql.append("BIGINT");
                     break;
                 case "TINYINT":
-                    sql.append("TINYINT");
+                    sql.append("SMALLINT");
                     break;
                 case "DECIMAL":
                     sql.append("DECIMAL");
@@ -738,13 +561,13 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
 
         if (StringUtils.isNotEmpty(column.getDataDefault())) {
             String defaultSql = "ALTER TABLE " + fullTableName + " ADD CONSTRAINT DF_" + tableName + "_" + column.getColName()
-                    + " DEFAULT " + column.getDataDefault() + " FOR " + column.getColName();
+                    + " DEFAULT " + sqlServerDefaultExpression(column.getDataType(), column.getDataDefault()) + " FOR " + quoteIdentifier(column.getColName());
             sqlList.add(defaultSql);
         }
 
         if (StringUtils.isNotEmpty(column.getColComment())) {
             String schema = StringUtils.isNotEmpty(dbQueryProperty.getSid()) ? dbQueryProperty.getSid() : "dbo";
-            sqlList.add("EXEC sys.sp_addextendedproperty @name = N'MS_Description', @value = N'"
+            sqlList.add("EXEC sys.sp_updateextendedproperty @name = N'MS_Description', @value = N'"
                     + DatabaseUtil.escapeSingleQuotes(column.getColComment())
                     + "', @level0type = N'SCHEMA', @level0name = N'" + schema
                     + "', @level1type = N'TABLE', @level1name = N'" + tableName
@@ -762,10 +585,14 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
         if (Boolean.TRUE.equals(column.getColKey())) {
             StringBuilder sql = new StringBuilder();
             sql.append("ALTER TABLE ").append(fullTableName).append(" ADD ");
-            sql.append(column.getColName()).append(" ");
+            sql.append(quoteIdentifier(column.getColName())).append(" ");
 
             String columnType = column.getDataType().toUpperCase();
             switch (columnType) {
+                case "NVARCHAR":
+                case "NVARCHAR(MAX)":
+                    sql.append(unicodeColumnType(column));
+                    break;
                 case "VARCHAR":
                 case "VARCHAR2":
                     sql.append("VARCHAR");
@@ -792,7 +619,7 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                     sql.append("BIGINT");
                     break;
                 case "TINYINT":
-                    sql.append("TINYINT");
+                    sql.append("SMALLINT");
                     break;
                 case "DECIMAL":
                     sql.append("DECIMAL");
@@ -821,27 +648,33 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                     break;
             }
 
+            sql.append(identityColumnClause(column));
+
             if (!column.getNullable()) {
                 sql.append(" NOT NULL");
             }
 
             if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                sql.append(" DEFAULT ").append(column.getDataDefault());
+                appendSqlServerDefaultClause(sql, columnType, column.getDataDefault());
             }
 
             sqlList.add(sql.toString());
 
             sql = new StringBuilder();
-            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT PK_").append(tableName).append("_").append(column.getColName());
-            sql.append(" PRIMARY KEY (").append(column.getColName()).append(")");
+            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT ").append(quoteIdentifier("PK_" + tableName + "_" + column.getColName()));
+            sql.append(" PRIMARY KEY (").append(quoteIdentifier(column.getColName())).append(")");
             sqlList.add(sql.toString());
         } else {
             StringBuilder sql = new StringBuilder();
             sql.append("ALTER TABLE ").append(fullTableName).append(" ADD ");
-            sql.append(column.getColName()).append(" ");
+            sql.append(quoteIdentifier(column.getColName())).append(" ");
 
             String columnType = column.getDataType().toUpperCase();
             switch (columnType) {
+                case "NVARCHAR":
+                case "NVARCHAR(MAX)":
+                    sql.append(unicodeColumnType(column));
+                    break;
                 case "VARCHAR":
                 case "VARCHAR2":
                     sql.append("VARCHAR");
@@ -868,7 +701,7 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                     sql.append("BIGINT");
                     break;
                 case "TINYINT":
-                    sql.append("TINYINT");
+                    sql.append("SMALLINT");
                     break;
                 case "DECIMAL":
                     sql.append("DECIMAL");
@@ -897,12 +730,14 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
                     break;
             }
 
+            sql.append(identityColumnClause(column));
+
             if (!column.getNullable()) {
                 sql.append(" NOT NULL");
             }
 
             if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                sql.append(" DEFAULT ").append(column.getDataDefault());
+                appendSqlServerDefaultClause(sql, columnType, column.getDataDefault());
             }
 
             sqlList.add(sql.toString());
@@ -918,5 +753,222 @@ public class SQLServer2008Dialect extends AbstractDbDialect {
         }
 
         return sqlList;
+    }
+
+    @Override
+    public String generateDropIndexSQL(DbQueryProperty property, String tableName, String indexName) {
+        requireIndexIdentifier(tableName);
+        requireIndexIdentifier(indexName);
+        return "DROP INDEX " + quoteIdentifier(indexName) + " ON " + getTableName(property, tableName);
+    }
+
+    @Override
+    public DbColumn convertLogicalColumn(DbColumn column) {
+        DbColumn converted = super.convertLogicalColumn(column);
+        if ("STRING".equalsIgnoreCase(column.getDataType())) {
+            converted.setDataType("NVARCHAR");
+            if (StringUtils.isBlank(converted.getDataLength())) converted.setDataLength("255");
+        } else if ("TEXT".equalsIgnoreCase(column.getDataType())) {
+            converted.setDataType("NVARCHAR(MAX)");
+            converted.setDataLength(null);
+        } else if ("DATETIME".equalsIgnoreCase(column.getDataType())) {
+            converted.setDataType("DATETIME2(3)");
+            converted.setDataLength(null);
+            converted.setDataPrecision(null);
+            converted.setDataScale("3");
+        }
+        return converted;
+    }
+
+    protected String unicodeColumnType(DbColumn column) {
+        if (column.getDataType().toUpperCase(java.util.Locale.ROOT).contains("(MAX)")) return "NVARCHAR(MAX)";
+        long length = DatabaseUtil.getStringToLong(column.getDataLength());
+        if (length <= 0) return "NVARCHAR(MAX)";
+        if (length > 4000) throw new IllegalArgumentException("SQL Server Unicode STRING长度不能超过4000，请使用TEXT");
+        return "NVARCHAR(" + length + ")";
+    }
+
+    @Override
+    public String getColumnType(DbColumn column) {
+        if (column == null) {
+            return null;
+        }
+        String type = normalizeTypeName(column.getDataType());
+        switch (type) {
+            case "NVARCHAR":
+                String unicodeType = unicodeColumnType(column);
+                return unicodeType.equals("NVARCHAR(MAX)") ? unicodeType : "NVARCHAR";
+            case "NUMBER":
+            case "NUMERIC":
+            case "DECIMAL":
+                return "DECIMAL";
+            case "TIMESTAMP":
+                return "DATETIME";
+            case "VARCHAR":
+            case "VARCHAR2":
+                long varcharLength = DatabaseUtil.getStringToLong(column.getDataLength());
+                return varcharLength <= 0 || varcharLength > MAX_VARCHAR_LENGTH ? "VARCHAR(MAX)" : "VARCHAR";
+            default:
+                return column.getDataType();
+        }
+    }
+
+    @Override
+    public DbColumn toStandardColumn(DbColumn column) {
+        String type = normalizeTypeName(column == null ? null : column.getDataType());
+        if ("NVARCHAR".equals(type) && (column.getDataType().toUpperCase(java.util.Locale.ROOT).contains("(MAX)")
+                || "-1".equals(column.getDataLength()))) {
+            return toStandardColumn(column, "TEXT");
+        }
+        switch (type) {
+            case "CHAR":
+            case "NCHAR":
+                return toStandardColumn(column, "CHAR");
+            case "VARCHAR":
+            case "NVARCHAR":
+                return toStandardColumn(column, "VARCHAR2");
+            case "TEXT":
+            case "NTEXT":
+            case "XML":
+                return toStandardColumn(column, "TEXT");
+            case "TINYINT":
+            case "SMALLINT":
+            case "INT":
+            case "INTEGER":
+            case "BIGINT":
+            case "DECIMAL":
+            case "NUMERIC":
+            case "MONEY":
+            case "SMALLMONEY": {
+                DbColumn standardColumn = toStandardColumn(column, "NUMBER");
+                if (StringUtils.isNotBlank(standardColumn.getDataPrecision())) {
+                    // SQL Server max_length is stored in bytes; numeric DDL requires decimal precision.
+                    standardColumn.setDataLength(standardColumn.getDataPrecision());
+                }
+                return standardColumn;
+            }
+            case "REAL":
+                return toStandardColumn(column, "FLOAT");
+            case "FLOAT":
+                return toStandardColumn(column, "DOUBLE");
+            case "BIT":
+            case "BOOLEAN":
+                return toStandardColumn(column, "TINYINT");
+            case "DATE":
+                return toStandardColumn(column, "DATE");
+            case "TIME":
+                return toStandardColumn(column, "TIMESTAMP");
+            case "DATETIME":
+            case "DATETIME2":
+            case "SMALLDATETIME":
+            case "DATETIMEOFFSET":
+                return toStandardColumn(column, "DATETIME");
+            case "TIMESTAMP":
+            case "ROWVERSION":
+                return toStandardColumn(column, "BLOB");
+            case "BINARY":
+            case "VARBINARY":
+            case "IMAGE":
+                return toStandardColumn(column, "BLOB");
+            case "UNIQUEIDENTIFIER":
+                return toStandardColumn(column, "VARCHAR2");
+            default:
+                return super.toStandardColumn(column);
+        }
+    }
+
+    @Override
+    public String getSchemaName(DbQueryProperty property) {
+        return StringUtils.defaultIfBlank(property.getSid(), "dbo");
+    }
+
+    protected void appendSqlServerDefaultClause(StringBuilder sql, String dataType, String defaultValue) {
+        if (StringUtils.isBlank(defaultValue)) {
+            return;
+        }
+        sql.append(" DEFAULT ").append(sqlServerDefaultExpression(dataType, defaultValue));
+    }
+
+    protected String sqlServerDefaultExpression(String dataType, String defaultValue) {
+        String def = normalizeDefaultValue(defaultValue);
+        String normalizedType = normalizeTypeName(dataType);
+        if ("NVARCHAR".equals(normalizedType) || "NCHAR".equals(normalizedType) || "NTEXT".equals(normalizedType)) {
+            if (def.matches("(?is)^N'.*'$")) return def;
+            if (isQuotedDefault(def)) return "N" + def;
+            if (!StringUtils.isBlank(def) && !isSqlServerFunctionDefault(def) && !isNumericDefault(def)) {
+                return "N'" + DatabaseUtil.escapeSingleQuotes(def) + "'";
+            }
+        }
+        if (StringUtils.isBlank(def)
+                || isQuotedDefault(def)
+                || isSqlServerFunctionDefault(def)
+                || isNumericDefault(def)) {
+            return def;
+        }
+        String type = dataType == null ? "" : dataType.trim().toUpperCase();
+        if (isSqlServerStringOrTemporalType(type)) {
+            return "'" + DatabaseUtil.escapeSingleQuotes(def) + "'";
+        }
+        return def;
+    }
+
+    private String normalizeDefaultValue(String defaultValue) {
+        String def = defaultValue == null ? "" : defaultValue.trim();
+        while (def.length() >= 2 && def.startsWith("(") && def.endsWith(")")) {
+            def = def.substring(1, def.length() - 1).trim();
+        }
+        return def;
+    }
+
+    private boolean isQuotedDefault(String defaultValue) {
+        return defaultValue.length() >= 2 && defaultValue.startsWith("'") && defaultValue.endsWith("'");
+    }
+
+    private boolean isNumericDefault(String defaultValue) {
+        return defaultValue.matches("^-?\\d+(\\.\\d+)?$");
+    }
+
+    private boolean isSqlServerFunctionDefault(String defaultValue) {
+        String def = defaultValue.trim().toUpperCase();
+        return "CURRENT_TIMESTAMP".equals(def)
+                || "GETDATE()".equals(def)
+                || "SYSDATETIME()".equals(def)
+                || "NEWID()".equals(def)
+                || "NULL".equals(def);
+    }
+
+    private boolean isSqlServerStringOrTemporalType(String dataType) {
+        return dataType.contains("CHAR")
+                || dataType.contains("TEXT")
+                || dataType.contains("DATE")
+                || dataType.contains("TIME");
+    }
+
+    @Override
+    protected String identityColumnClause() {
+        return " IDENTITY(1,1)";
+    }
+
+    @Override
+    public String castToText(String expression) {
+        return "CAST(" + expression + " AS NVARCHAR(MAX))";
+    }
+
+    @Override
+    public String containsPattern(String value) {
+        return super.containsPattern(value).replace("[", "![");
+    }
+
+    @Override
+    public String buildSelectForUpdateSql(String table, String columns, String predicate) {
+        return "SELECT " + columns + " FROM " + table + " WITH (UPDLOCK, HOLDLOCK) WHERE " + predicate;
+    }
+
+    @Override
+    public boolean requiresIdentityInsert() { return true; }
+
+    @Override
+    public String identityInsertSql(String qualifiedTable, boolean enabled) {
+        return "SET IDENTITY_INSERT " + qualifiedTable + (enabled ? " ON" : " OFF");
     }
 }

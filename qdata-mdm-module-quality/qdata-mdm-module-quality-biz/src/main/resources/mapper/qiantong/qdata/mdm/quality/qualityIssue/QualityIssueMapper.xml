@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.quality.dal.mapper.qualityIssue.QualityIssueMapper">
+
+    <resultMap type="QualityIssueDO" id="QualityIssueResult">
+        <result property="id"    column="ID"    />
+        <result property="issueCode"    column="ISSUE_CODE"    />
+        <result property="modelId"    column="MODEL_ID"    />
+        <result property="masterRecordId"    column="MASTER_RECORD_ID"    />
+        <result property="status"    column="STATUS"    />
+        <result property="firstFoundTime"    column="FIRST_FOUND_TIME"    />
+        <result property="lastFoundTime"    column="LAST_FOUND_TIME"    />
+        <result property="closeTime"    column="CLOSE_TIME"    />
+        <result property="closerId"    column="CLOSER_ID"    />
+        <result property="rectificationStatus"    column="RECTIFICATION_STATUS"    />
+        <result property="validFlag"    column="VALID_FLAG"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="creatorId"    column="CREATOR_ID"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updaterId"    column="UPDATER_ID"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="remark"    column="REMARK"    />
+    </resultMap>
+
+    <sql id="selectQualityIssueVo">
+        select ID, ISSUE_CODE, MODEL_ID, MASTER_RECORD_ID, STATUS, FIRST_FOUND_TIME, LAST_FOUND_TIME, CLOSE_TIME, CLOSER_ID, RECTIFICATION_STATUS, VALID_FLAG, DEL_FLAG, CREATE_BY, CREATOR_ID, CREATE_TIME, UPDATE_BY, UPDATER_ID, UPDATE_TIME, REMARK from QUALITY_ISSUE
+    </sql>
+
+    <select id="selectQualityIssueList" parameterType="QualityIssueDO" resultMap="QualityIssueResult">
+        <include refid="selectQualityIssueVo"/>
+        <where>
+            <if test="issueCode != null  and issueCode != ''"> and ISSUE_CODE = #{issueCode}</if>
+            <if test="modelId != null "> and MODEL_ID = #{modelId}</if>
+            <if test="masterRecordId != null "> and MASTER_RECORD_ID = #{masterRecordId}</if>
+            <if test="status != null  and status != ''"> and STATUS = #{status}</if>
+            <if test="firstFoundTime != null "> and FIRST_FOUND_TIME = #{firstFoundTime}</if>
+            <if test="lastFoundTime != null "> and LAST_FOUND_TIME = #{lastFoundTime}</if>
+            <if test="closeTime != null "> and CLOSE_TIME = #{closeTime}</if>
+            <if test="closerId != null "> and CLOSER_ID = #{closerId}</if>
+            <if test="rectificationStatus != null  and rectificationStatus != ''"> and RECTIFICATION_STATUS = #{rectificationStatus}</if>
+            <if test="validFlag != null "> and VALID_FLAG = #{validFlag}</if>
+            <if test="createTime != null "> and CREATE_TIME = #{createTime}</if>
+        </where>
+    </select>
+
+    <select id="selectQualityIssueById" parameterType="Long" resultMap="QualityIssueResult">
+        <include refid="selectQualityIssueVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertQualityIssue" parameterType="QualityIssueDO">
+        insert into QUALITY_ISSUE
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="issueCode != null">ISSUE_CODE,</if>
+            <if test="modelId != null">MODEL_ID,</if>
+            <if test="masterRecordId != null">MASTER_RECORD_ID,</if>
+            <if test="status != null">STATUS,</if>
+            <if test="firstFoundTime != null">FIRST_FOUND_TIME,</if>
+            <if test="lastFoundTime != null">LAST_FOUND_TIME,</if>
+            <if test="closeTime != null">CLOSE_TIME,</if>
+            <if test="closerId != null">CLOSER_ID,</if>
+            <if test="rectificationStatus != null">RECTIFICATION_STATUS,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="remark != null">REMARK,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="issueCode != null">#{issueCode},</if>
+            <if test="modelId != null">#{modelId},</if>
+            <if test="masterRecordId != null">#{masterRecordId},</if>
+            <if test="status != null">#{status},</if>
+            <if test="firstFoundTime != null">#{firstFoundTime},</if>
+            <if test="lastFoundTime != null">#{lastFoundTime},</if>
+            <if test="closeTime != null">#{closeTime},</if>
+            <if test="closerId != null">#{closerId},</if>
+            <if test="rectificationStatus != null">#{rectificationStatus},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateQualityIssue" parameterType="QualityIssueDO">
+        update QUALITY_ISSUE
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="issueCode != null">ISSUE_CODE = #{issueCode},</if>
+            <if test="modelId != null">MODEL_ID = #{modelId},</if>
+            <if test="masterRecordId != null">MASTER_RECORD_ID = #{masterRecordId},</if>
+            <if test="status != null">STATUS = #{status},</if>
+            <if test="firstFoundTime != null">FIRST_FOUND_TIME = #{firstFoundTime},</if>
+            <if test="lastFoundTime != null">LAST_FOUND_TIME = #{lastFoundTime},</if>
+            <if test="closeTime != null">CLOSE_TIME = #{closeTime},</if>
+            <if test="closerId != null">CLOSER_ID = #{closerId},</if>
+            <if test="rectificationStatus != null">RECTIFICATION_STATUS = #{rectificationStatus},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="remark != null">REMARK = #{remark},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteQualityIssueById" parameterType="Long">
+        delete from QUALITY_ISSUE where ID = #{id}
+    </delete>
+
+    <delete id="deleteQualityIssueByIds" parameterType="String">
+        delete from QUALITY_ISSUE where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="18px" height="18px" viewBox="0 0 18 18" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>通过</title>
+    <g id="通过" stroke="none" fill="none" fill-rule="evenodd" stroke-width="1">
+        <g id="编组">
+            <polygon id="路径" points="0 0 18 0 18 18 0 18"></polygon>
+            <path d="M3,9 C3,5.68629 5.68629,3 9,3 C12.313725,3 15,5.68629 15,9 C15,12.313725 12.313725,15 9,15 C5.68629,15 3,12.313725 3,9 Z M9,1.5 C4.8578625,1.5 1.5,4.8578625 1.5,9 C1.5,13.1421 4.8578625,16.5 9,16.5 C13.1421,16.5 16.5,13.1421 16.5,9 C16.5,4.8578625 13.1421,1.5 9,1.5 Z M13.092825,7.0928325 L12.032175,6.0321675 L8.25,9.81435 L6.1553325,7.719675 L5.0946675,8.780325 L8.25,11.93565 L13.092825,7.0928325 Z" id="形状" fill="#12B369" fill-rule="nonzero"></path>
+        </g>
+    </g>
+</svg>

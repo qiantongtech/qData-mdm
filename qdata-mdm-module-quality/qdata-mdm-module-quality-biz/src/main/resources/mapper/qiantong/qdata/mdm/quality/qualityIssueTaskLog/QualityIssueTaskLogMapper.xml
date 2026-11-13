@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.quality.dal.mapper.qualityIssueTaskLog.QualityIssueTaskLogMapper">
+
+    <select id="selectBatchPage" resultType="tech.qiantong.qdata.mdm.quality.dal.dataobject.qualityIssueTaskLog.QualityIssueTaskLogDO">
+        SELECT l.* FROM QUALITY_ISSUE_TASK_LOG l
+        INNER JOIN QUALITY_ISSUE_TASK t ON t.ID = l.QUALITY_ISSUE_TASK_ID AND t.DEL_FLAG = 0
+        WHERE l.DEL_FLAG = 0 AND t.ID = #{taskId}
+        ORDER BY l.CREATE_TIME ASC, l.ID ASC
+    </select>
+
+    <resultMap type="QualityIssueTaskLogDO" id="QualityIssueTaskLogResult">
+        <result property="id"    column="ID"    />
+        <result property="qualityIssueTaskId"    column="QUALITY_ISSUE_TASK_ID"    />
+        <result property="issueId"    column="ISSUE_ID"    />
+        <result property="taskSendId"    column="TASK_SEND_ID"    />
+        <result property="taskHandlerId"    column="TASK_HANDLER_ID"    />
+        <result property="sendTime"    column="SEND_TIME"    />
+        <result property="handlerTime"    column="HANDLER_TIME"    />
+        <result property="description"    column="DESCRIPTION"    />
+        <result property="validFlag"    column="VALID_FLAG"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="creatorId"    column="CREATOR_ID"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updaterId"    column="UPDATER_ID"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="remark"    column="REMARK"    />
+    </resultMap>
+
+    <sql id="selectQualityIssueTaskLogVo">
+        select ID, QUALITY_ISSUE_TASK_ID, ISSUE_ID, TASK_SEND_ID, TASK_HANDLER_ID, SEND_TIME, HANDLER_TIME, DESCRIPTION, VALID_FLAG, DEL_FLAG, CREATE_BY, CREATOR_ID, CREATE_TIME, UPDATE_BY, UPDATER_ID, UPDATE_TIME, REMARK from QUALITY_ISSUE_TASK_LOG
+    </sql>
+
+    <select id="selectQualityIssueTaskLogList" parameterType="QualityIssueTaskLogDO" resultMap="QualityIssueTaskLogResult">
+        <include refid="selectQualityIssueTaskLogVo"/>
+        <where>
+            <if test="qualityIssueTaskId != null "> and QUALITY_ISSUE_TASK_ID = #{qualityIssueTaskId}</if>
+            <if test="issueId != null "> and ISSUE_ID = #{issueId}</if>
+            <if test="taskSendId != null "> and TASK_SEND_ID = #{taskSendId}</if>
+            <if test="taskHandlerId != null "> and TASK_HANDLER_ID = #{taskHandlerId}</if>
+            <if test="sendTime != null "> and SEND_TIME = #{sendTime}</if>
+            <if test="handlerTime != null "> and HANDLER_TIME = #{handlerTime}</if>
+            <if test="description != null  and description != ''"> and DESCRIPTION = #{description}</if>
+            <if test="validFlag != null "> and VALID_FLAG = #{validFlag}</if>
+            <if test="createTime != null "> and CREATE_TIME = #{createTime}</if>
+        </where>
+    </select>
+
+    <select id="selectQualityIssueTaskLogById" parameterType="Long" resultMap="QualityIssueTaskLogResult">
+        <include refid="selectQualityIssueTaskLogVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertQualityIssueTaskLog" parameterType="QualityIssueTaskLogDO">
+        insert into QUALITY_ISSUE_TASK_LOG
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="qualityIssueTaskId != null">QUALITY_ISSUE_TASK_ID,</if>
+            <if test="issueId != null">ISSUE_ID,</if>
+            <if test="taskSendId != null">TASK_SEND_ID,</if>
+            <if test="taskHandlerId != null">TASK_HANDLER_ID,</if>
+            <if test="sendTime != null">SEND_TIME,</if>
+            <if test="handlerTime != null">HANDLER_TIME,</if>
+            <if test="description != null">DESCRIPTION,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="remark != null">REMARK,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="qualityIssueTaskId != null">#{qualityIssueTaskId},</if>
+            <if test="issueId != null">#{issueId},</if>
+            <if test="taskSendId != null">#{taskSendId},</if>
+            <if test="taskHandlerId != null">#{taskHandlerId},</if>
+            <if test="sendTime != null">#{sendTime},</if>
+            <if test="handlerTime != null">#{handlerTime},</if>
+            <if test="description != null">#{description},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateQualityIssueTaskLog" parameterType="QualityIssueTaskLogDO">
+        update QUALITY_ISSUE_TASK_LOG
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="qualityIssueTaskId != null">QUALITY_ISSUE_TASK_ID = #{qualityIssueTaskId},</if>
+            <if test="issueId != null">ISSUE_ID = #{issueId},</if>
+            <if test="taskSendId != null">TASK_SEND_ID = #{taskSendId},</if>
+            <if test="taskHandlerId != null">TASK_HANDLER_ID = #{taskHandlerId},</if>
+            <if test="sendTime != null">SEND_TIME = #{sendTime},</if>
+            <if test="handlerTime != null">HANDLER_TIME = #{handlerTime},</if>
+            <if test="description != null">DESCRIPTION = #{description},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="remark != null">REMARK = #{remark},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteQualityIssueTaskLogById" parameterType="Long">
+        delete from QUALITY_ISSUE_TASK_LOG where ID = #{id}
+    </delete>
+
+    <delete id="deleteQualityIssueTaskLogByIds" parameterType="String">
+        delete from QUALITY_ISSUE_TASK_LOG where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

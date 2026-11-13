@@ -134,4 +134,38 @@
   --el-disabled-bg-color: var(--qt-control-disabled-background);
   --el-disabled-border-color: var(--qt-control-disabled-border);
   --el-disabled-text-color: var(--qt-control-disabled-text);
+
+  /* 字体、间距与布局。 */
+  --qt-font-size-small: 12px;
+  --qt-font-size-secondary: 13px;
+  --qt-font-size-emphasis: 15px;
+  --qt-font-size-title: 16px;
+  --qt-space-6: 24px;
+
+  /* 模型工作区和关系图的固定布局尺寸，不跟随主题变化。 */
+  --qt-model-workspace-min-height: 65vh;
+  --qt-model-sidebar-width: 280px;
+  --qt-model-sidebar-list-max-height: 560px;
+  --qt-model-workspace-header-height: 60px;
+  --qt-model-version-select-width: 210px;
+  --qt-model-graph-toolbar-width: 34px;
+  --qt-model-graph-toolbar-layer: 100;
+  --qt-model-graph-empty-layer: 20;
+  --qt-model-graph-empty-offset: 160px;
+  --qt-model-graph-legend-width: 220px;
+  --qt-model-graph-legend-height: 196px;
+  --qt-model-graph-motion-duration: 0.2s;
+  --qt-model-validation-score-size: 62px;
+  --qt-model-encoding-empty-width: 200px;
+
+  /* 权威主数据入口的专用布局尺寸，通用视觉复用系统变量。 */
+  --qt-master-entry-card-min-width: 340px;
+  --qt-master-entry-card-min-height: 296px;
+  --qt-master-entry-header-min-height: 94px;
+  --qt-master-entry-icon-size: 52px;
+  --qt-master-entry-icon-glyph-size: 28px;
+  --qt-master-entry-footer-min-height: 72px;
+  --qt-master-entry-button-width: 88px;
+  --qt-master-entry-empty-offset: 250px;
+  --qt-master-entry-empty-image-width: 380px;
 }

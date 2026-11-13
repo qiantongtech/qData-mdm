@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -17,15 +17,14 @@
 -->
 
 <template>
-  <div class="app-container" ref="app-container">
-    <qt-wrap :columns="tableStore.columns" :config="tableStore.config" :table-ref="tableActions">
+  <div class="app-container">
+    <qt-wrap :columns="columns" :config="config" :table-ref="tableRef">
       <template #search>
         <qt-search-bar
-          ref="queryRef"
           v-bind="searchStore"
           :params="searchParams"
-          @query="handleQuery"
-          @reset="resetQuery"
+          @query="tableRef.resetQuery()"
+          @reset="tableRef.resetQuery()"
         />
       </template>
       <template #actions-data>
@@ -33,7 +32,7 @@
           type="primary"
           plain
           icon="Plus"
-          @click="handleAdd"
+          @click="formDialogRef.openDialog()"
           v-hasPermi="['system:notice:add']"
         >
           {{ td('common.button.add') }}
@@ -42,216 +41,117 @@
           type="danger"
           plain
           icon="Delete"
-          :disabled="multiple || batchDeleteDisabled"
-          @click="handleDelete"
+          :disabled="batchDeleteDisabled"
+          @click="handleDelete()"
           v-hasPermi="['system:notice:remove']"
         >
           {{ td('common.button.delete') }}
         </el-button>
       </template>
-      <div v-loading="loading">
-        <qt-table v-bind="tableStore" ref="tableRef">
-          <template #noticeId="{ row }">{{ row.noticeId }}</template>
-          <template #noticeTitle="{ row }">{{ row.noticeTitle }}</template>
-          <template #noticeType="scope">
-            <dict-tag :options="sys_notice_type" :value="scope.row.noticeType" />
-          </template>
-          <template #topFlag="scope">
-            <dict-tag :options="sys_is_or_not" :value="scope.row.topFlag" />
-          </template>
-          <template #alertFlag="scope">
-            <dict-tag :options="sys_is_or_not" :value="scope.row.alertFlag" />
-          </template>
-          <template #cell6="scope">
-            <span>
-              {{ parseTime(scope.row.alertStartTime, '{y}-{m}-{d}') }}
-              ~
-              {{ parseTime(scope.row.alertEndTime, '{y}-{m}-{d}') }}
-            </span>
-          </template>
-          <template #status="scope">
-            <dict-tag :options="sys_notice_status" :value="scope.row.status" />
-          </template>
-          <template #createBy="{ row }">{{ row.createBy }}</template>
-          <template #createTime="scope">
-            <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
-          </template>
-          <template #action="scope">
-            <el-button
-              link
-              type="primary"
-              icon="View"
-              @click="handleView(scope.row)"
-              v-hasPermi="['system:notice:detail']"
-            >
-              {{ td('common.button.details') }}
-            </el-button>
-            <el-button
-              link
-              type="primary"
-              icon="Edit"
-              @click="handleUpdate(scope.row)"
-              v-hasPermi="['system:notice:edit']"
-            >
-              {{ td('common.button.update') }}
-            </el-button>
-            <el-button
-              link
-              type="danger"
-              icon="Delete"
-              @click="handleDelete(scope.row)"
-              v-hasPermi="['system:notice:remove']"
-              :disabled="isDeleteDisabled(scope.row)"
-            >
-              {{ td('common.button.delete') }}
-            </el-button>
-          </template>
-        </qt-table>
-      </div>
+      <qt-table ref="tableRef" :columns="columns" :config="config" :params="searchParams" :func="fetchNotices">
+        <template #noticeId="{ row }">{{ row.noticeId }}</template>
+        <template #noticeTitle="{ row }">
+          <div class="notice-title-cell">
+            <router-link
+              v-if="getDisplayTitle(row.noticeTitle) && $auth.hasPermi('system:notice:query')"
+              class="el-link el-link--primary qt-detail-link text-ellipsis"
+              :title="String(row.noticeTitle)"
+              :to="{ name: 'noticeDetail', query: { id: row.noticeId } }"
+              @click.stop
+            >{{ row.noticeTitle }}</router-link>
+            <span v-else class="qt-detail-link text-ellipsis" :title="getDisplayTitle(row.noticeTitle)">{{ getDisplayTitle(row.noticeTitle) ?? '-' }}</span>
+            <el-tag v-if="Number(row.topFlag) === 1" size="small" effect="plain">
+              {{ td('sys.system.notice.isTop') }}
+            </el-tag>
+            <el-tag v-if="Number(row.alertFlag) === 1" size="small" type="info" effect="plain">
+              {{ td('sys.system.notice.popup') }}
+            </el-tag>
+          </div>
+        </template>
+        <template #effectivePeriod="{ row }">
+          <span :class="{ 'empty-period': !row.alertStartTime && !row.alertEndTime }">
+            {{ formatPeriod(row) }}
+          </span>
+        </template>
+        <template #createBy="{ row }">{{ row.createBy || '—' }}</template>
+        <template #action="{ row }">
+          <el-button
+            v-if="canEdit"
+            link
+            type="primary"
+            icon="Edit"
+            @click="formDialogRef.openDialog(row, true)"
+          >{{ td('common.button.update') }}</el-button>
+          <el-button
+            v-if="canRemove"
+            link
+            type="danger"
+            icon="Delete"
+            :disabled="isDeleteDisabled(row)"
+            @click="handleDelete(row)"
+          >{{ td('common.button.delete') }}</el-button>
+        </template>
+      </qt-table>
     </qt-wrap>
-    <notice-form-dialog ref="formDialogRef" :ids="ids" @success="getList" />
+    <notice-form-dialog ref="formDialogRef" :ids="ids" @success="tableRef.getList()" />
   </div>
 </template>
 
 <script setup name="Notice">
-import {
-  listNotice,
-  getNoticeOne,
-  delNotice,
-  addNotice,
-  updateNotice
-} from '@/api/system/system/notice.js';
+import { computed, reactive, ref, unref } from 'vue';
+import { delNotice, listNotice } from '@/api/system/system/notice.js';
 import useDefaultLang from '@/composables/useDefaultLang';
-import { ref, reactive, computed, watch, unref } from 'vue';
+import { getDisplayTitle, parseTime } from '@/utils/anivia';
+import { checkPermi } from '@/utils/permission';
 import QtSearchBar from '@/components/QtSearchBar/index.vue';
 import NoticeFormDialog from './components/noticeFormDialog.vue';
-const tableRef = ref(null);
-// 工具栏刷新仍走原有接口；QtTable 使用原列表数据展示和分页。
-const tableActions = { getList: () => getList() };
-const formDialogRef = ref(null);
-const { td } = useDefaultLang();
 
+const { td, t } = useDefaultLang();
 const { proxy } = getCurrentInstance();
-
-const { sys_notice_status, sys_notice_type, sys_is_or_not } = proxy.useDict(
-  'sys_notice_status',
-  'sys_notice_type',
-  'sys_is_or_not'
-);
-
-const router = useRouter();
-
-const noticeList = ref([]);
-
-const loading = ref(true);
-
-const showSearch = ref(true);
-
-const ids = ref([]);
-
-const single = ref(true);
-
-const multiple = ref(true);
-
-const total = ref(0);
-
-const data = reactive({
-  queryParams: {
-    pageNum: 1,
-    pageSize: 10,
-    noticeTitle: undefined,
-    createBy: undefined,
-    status: undefined,
-    orderByColumn: 'createTime',
-    isAsc: 'descending'
-  }
-});
-const { queryParams } = toRefs(data);
-
-function getList() {
-  loading.value = true;
-  listNotice(queryParams.value).then((response) => {
-    noticeList.value = [...(response.rows || [])].sort(
-      (a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
-    );
-    total.value = response.total;
-    loading.value = false;
-  });
-}
-
-function handleQuery() {
-  queryParams.value.pageNum = 1;
-  getList();
-}
-
-function resetQuery() {
-  proxy.$refs.queryRef?.$refs.formRef?.resetFields();
-  handleQuery();
-}
-
-function handleSelectionChange(selection) {
-  deleteSelection.value = selection;
-  ids.value = selection.map((item) => item.noticeId);
-  single.value = selection.length != 1;
-  multiple.value = !selection.length;
-}
-
-function handleView(row) {
-  router.push({ path: '/sys/system/notice/detail', query: { id: row.noticeId } });
-}
-
-const deleteSelection = ref([]);
+const { sys_notice_type } = proxy.useDict('sys_notice_type');
+const canEdit = computed(() => checkPermi(['system:notice:edit']));
+const canRemove = computed(() => checkPermi(['system:notice:remove']));
+const tableRef = ref(null);
+const formDialogRef = ref(null);
+const selection = ref([]);
+const ids = computed(() => selection.value.map((row) => row.noticeId));
 const batchDeleteDisabled = computed(
-  () => !deleteSelection.value.length || deleteSelection.value.some(isDeleteDisabled)
+  () => !selection.value.length || selection.value.some(isDeleteDisabled)
 );
 
 function isDeleteDisabled(row) {
-  return String(row?.status) === '0';
+  return String(row.status) === '0';
 }
 
 function handleDelete(row) {
-  if (row?.noticeId != null ? isDeleteDisabled(row) : batchDeleteDisabled.value) return;
-  const noticeIds = row.noticeId || ids.value;
+  if (row ? isDeleteDisabled(row) : batchDeleteDisabled.value) return;
+  const noticeIds = row?.noticeId ?? ids.value;
   proxy.$modal
-    .confirm(td('sys.system.notice.confirmDelete', { id: noticeIds }))
-    .then(function () {
-      return delNotice(noticeIds);
-    })
+    .confirm(t('sys.system.notice.confirmDelete', { id: String(noticeIds) }))
+    .then(() => delNotice(noticeIds))
     .then(() => {
-      getList();
+      tableRef.value.getList();
       proxy.$modal.msgSuccess(td('common.message.deleteSuccess'));
     })
     .catch(() => {});
 }
 
-getList();
-function handleAdd(row) {
-  return formDialogRef.value.openDialog(row);
-}
-function handleUpdate(row) {
-  return formDialogRef.value.openDialog(row, true);
+function formatPeriod(row) {
+  const start = parseTime(row.alertStartTime, '{y}-{m}-{d}');
+  const end = parseTime(row.alertEndTime, '{y}-{m}-{d}');
+  if (start && end) return start === end ? start : `${start} – ${end}`;
+  if (start) return `${td('common.date.startDate')} ${start}`;
+  if (end) return `${td('common.date.endDate')} ${end}`;
+  return '—';
 }
 
-const searchParams = reactive({
-  get noticeTitle() {
-    return unref(queryParams).noticeTitle;
-  },
-  set noticeTitle(value) {
-    unref(queryParams).noticeTitle = value;
-  },
-  get createBy() {
-    return unref(queryParams).createBy;
-  },
-  set createBy(value) {
-    unref(queryParams).createBy = value;
-  },
-  get noticeType() {
-    return unref(queryParams).noticeType;
-  },
-  set noticeType(value) {
-    unref(queryParams).noticeType = value;
-  }
-});
+async function fetchNotices(params) {
+  defaultPage.pageSize = params.pageSize;
+  const { rows, total } = await listNotice(params);
+  return { data: { rows: rows || [], total } };
+}
+
+const searchParams = reactive({ noticeTitle: undefined, createBy: undefined, noticeType: undefined });
 const searchStore = reactive({
   config: { form: { labelPosition: proxy.labelPosition } },
   items: computed(() => [
@@ -265,11 +165,11 @@ const searchStore = reactive({
       }
     },
     {
-      label: td('sys.system.notice.operPerson'),
+      label: td('sys.system.notice.creator'),
       prop: 'createBy',
       component: {
         is: 'input',
-        placeholder: td('sys.system.notice.operPersonPlaceholder'),
+        placeholder: td('sys.system.notice.creatorPlaceholder'),
         clearable: true
       }
     },
@@ -286,124 +186,104 @@ const searchStore = reactive({
   ])
 });
 
-const tableStore = reactive({
-  config: computed(() => ({
-    table: {
-      defaultSort: { prop: 'createTime', order: 'descending' },
-      stripe: true,
-      onSelectionChange: handleSelectionChange
-    },
-    pagination: {
-      pageSizes: [10, 20, 30, 50],
-      pagerCount: document.body.clientWidth < 992 ? 5 : 7,
-      params: {
-        pageNum: unref(queryParams).pageNum ?? 1,
-        pageSize: unref(queryParams).pageSize ?? 10
-      }
-    }
-  })),
-  columns: [
-    { type: 'selection', width: '55', align: 'center' },
-    {
-      prop: 'noticeId',
-      sortable: true,
-      get label() {
-        return td('common.display.index');
-      },
-      align: 'center',
-      width: 60,
-      slot: 'noticeId'
-    },
-    {
-      get label() {
-        return td('sys.system.notice.noticeTitle');
-      },
-      align: 'center',
-      showOverflowTooltip: { effect: 'light' },
-      slot: 'noticeTitle'
-    },
-    {
-      get label() {
-        return td('sys.system.notice.noticeType');
-      },
-      align: 'center',
-      width: '120',
-      slot: 'noticeType'
-    },
-    {
-      get label() {
-        return td('sys.system.notice.isTop');
-      },
-      align: 'center',
-      width: '100',
-      slot: 'topFlag'
-    },
-    {
-      get label() {
-        return td('sys.system.notice.popup');
-      },
-      align: 'center',
-      width: '100',
-      slot: 'alertFlag'
-    },
-    {
-      get label() {
-        return td('sys.system.notice.effectTime');
-      },
-      align: 'center',
-      width: '220',
-      slot: 'cell6'
-    },
-    {
-      get label() {
-        return td('common.texts.status');
-      },
-      align: 'center',
-      width: '100',
-      slot: 'status'
-    },
-    {
-      get label() {
-        return td('sys.system.notice.creator');
-      },
-      align: 'center',
-      width: '100',
-      slot: 'createBy'
-    },
-    {
-      prop: 'createTime',
-      sortableKey: 'create_time',
-      sortable: true,
-      get label() {
-        return td('common.texts.createdTime');
-      },
-      align: 'center',
-      width: '100',
-      slot: 'createTime'
-    },
-    {
-      get label() {
-        return td('common.texts.operation');
-      },
-      align: 'center',
-      className: 'small-padding fixed-width',
-      fixed: 'right',
-      width: '240',
-      slot: 'action'
-    }
-  ],
-  func: async () => ({ data: { rows: unref(noticeList), total: unref(total) } }),
-  params: queryParams,
-  events: { onPageCurrentChange: handleTablePagination, onPageSizeChange: handleTablePagination }
-});
-function handleTablePagination(params) {
-  Object.assign(unref(queryParams), params);
-  getList();
+const defaultPage = reactive({ pageNum: 1, pageSize: 10 });
+const config = {
+  sort: true,
+  table: {
+    defaultSort: { prop: 'createTime', order: 'descending' },
+    stripe: true,
+    onSelectionChange: (rows) => { selection.value = rows; }
+  },
+  pagination: {
+    pageSizes: [10, 20, 30, 50],
+    pagerCount: document.body.clientWidth < 992 ? 5 : 7,
+    params: defaultPage
+  }
+};
+
+const tableColumns = reactive([
+  { type: 'selection', width: 44 },
+  {
+    prop: 'noticeId',
+    get label() { return td('common.display.index'); },
+    sortable: 'custom',
+    width: 80,
+    slot: 'noticeId'
+  },
+  {
+    prop: 'noticeTitle',
+    get label() { return td('sys.system.notice.noticeTitle'); },
+    align: 'left',
+    headerAlign: 'left',
+    className: 'notice-title-column',
+    minWidth: 280,
+    slot: 'noticeTitle'
+  },
+  {
+    prop: 'noticeType',
+    get label() { return td('sys.system.notice.noticeType'); },
+    width: 110,
+    dict: 'sys_notice_type'
+  },
+  {
+    prop: 'status',
+    get label() { return td('common.texts.status'); },
+    width: 90,
+    dict: 'sys_notice_status'
+  },
+  {
+    prop: 'alertStartTime',
+    get label() { return td('sys.system.notice.effectTime'); },
+    width: 208,
+    showOverflowTooltip: true,
+    slot: 'effectivePeriod'
+  },
+  {
+    prop: 'createBy',
+    get label() { return td('sys.system.notice.creator'); },
+    width: 138,
+    showOverflowTooltip: true,
+    slot: 'createBy'
+  },
+  {
+    prop: 'createTime',
+    get label() { return td('common.texts.createdTime'); },
+    sortable: 'custom',
+    width: 136,
+    date: '{y}-{m}-{d}'
+  },
+  {
+    prop: 'action',
+    get label() { return td('common.texts.operation'); },
+    fixed: 'right',
+    get width() { return canEdit.value && canRemove.value ? 168 : 94; },
+    slot: 'action'
+  }
+]);
+
+const columns = computed(() => tableColumns.filter((column) => {
+  if (column.type === 'selection') return canRemove.value;
+  if (column.prop === 'action') return canEdit.value || canRemove.value;
+  return true;
+}));
+</script>
+
+<style scoped>
+:deep(td.notice-title-column > .cell) {
+  padding-left: 10px;
 }
 
-watch(
-  [noticeList, total, () => unref(queryParams).pageNum, () => unref(queryParams).pageSize],
-  () => tableRef.value?.resetQuery(),
-  { flush: 'post' }
-);
-</script>
+.notice-title-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notice-title-cell .el-tag {
+  flex: none;
+}
+
+.empty-period {
+  color: var(--el-text-color-placeholder);
+}
+</style>

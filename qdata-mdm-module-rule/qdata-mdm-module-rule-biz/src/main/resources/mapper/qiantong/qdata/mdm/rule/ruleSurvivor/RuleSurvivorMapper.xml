@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.rule.dal.mapper.ruleSurvivor.RuleSurvivorMapper">
+
+    <!-- 规则归属由规则模块维护；模型发布保存完整状态，不套用管理列表的有效/删除过滤。 -->
+    <select id="selectModelRules" resultMap="RuleSurvivorResult">
+        <include refid="selectRuleSurvivorVo"/>
+        WHERE MODEL_ID IN
+        <foreach collection="modelIds" item="modelId" open="(" separator="," close=")">#{modelId}</foreach>
+        ORDER BY ID
+    </select>
+
+
+    <select id="selectDisplayInfo" resultMap="RuleSurvivorResult">
+        SELECT r.ID, m.NAME AS MODEL_NAME, m.CODE AS MODEL_CODE, m.TYPE AS MODEL_TYPE,
+               m.ICON AS MODEL_ICON, m.DESCRIPTION AS MODEL_DESCRIPTION,
+               p.NAME AS PROJECT_NAME, l.NAME AS LAYER_NAME,
+               COALESCE(NULLIF(u.nick_name, ''), u.user_name) AS RESPONSIBLE_USER_NAME,
+               u.phonenumber AS RESPONSIBLE_USER_PHONE
+        FROM RULE_SURVIVOR r
+        LEFT JOIN system_user u ON u.user_id = r.RESPONSIBLE_USER_ID AND u.del_flag = '0'
+        LEFT JOIN MODEL_BASE m ON m.ID = r.MODEL_ID AND m.DEL_FLAG = '0'
+        LEFT JOIN MODEL_PROJECT p ON p.ID = m.PROJECT_ID AND p.DEL_FLAG = '0'
+        LEFT JOIN MODEL_LAYER l ON l.ID = m.LAYER_ID AND l.DEL_FLAG = '0'
+        WHERE r.ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <resultMap type="RuleSurvivorDO" id="RuleSurvivorResult">
+        <result property="id"    column="ID"    />
+        <result property="responsibleUserId" column="RESPONSIBLE_USER_ID" />
+        <result property="responsibleUserName" column="RESPONSIBLE_USER_NAME" />
+        <result property="responsibleUserPhone" column="RESPONSIBLE_USER_PHONE" />
+        <result property="modelName" column="MODEL_NAME" />
+        <result property="modelCode" column="MODEL_CODE" />
+        <result property="modelType" column="MODEL_TYPE" />
+        <result property="modelIcon" column="MODEL_ICON" />
+        <result property="modelDescription" column="MODEL_DESCRIPTION" />
+        <result property="projectName" column="PROJECT_NAME" />
+        <result property="layerName" column="LAYER_NAME" />
+        <result property="ruleCode"    column="RULE_CODE"    />
+        <result property="ruleName"    column="RULE_NAME"    />
+        <result property="modelId"    column="MODEL_ID"    />
+        <result property="modelVersion"    column="MODEL_VERSION"    />
+        <result property="modelFieldId"    column="MODEL_FIELD_ID"    />
+        <result property="abnormalFlag"    column="ABNORMAL_FLAG"    />
+        <result property="ruleType"    column="RULE_TYPE"    />
+        <result property="ruleConfig"    column="RULE_CONFIG"    />
+        <result property="validFlag"    column="VALID_FLAG"    />
+        <result property="description"    column="DESCRIPTION"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="creatorId"    column="CREATOR_ID"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updaterId"    column="UPDATER_ID"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="remark"    column="REMARK"    />
+    </resultMap>
+
+    <sql id="selectRuleSurvivorVo">
+        select ID, RESPONSIBLE_USER_ID, RULE_CODE, RULE_NAME, MODEL_ID, MODEL_VERSION, MODEL_FIELD_ID, ABNORMAL_FLAG, RULE_TYPE, RULE_CONFIG, VALID_FLAG, DESCRIPTION, DEL_FLAG, CREATE_BY, CREATOR_ID, CREATE_TIME, UPDATE_BY, UPDATER_ID, UPDATE_TIME, REMARK from RULE_SURVIVOR
+    </sql>
+
+    <select id="selectRuleSurvivorList" parameterType="RuleSurvivorDO" resultMap="RuleSurvivorResult">
+        <include refid="selectRuleSurvivorVo"/>
+        <where>
+            <if test="ruleCode != null  and ruleCode != ''"> and RULE_CODE = #{ruleCode}</if>
+            <if test="ruleName != null  and ruleName != ''"> and RULE_NAME like concat(concat('%', #{ruleName}), '%')</if>
+            <if test="modelId != null "> and MODEL_ID = #{modelId}</if>
+            <if test="modelVersion != null  and modelVersion != ''"> and MODEL_VERSION = #{modelVersion}</if>
+            <if test="modelFieldId != null  and modelFieldId != ''"> and MODEL_FIELD_ID = #{modelFieldId}</if>
+            <if test="abnormalFlag != null  and abnormalFlag != ''"> and ABNORMAL_FLAG = #{abnormalFlag}</if>
+            <if test="ruleType != null  and ruleType != ''"> and RULE_TYPE = #{ruleType}</if>
+            <if test="ruleConfig != null  and ruleConfig != ''"> and RULE_CONFIG = #{ruleConfig}</if>
+            <if test="validFlag != null "> and VALID_FLAG = #{validFlag}</if>
+            <if test="description != null  and description != ''"> and DESCRIPTION = #{description}</if>
+        </where>
+    </select>
+
+    <select id="selectRuleSurvivorById" parameterType="Long" resultMap="RuleSurvivorResult">
+        <include refid="selectRuleSurvivorVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertRuleSurvivor" parameterType="RuleSurvivorDO">
+        insert into RULE_SURVIVOR
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="ruleCode != null">RULE_CODE,</if>
+            <if test="ruleName != null">RULE_NAME,</if>
+            <if test="modelId != null">MODEL_ID,</if>
+            <if test="modelVersion != null">MODEL_VERSION,</if>
+            <if test="modelFieldId != null">MODEL_FIELD_ID,</if>
+            <if test="abnormalFlag != null">ABNORMAL_FLAG,</if>
+            <if test="ruleType != null">RULE_TYPE,</if>
+            <if test="ruleConfig != null">RULE_CONFIG,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+            <if test="description != null">DESCRIPTION,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="remark != null">REMARK,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="ruleCode != null">#{ruleCode},</if>
+            <if test="ruleName != null">#{ruleName},</if>
+            <if test="modelId != null">#{modelId},</if>
+            <if test="modelVersion != null">#{modelVersion},</if>
+            <if test="modelFieldId != null">#{modelFieldId},</if>
+            <if test="abnormalFlag != null">#{abnormalFlag},</if>
+            <if test="ruleType != null">#{ruleType},</if>
+            <if test="ruleConfig != null">#{ruleConfig},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+            <if test="description != null">#{description},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateRuleSurvivor" parameterType="RuleSurvivorDO">
+        update RULE_SURVIVOR
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="ruleCode != null">RULE_CODE = #{ruleCode},</if>
+            <if test="ruleName != null">RULE_NAME = #{ruleName},</if>
+            <if test="modelId != null">MODEL_ID = #{modelId},</if>
+            <if test="modelVersion != null">MODEL_VERSION = #{modelVersion},</if>
+            <if test="modelFieldId != null">MODEL_FIELD_ID = #{modelFieldId},</if>
+            <if test="abnormalFlag != null">ABNORMAL_FLAG = #{abnormalFlag},</if>
+            <if test="ruleType != null">RULE_TYPE = #{ruleType},</if>
+            <if test="ruleConfig != null">RULE_CONFIG = #{ruleConfig},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+            <if test="description != null">DESCRIPTION = #{description},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="remark != null">REMARK = #{remark},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteRuleSurvivorById" parameterType="Long">
+        delete from RULE_SURVIVOR where ID = #{id}
+    </delete>
+
+    <delete id="deleteRuleSurvivorByIds" parameterType="String">
+        delete from RULE_SURVIVOR where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

@@ -1,0 +1,46 @@
+/* 只输出调用方所需的声明，保留其选择器、作用域和覆盖顺序。 */
+
+@mixin full-width {
+  width: 100%;
+}
+
+@mixin compact-action-button {
+  height: var(--qt-action-button-height);
+  padding: var(--qt-action-button-padding);
+  font-size: var(--qt-font-size-small);
+}
+
+@mixin template-link {
+  font-size: var(--qt-font-size-small);
+  vertical-align: baseline;
+}
+
+@mixin import-result-scroll {
+  max-height: var(--qt-import-result-max-height);
+  padding: var(--qt-import-result-padding);
+  overflow: auto;
+  overflow-x: hidden;
+}
+
+@mixin plain-tip-title {
+  --tip-title-weight: normal;
+  --tip-title-color: var(--el-text-color-regular);
+}
+
+@mixin wrap-tip-text {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+@mixin title-marker {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: var(--qt-title-marker-width);
+  height: var(--qt-title-marker-height);
+  border-radius: var(--qt-title-marker-radius);
+  background: var(--qt-title-marker-color);
+  transform: translateY(-50%);
+  content: "";
+}

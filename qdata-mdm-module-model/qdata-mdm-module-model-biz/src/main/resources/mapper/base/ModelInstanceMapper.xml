@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.model.dal.mapper.base.ModelInstanceMapper">
+
+    <!-- 只查询历史列表需要的字段，不加载模型快照、执行计划和SQL大字段。 -->
+    <select id="selectHistoryByModelId" resultType="tech.qiantong.qdata.mdm.model.base.dto.ModelInstanceHistoryRespDTO">
+        SELECT I.ID, I.MODEL_ID, I.MODEL_VERSION_ID, V.VERSION_NO,
+               I.DATASOURCE_ID, I.STATUS, I.CURRENT_STAGE,
+               I.STARTED_TIME, I.FINISHED_TIME, I.PUBLISHED_TIME,
+               I.CREATE_BY, I.CREATE_TIME, I.CHANGE_STATUS,
+               I.FAILURE_REASON, I.COMPENSATION_STATUS, I.REMARK
+        FROM MODEL_INSTANCE I
+        LEFT JOIN MODEL_VERSION V ON V.ID = I.MODEL_VERSION_ID AND V.MODEL_ID = I.MODEL_ID
+        WHERE I.MODEL_ID = #{modelId}
+        ORDER BY I.ID DESC
+    </select>
+
+    <!-- 列表、计数和单条读取共用成功指针的可用性约束。 -->
+    <sql id="publishedInstanceFrom">
+        FROM MODEL_BASE M
+        INNER JOIN MODEL_VERSION V ON V.ID = M.VERSION_ID AND V.MODEL_ID = M.ID
+        INNER JOIN MODEL_INSTANCE I ON I.ID = M.PUBLISHED_INSTANCE_ID AND I.MODEL_ID = M.ID
+    </sql>
+
+    <sql id="publishedInstanceWhere">
+        WHERE (M.PARENT_ID IS NULL OR M.PARENT_ID = 0) AND M.DEL_FLAG = '0'
+          AND V.DEL_FLAG = '0' AND V.STATUS IN (1, 2)
+          AND I.STATUS = 'SUCCEEDED'
+    </sql>
+
+    <sql id="publishedInstanceSource">
+        <include refid="publishedInstanceFrom"/>
+        <include refid="publishedInstanceWhere"/>
+    </sql>
+
+    <!-- 显式指定字符串长度，避免快照说明被默认返回长度截断。 -->
+    <sql id="publishedSnapshotString">
+        JSON_VALUE(I.MODEL_SNAPSHOT, '$.model.${property}' RETURNING VARCHAR(4000))
+    </sql>
+
+    <!-- property仅来自下方固定include属性；所有用户输入均通过绑定参数传入。 -->
+    <sql id="publishedPageSource">
+        <include refid="publishedInstanceWhere"/>
+        <if test="req.id != null">AND M.ID = #{req.id}</if>
+        <if test="req.versionId != null">AND I.MODEL_VERSION_ID = #{req.versionId}</if>
+        <if test="req.code != null and req.code.trim().length() > 0">
+            <bind name="codeFilter" value="req.code.trim()"/>
+            AND INSTR(<include refid="publishedSnapshotString"><property name="property" value="code"/></include>, #{codeFilter}) > 0
+        </if>
+        <if test="req.name != null and req.name.trim().length() > 0">
+            <bind name="nameFilter" value="req.name.trim()"/>
+            AND INSTR(<include refid="publishedSnapshotString"><property name="property" value="name"/></include>, #{nameFilter}) > 0
+        </if>
+        <if test="req.description != null and req.description.trim().length() > 0">
+            <bind name="descriptionFilter" value="req.description.trim()"/>
+            AND INSTR(<include refid="publishedSnapshotString"><property name="property" value="description"/></include>, #{descriptionFilter}) > 0
+        </if>
+        <if test="req.type != null and req.type.trim().length() > 0">
+            <bind name="typeFilter" value="req.type.trim()"/>
+            AND <include refid="publishedSnapshotString"><property name="property" value="type"/></include> = #{typeFilter}
+        </if>
+        <if test="req.projectId != null">
+            AND CAST(JSON_VALUE(I.MODEL_SNAPSHOT, '$.model.projectId') AS DECIMAL(20, 0)) = #{req.projectId}
+        </if>
+        <if test="req.layerId != null">
+            AND CAST(JSON_VALUE(I.MODEL_SNAPSHOT, '$.model.layerId') AS DECIMAL(20, 0)) = #{req.layerId}
+        </if>
+    </sql>
+
+    <select id="countPublishedInstances" resultType="long">
+        SELECT COUNT(*)
+        <include refid="publishedInstanceFrom"/>
+        <include refid="publishedPageSource"/>
+    </select>
+
+    <select id="selectPublishedModelId" resultType="long">
+        SELECT M.ID
+        <include refid="publishedInstanceSource"/>
+        AND I.ID = #{instanceId}
+    </select>
+
+    <select id="countPublishedInstance" resultType="long">
+        SELECT COUNT(*)
+        <include refid="publishedInstanceSource"/>
+        AND M.ID = #{modelId} AND I.ID = #{instanceId} AND I.MODEL_VERSION_ID = #{versionId}
+    </select>
+
+    <select id="selectPublishedStructure" resultMap="ModelInstanceResult">
+        SELECT I.ID, I.MODEL_ID, I.MODEL_VERSION_ID, I.PUBLISHED_TIME, I.MODEL_SNAPSHOT, I.DATASOURCE_ID
+        <if test="includeAuthorityTable">
+            , T.ID AS AUTHORITY_TABLE_ID, T.TABLE_NAME AS AUTHORITY_TABLE_NAME
+        </if>
+        <include refid="publishedInstanceFrom"/>
+        <if test="includeAuthorityTable"><include refid="publishedAuthorityTableJoin"/></if>
+        <include refid="publishedInstanceWhere"/>
+        AND M.ID = #{modelId}
+    </select>
+
+    <sql id="publishedAuthorityTableJoin">
+        LEFT JOIN MODEL_MATERIALIZED_TABLE T
+          ON T.INSTANCE_ID = I.ID AND T.MODEL_ID = I.MODEL_ID
+         AND T.DATASOURCE_ID = I.DATASOURCE_ID
+         AND T.PARENT_ID = 0 AND (T.PARENT_TABLE_ID IS NULL OR T.PARENT_TABLE_ID = 0)
+         AND T.TABLE_ROLE = 'AUTHORITY'
+         AND T.ENABLED_FLAG = '1' AND T.VALID_FLAG = '1' AND T.DEL_FLAG = '0'
+    </sql>
+
+    <sql id="publishedInstanceQuery">
+        SELECT I.ID, I.MODEL_ID, I.MODEL_VERSION_ID, I.PUBLISHED_TIME, I.MODEL_SNAPSHOT, I.DATASOURCE_ID
+        , T.ID AS AUTHORITY_TABLE_ID, T.TABLE_NAME AS AUTHORITY_TABLE_NAME
+        <include refid="publishedInstanceFrom"/>
+        <!-- 分页只关联权威主表，统计系统列在分页后按当前页表ID批量读取。 -->
+        <include refid="publishedAuthorityTableJoin"/>
+        <include refid="publishedPageSource"/>
+        <!-- 仅接受固定模型 ID 排序；未指定时保留其他调用方的默认顺序。 -->
+        ORDER BY M.ID
+        <choose>
+            <when test="req.orderByColumn == 'id' and req.isAsc == 'desc'">DESC</when>
+            <otherwise>ASC</otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectPublishedInstancePage" resultMap="ModelInstanceResult">
+        <include refid="publishedInstanceQuery"/>
+    </select>
+
+    <select id="selectPublishedInstanceList" resultMap="ModelInstanceResult">
+        <include refid="publishedInstanceQuery"/>
+    </select>
+
+    <!-- 当前版本只判断可用性；实际返回内容始终来自成功指针对应的配置，不读取草稿名称等属性。 -->
+    <select id="selectPublishedInstances" resultMap="ModelInstanceResult" fetchSize="100">
+        SELECT I.ID, I.MODEL_ID, I.MODEL_VERSION_ID, I.PUBLISHED_TIME, I.MODEL_SNAPSHOT, I.DATASOURCE_ID
+        <if test="includeMaterialization">
+            , I.STRUCTURE_FORMAT_VERSION
+        </if>
+        <include refid="publishedInstanceSource"/>
+        <if test="modelId != null">AND M.ID = #{modelId}</if>
+        ORDER BY M.ID ASC
+    </select>
+
+    <resultMap id="ModelInstanceResult" type="tech.qiantong.qdata.mdm.model.dal.dataobject.base.ModelInstanceDO">
+        <id property="id" column="ID"/>
+        <result property="modelId" column="MODEL_ID"/>
+        <result property="modelVersionId" column="MODEL_VERSION_ID"/>
+        <result property="datasourceId" column="DATASOURCE_ID"/>
+        <result property="status" column="STATUS"/>
+        <result property="baseInstanceId" column="BASE_INSTANCE_ID"/>
+        <result property="currentStage" column="CURRENT_STAGE"/>
+        <result property="startedTime" column="STARTED_TIME"/>
+        <result property="finishedTime" column="FINISHED_TIME"/>
+        <result property="publishedTime" column="PUBLISHED_TIME"/>
+        <result property="executedSql" column="EXECUTED_SQL"/>
+        <result property="changeStatus" column="CHANGE_STATUS"/>
+        <result property="changeContent" column="CHANGE_CONTENT"/>
+        <result property="modelSnapshot" column="MODEL_SNAPSHOT"/>
+        <result property="executionPlan" column="EXECUTION_PLAN"/>
+        <result property="structureFormatVersion" column="STRUCTURE_FORMAT_VERSION"/>
+        <result property="structureHash" column="STRUCTURE_HASH"/>
+        <result property="failureReason" column="FAILURE_REASON"/>
+        <result property="failedStage" column="FAILED_STAGE"/>
+        <result property="compensationStatus" column="COMPENSATION_STATUS"/>
+        <result property="remainingEffects" column="REMAINING_EFFECTS"/>
+        <result property="creatorId" column="CREATOR_ID"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updaterId" column="UPDATER_ID"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="remark" column="REMARK"/>
+        <result property="authorityTableId" column="AUTHORITY_TABLE_ID"/>
+        <result property="authorityTableName" column="AUTHORITY_TABLE_NAME"/>
+    </resultMap>
+
+    <sql id="selectModelInstanceVo">
+        SELECT ID,
+               MODEL_ID,
+               MODEL_VERSION_ID,
+               DATASOURCE_ID,
+               STATUS,
+               BASE_INSTANCE_ID,
+               CURRENT_STAGE,
+               STARTED_TIME,
+               FINISHED_TIME,
+               PUBLISHED_TIME,
+               EXECUTED_SQL,
+               CHANGE_STATUS,
+               CHANGE_CONTENT,
+               MODEL_SNAPSHOT,
+               EXECUTION_PLAN,
+               STRUCTURE_FORMAT_VERSION,
+               STRUCTURE_HASH,
+               FAILURE_REASON,
+               FAILED_STAGE,
+               COMPENSATION_STATUS,
+               REMAINING_EFFECTS,
+               CREATOR_ID,
+               CREATE_BY,
+               CREATE_TIME,
+               UPDATER_ID,
+               UPDATE_BY,
+               UPDATE_TIME,
+               REMARK
+        FROM MODEL_INSTANCE
+    </sql>
+
+</mapper>

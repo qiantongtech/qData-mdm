@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -36,7 +36,6 @@
       </template>
       <div v-loading="loading">
         <qt-table v-bind="tableStore" ref="tableRef">
-          <template #title="{ row }">{{ row.title }}</template>
           <template #category="scope">
             <dict-tag :options="message_category" :value="scope.row.category" />
           </template>
@@ -69,6 +68,7 @@
 </template>
 
 <script setup name="Message">
+import { tableTitleLink, titleCellClass } from '@/utils/anivia.js'
 import { getCurrentInstance, ref } from 'vue';
 import useDefaultLang from '@/composables/useDefaultLang';
 import useUserStore from '@/store/system/user';
@@ -214,7 +214,10 @@ const searchStore = reactive({
 
 const tableStore = reactive({
   config: computed(() => ({
-    table: { defaultSort: { prop: 'createTime', order: 'descending' }, stripe: true },
+    table: {
+      cellClassName: titleCellClass,
+      defaultSort: { prop: 'createTime', order: 'descending' }, stripe: true
+    },
     pagination: {
       pageSizes: [10, 20, 30, 50],
       pagerCount: document.body.clientWidth < 992 ? 5 : 7,
@@ -230,7 +233,9 @@ const tableStore = reactive({
         return td('sys.system.message.msgTitle');
       },
       align: 'center',
-      slot: 'title'
+      prop: 'title',
+      className: 'title-column',
+      link: tableTitleLink(row => handleView(row))
     },
     {
       get label() {

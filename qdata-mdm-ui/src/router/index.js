@@ -1,14 +1,14 @@
 /*
  * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -19,12 +19,24 @@
 import { createWebHistory, createRouter } from 'vue-router';
 import { clearCancelTokens } from '@/utils/request'; // Make sure the import path is correct
 
-/* Layout */
-import Layout from '@/layout';
 /* System module public routing */
 import systemPublicRouter from './system/public/index.js';
 /* System module dynamic routing */
 import systemDynamicRouter from './system/dynamic/index.js';
+/* 模型管理 */
+import modelRouter from "@/router/model/index.js";
+/* 主数据管理 */
+import masterRouter from './master/index.js';
+/*任务管理*/
+import ruleRouter from './rule/index.js';
+import ingestPublicRouter from './ingest/public/index.js';
+import mergePublicRouter from './merge/public/index.js';
+import qualityRouter from './quality/qualityTask/index.js';
+import auditRouter from './audit/public/index.js'
+/* 数据分发*/
+import distPublicRouter from './dist/public/index.js';
+/* 授权管理*/
+import authorizationRouter from './authorization/index.js';
 
 /**
  * Note: Routing configuration items
@@ -40,45 +52,52 @@ import systemDynamicRouter from './system/dynamic/index.js';
  * roles: ['admin', 'common'] // Role permissions to access routing
  * permissions: ['a:a:a', 'b:b:b'] // Access route menu permissions
  * meta : {
-    noCache: true // If set to true, it will not be cached by <keep-alive> (default false)
-    title: 'title' // Set the name of the route displayed in the sidebar and breadcrumbs
-    icon: 'svg-name' // Set the icon of this route, corresponding to the path src/assets/common/icons/svg
-    breadcrumb: false // If set to false, it will not be displayed in breadcrumbs
-    activeMenu: '/system/user' // When the route sets this attribute, the corresponding sidebar will be highlighted.
-  }
+ noCache: true // If set to true, it will not be cached by <keep-alive> (default false)
+ title: 'title' // Set the name of the route displayed in the sidebar and breadcrumbs
+ icon: 'svg-name' // Set the icon of this route, corresponding to the path src/assets/common/icons/svg
+ breadcrumb: false // If set to false, it will not be displayed in breadcrumbs
+ activeMenu: '/system/user' // When the route sets this attribute, the corresponding sidebar will be highlighted.
+ }
  */
 
 // public route
-export const constantRoutes = [...systemPublicRouter];
+export const constantRoutes = [
+    ...systemPublicRouter,
+    ...modelRouter,
+    ...masterRouter, ...ruleRouter,
+    ...distPublicRouter,
+    ...authorizationRouter,
+    ...ingestPublicRouter, ...mergePublicRouter
+,...qualityRouter,...auditRouter];
 
 // Dynamic routing, dynamic loading based on user permissions
 export const dynamicRoutes = [...systemDynamicRouter];
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes: constantRoutes,
-  scrollBehavior(to, from, savedPosition) {
-    if (savedPosition) {
-      return savedPosition;
-    } else {
-      return { top: 0 };
+    history: createWebHistory(),
+    routes: constantRoutes,
+    scrollBehavior(to, from, savedPosition) {
+        if (savedPosition) {
+            return savedPosition;
+        } else {
+            return {top: 0};
+        }
     }
-  }
 });
 
 // Add cancellation request logic in route guard
 router.beforeEach((to, from, next) => {
-  if (to.path !== from.path) {
-    clearCancelTokens(); // Cancel all outstanding requests before routing switch
-  }
-  next();
+    if (to.path !== from.path) {
+        clearCancelTokens(); // Cancel all outstanding requests before routing switch
+    }
+    next();
 });
 
 /**
  * Reset routing
  */
 export function resetRouter() {
-  window.location.href = `${window.location.protocol}//${window.location.host}/login/`;
+    window.location.href = `${window.location.protocol}//${window.location.host}/login/`;
 }
 
 export default router;

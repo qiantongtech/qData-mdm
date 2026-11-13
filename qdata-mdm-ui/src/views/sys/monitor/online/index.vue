@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -38,7 +38,6 @@
             <span>{{ (pageNum - 1) * pageSize + scope.$index + 1 }}</span>
           </template>
           <template #tokenId="{ row }">{{ row.tokenId }}</template>
-          <template #userName="{ row }">{{ row.userName }}</template>
           <template #deptName="{ row }">{{ row.deptName }}</template>
           <template #ipaddr="{ row }">{{ row.ipaddr }}</template>
           <template #loginLocation="{ row }">{{ row.loginLocation }}</template>
@@ -74,6 +73,7 @@
 </template>
 
 <script setup name="Online">
+import { tableTitleLink, titleCellClass } from '@/utils/anivia.js'
 import OnlineDetailDialog from './components/onlineDetailDialog.vue';
 import { checkPermi } from '@/utils/permission';
 import { reactive, computed, watch, ref, unref, isRef } from 'vue';
@@ -184,6 +184,7 @@ const tableStore0 = reactive({
   config: computed(() => ({
     autoPagination: true,
     table: {
+      cellClassName: titleCellClass,
       defaultSort: { prop: 'tokenId', order: 'descending' },
       height: '60vh',
       stripe: true,
@@ -224,7 +225,9 @@ const tableStore0 = reactive({
       },
       align: 'center',
       showOverflowTooltip: true,
-      slot: 'userName'
+      prop: 'userName',
+      className: 'title-column',
+      get link() { return tableTitleLink(row => proxy.$refs.detailDialogRef.openDialog(row), 'monitor:online:query'); }
     },
     {
       get label() {

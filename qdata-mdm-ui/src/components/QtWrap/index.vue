@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -144,8 +144,43 @@ function handleCheckboxChange(checked, item) {
 <style lang="scss" scoped>
 .qt-wrap {
   width: 100%;
-  height: 100%;
 }
+.qt-wrap--main {
+  :deep(td.title-column .el-link) {
+    max-width: 100%;
+  }
+
+  :deep(td.title-column .el-link:hover::after) {
+    display: none;
+  }
+
+  :deep(td.title-column .el-link:focus-visible) {
+    outline: revert;
+  }
+
+  :deep(td.title-column .el-link__inner) {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :deep(td.title-null .el-link),
+  :deep(td.title-placeholder .el-link) {
+    display: none;
+  }
+
+  // QtTable 已处理 null；空串和历史占位值也只显示一个短横线。
+  :deep(td.title-placeholder > .cell) {
+    font-size: 0;
+  }
+
+  :deep(td.title-placeholder > .cell::after) {
+    content: '-';
+    font-size: 14px;
+  }
+}
+
 .qt-wrap--search {
   padding: 15px 15px 1px;
   background-color: var(--qt-surface-background);

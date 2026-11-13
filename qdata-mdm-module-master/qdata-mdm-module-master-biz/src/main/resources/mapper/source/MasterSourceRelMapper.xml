@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.master.dal.mapper.source.MasterSourceRelMapper">
+
+    <!-- 显式映射来源关系和关联展示字段，不依赖 JDBC 返回列名的大小写。 -->
+    <resultMap id="SourceRecordResultMap" type="MasterSourceRelDO">
+        <id column="REL_ID" property="id"/>
+        <result column="RECORD_ID" property="sourceRecordId"/>
+        <result column="VERSION_ID" property="sourceVersionId"/>
+        <result column="SYSTEM_NAME" property="sourceSystemName"/>
+        <result column="SOURCE_RECORD_KEY" property="sourceRecordKey"/>
+        <result column="STABLE_RECORD_ID" property="stableRecordId"/>
+        <result column="REL_TYPE" property="type"/>
+        <result column="EFFECTIVE_TIME" property="effectiveTime" javaType="java.sql.Timestamp"/>
+        <result column="LAST_RECEIVE_TIME" property="lastReceiveTime"/>
+        <result column="MODEL_DATA" property="sourceModelData" javaType="string"/>
+    </resultMap>
+
+    <resultMap id="SourceSystemResultMap" type="tech.qiantong.qdata.mdm.master.dal.dto.source.MasterSourceSystemDTO">
+        <id column="ID" property="id"/>
+        <result column="NAME" property="name"/>
+    </resultMap>
+
+    <!-- 只取指定模型与主记录的有效来源关系；采集记录须同模型，采集版本须属于该记录，
+         来源关系和三张关联表均须有效且未删除。按生效时间及关系 ID 倒序返回全部记录。 -->
+    <select id="selectSourceRecords" resultMap="SourceRecordResultMap">
+        SELECT r.ID AS REL_ID,
+               d.ID AS RECORD_ID,
+               v.ID AS VERSION_ID,
+               s.NAME AS SYSTEM_NAME,
+               d.SOURCE_RECORD_KEY,
+               d.STABLE_RECORD_ID,
+               r.TYPE AS REL_TYPE,
+               r.EFFECTIVE_TIME,
+               d.LAST_RECEIVE_TIME,
+               v.MODEL_DATA
+        FROM MASTER_SOURCE_REL r
+        JOIN INGEST_SOURCE_DATA d ON d.ID = r.SOURCE_RECORD_ID AND d.MODEL_ID = r.MODEL_ID
+        JOIN INGEST_SOURCE_SYSTEM s ON s.ID = d.SOURCE_SYSTEM_ID
+        JOIN INGEST_SOURCE_DATA_VERSION v ON v.ID = r.SOURCE_VERSION_ID AND v.SOURCE_RECORD_ID = d.ID
+        WHERE r.MODEL_ID = #{modelId}
+          AND r.MASTER_RECORD_ID = #{masterRecordId}
+          AND r.STATUS = '1' AND r.VALID_FLAG = '1' AND r.DEL_FLAG = '0'
+          AND d.VALID_FLAG = '1' AND d.DEL_FLAG = '0'
+          AND s.VALID_FLAG = '1' AND s.DEL_FLAG = '0'
+          AND v.VALID_FLAG = '1' AND v.DEL_FLAG = '0'
+        ORDER BY r.EFFECTIVE_TIME DESC, r.ID DESC
+    </select>
+
+    <!-- 项目库只查询来源关系；权威物理表由目标数据源单独查询。 -->
+    <select id="selectSourceSystems" resultMap="SourceSystemResultMap">
+        SELECT DISTINCT s.ID,
+                        s.NAME
+        FROM MASTER_SOURCE_REL r
+        INNER JOIN INGEST_SOURCE_DATA d ON d.ID = r.SOURCE_RECORD_ID
+            AND d.MODEL_ID = r.MODEL_ID
+            AND d.VALID_FLAG = '1'
+            AND d.DEL_FLAG = '0'
+        INNER JOIN INGEST_SOURCE_SYSTEM s ON s.ID = d.SOURCE_SYSTEM_ID
+            AND s.VALID_FLAG = '1'
+            AND s.DEL_FLAG = '0'
+        WHERE r.MODEL_ID = #{modelId}
+          AND r.STATUS = '1'
+          AND r.VALID_FLAG = '1'
+          AND r.DEL_FLAG = '0'
+        ORDER BY s.NAME, s.ID
+    </select>
+
+    <!-- 来源系统筛选使用固定关系表完成，动态物化表仅在业务查询 Repository 中读取。 -->
+    <select id="selectMasterRecordIdsBySourceSystem" resultType="long">
+        SELECT DISTINCT r.MASTER_RECORD_ID
+        FROM MASTER_SOURCE_REL r
+        INNER JOIN INGEST_SOURCE_DATA d ON d.ID = r.SOURCE_RECORD_ID
+            AND d.MODEL_ID = r.MODEL_ID
+            AND d.VALID_FLAG = '1'
+            AND d.DEL_FLAG = '0'
+        INNER JOIN INGEST_SOURCE_SYSTEM s ON s.ID = d.SOURCE_SYSTEM_ID
+            AND s.VALID_FLAG = '1'
+            AND s.DEL_FLAG = '0'
+        WHERE r.MODEL_ID = #{modelId}
+          AND r.STATUS = '1'
+          AND r.VALID_FLAG = '1'
+          AND r.DEL_FLAG = '0'
+          AND s.ID = #{sourceSystemId}
+    </select>
+</mapper>

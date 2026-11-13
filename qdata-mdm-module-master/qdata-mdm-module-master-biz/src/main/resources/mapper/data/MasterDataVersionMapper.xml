@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://community.qdata.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.master.dal.mapper.data.MasterDataVersionMapper">
+
+    <resultMap id="VersionPageResultMap" type="MasterDataVersionDO">
+        <id column="ID" property="id"/>
+        <result column="VERSION_NO" property="versionNo"/>
+        <result column="GENERATE_TIME" property="generateTime"/>
+        <result column="GENERATE_TYPE" property="generateType"/>
+        <result column="CURRENT_FLAG" property="currentFlag"/>
+        <result column="CHANGE_TYPE" property="changeType"/>
+        <result column="OPERATOR_NAME" property="operatorName"/>
+        <result column="REQUEST_NO" property="requestNo"/>
+    </resultMap>
+
+    <resultMap id="CurrentVersionNumberResultMap" type="MasterDataVersionDO">
+        <result column="MASTER_RECORD_ID" property="masterRecordId"/>
+        <result column="VERSION_NO" property="versionNo"/>
+    </resultMap>
+
+    <resultMap id="VersionSnapshotResultMap" type="MasterDataVersionDO">
+        <id column="ID" property="id"/>
+        <result column="VERSION_NO" property="versionNo"/>
+        <result column="SNAPSHOT_DATA" property="snapshotData" javaType="string"/>
+    </resultMap>
+
+    <!-- 来源详情只需版本 ID；不限制结果条数，以便业务层发现多个有效当前版本。 -->
+    <select id="selectCurrentVersionIds" resultType="long">
+        SELECT ID FROM MASTER_DATA_VERSION
+        WHERE MODEL_ID = #{modelId} AND MASTER_RECORD_ID = #{masterRecordId}
+          AND CURRENT_FLAG = '1' AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+    </select>
+
+    <select id="selectMaxVersionSeq" resultType="int">
+        SELECT COALESCE(MAX(VERSION_SEQ), 0)
+        FROM MASTER_DATA_VERSION
+        WHERE MODEL_ID = #{modelId} AND MASTER_RECORD_ID = #{masterRecordId}
+          AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+    </select>
+
+    <!-- 主数据列表按一批记录 ID 补充当前版本号；排除无效、已删除记录，业务层处理重复版本。 -->
+    <select id="selectCurrentVersionNumbers" resultMap="CurrentVersionNumberResultMap">
+        SELECT MASTER_RECORD_ID, VERSION_NO FROM MASTER_DATA_VERSION
+        WHERE MODEL_ID = #{modelId} AND CURRENT_FLAG = '1' AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+          AND MASTER_RECORD_ID IN
+          <foreach collection="recordIds" item="recordId" open="(" separator="," close=")">
+              #{recordId}
+          </foreach>
+        ORDER BY GENERATE_TIME DESC, ID DESC
+    </select>
+
+    <!-- 版本行按模型和主记录过滤；变更历史与申请单为左关联，关联行也须有效且未删除。
+         默认按版本序号和 ID 倒序，仅开放 ID 和操作时间的白名单排序分支。 -->
+    <select id="selectVersionPage" resultMap="VersionPageResultMap">
+        SELECT v.ID, v.VERSION_NO, v.GENERATE_TIME, v.GENERATE_TYPE, v.CURRENT_FLAG,
+               c.TYPE AS CHANGE_TYPE, c.OPERATOR_NAME, q.REQUEST_NO
+        FROM MASTER_DATA_VERSION v
+        LEFT JOIN MASTER_CHANGE c ON c.ID = v.CHANGE_ID AND c.MODEL_ID = v.MODEL_ID
+            AND c.MASTER_RECORD_ID = v.MASTER_RECORD_ID AND c.VALID_FLAG = '1' AND c.DEL_FLAG = '0'
+        LEFT JOIN MASTER_CHANGE_REQUEST q ON q.ID = c.REQUEST_ID AND q.MODEL_ID = v.MODEL_ID
+            AND q.VALID_FLAG = '1' AND q.DEL_FLAG = '0'
+        WHERE v.MODEL_ID = #{modelId} AND v.MASTER_RECORD_ID = #{masterRecordId}
+          AND v.VALID_FLAG = '1' AND v.DEL_FLAG = '0'
+        <choose>
+            <when test="req != null and req.orderByColumn == 'id'">
+                ORDER BY v.ID
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <when test="req != null and req.orderByColumn == 'generate_time'">
+                ORDER BY v.GENERATE_TIME
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>, v.ID
+                <choose>
+                    <when test="req.isAsc == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <otherwise>ORDER BY v.VERSION_SEQ DESC, v.ID DESC</otherwise>
+        </choose>
+    </select>
+
+    <select id="selectSnapshot" resultMap="VersionSnapshotResultMap">
+        SELECT ID, VERSION_NO, SNAPSHOT_DATA
+        FROM MASTER_DATA_VERSION
+        WHERE ID = #{versionId} AND MODEL_ID = #{modelId} AND MASTER_RECORD_ID = #{masterRecordId}
+          AND VALID_FLAG = '1' AND DEL_FLAG = '0'
+    </select>
+</mapper>

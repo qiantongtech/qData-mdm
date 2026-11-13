@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -28,23 +28,22 @@
     }"
   >
     <transition name="sidebarLogoFade">
-      <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/">
+      <router-link
+          v-if="collapse"
+          key="collapse"
+          class="sidebar-logo-link"
+          to="/"
+      >
         <!--        <img v-if="logo" :src="simpLogo" class="sidebar-logo" />-->
-        <img v-if="logo" :src="displaySimpLogo" class="sidebar-logo sidebar-logo-width"/>
+        <img v-if="logo" :src="displaySimpLogo" class="sidebar-logo"/>
         <h1 v-else class="sidebar-title" :style="{ color: 'var(--qt-text-inverse)' }">
           {{ title }}
         </h1>
       </router-link>
       <router-link v-else key="expand" class="sidebar-logo-link" to="/">
         <!--        <img v-if="logo" :src="logo" class="sidebar-logo" /> -->
-        <img
-            v-if="logo"
-            :src="displayLogo"
-            ref="logoRef"
-            class="sidebar-logo"
-            :class="{ 'logo-intro': logoIntroActive }"
-            @mouseenter="replayHover"
-        />
+        <img v-if="logo" :src="displayLogo" ref="logoRef" class="sidebar-logo"
+             :class="{ 'logo-intro': logoIntroActive }" @mouseenter="replayHover"/>
       </router-link>
     </transition>
   </div>
@@ -71,12 +70,12 @@ const logoIntroActive = ref(false);
 const props = defineProps({
   collapse: {
     type: Boolean,
-    required: true
+    required: true,
   },
   currentRoute: {
     type: String,
-    default: '/'
-  }
+    default: "/",
+  },
 });
 
 const displayLogo = computed(() => {
@@ -139,68 +138,46 @@ const sideTheme = computed(() => settingsStore.sideTheme);
   width: 100%;
   height: 60px;
   line-height: 50px;
+  background: #2b2f3a;
   text-align: center;
   overflow: hidden;
-
-  & .logo-intro,
-  &:hover .sidebar-logo {
-    animation: logoEntrance 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-  }
 
   & .sidebar-logo-link {
     height: 100%;
     width: 100%;
-    background-color: inherit;
-    text-align: center;
-    overflow: hidden;
 
     & .sidebar-logo {
-      background-color: inherit;
       height: 48px;
-      margin-top: 6px;
-      margin-right: 12px;
-      transform: scale(0.43);
-      margin-left: -116px;
+      margin-top: 8px;
+      vertical-align: middle;
+      // margin-right: 12px;
+      transform: scale(0.7);
+      margin-left: -30px;
     }
 
-    & .sidebar-logo {
-      background-color: inherit;
-      height: 48px;
-      margin-top: 6px;
-      margin-right: 12px;
-      transform: scale(0.43);
-      margin-left: -116px;
+    & .logo-intro,
+    &:hover .sidebar-logo {
+      animation: logoEntrance 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
     }
 
     & .sidebar-title {
       display: inline-block;
       margin: 0;
-      color: var(--qt-text-inverse);
+      color: #fff;
       font-weight: 600;
       line-height: 50px;
       font-size: 14px;
-      font-family: Avenir,
-      Helvetica Neue,
-      Arial,
-      Helvetica,
-      sans-serif;
+      font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
       vertical-align: middle;
     }
   }
 
   &.collapse {
     .sidebar-logo {
-      height: 42px;
-      margin-right: 0;
-      margin-left: 0;
-      margin-top: 9px;
-    }
-
-    .sidebar-logo-width {
-      height: 60px !important;
-      margin-top: 0 !important;
-      margin-right: 0 !important;
-      margin-left: 0 !important;
+      height: 60px;
+      margin-top: 0px;
+      margin-right: 0px;
+      margin-left: 0px;
     }
   }
 }
@@ -209,15 +186,15 @@ const sideTheme = computed(() => settingsStore.sideTheme);
 @keyframes logoEntrance {
   /* Stage 1: Fade in from left while zooming from small to large */
   0% {
-    transform: translateX(-200px) scale(0.1);
+    transform: translateX(-200px) scale(0.3);
     opacity: 0;
   }
   35% {
-    transform: translateX(0) scale(0.2);
+    transform: translateX(0) scale(0.4);
     opacity: 1;
   }
   100% {
-    transform: scale(0.43);
+    transform: translateY(0) scale(0.7);
     opacity: 1;
   }
 }

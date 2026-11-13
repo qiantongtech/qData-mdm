@@ -1,14 +1,14 @@
 /*
- * Copyright © 2025-present Jiangsu Qiantong Technology Co., Ltd.
+ * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
- * This document is part of the qData Master Data Platform (open source version).
+ * This file is part of qData-mdm Master Data Platform (Open Source Edition).
  *
- * qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
- * You may use qData for commercial purposes, but you may not remove, hide,
- * modify, or replace the qData master data platform logo, copyright notices, license notices,
+ * qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+ * You may use qData-mdm for commercial purposes, but you may not remove, hide,
+ * modify, or replace the qData-mdm logo, copyright notices, license notices,
  * or attribution information without a separate commercial license.
  *
- * White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+ * White-label use, OEM distribution, rebranding, or presenting qData-mdm as
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -71,7 +71,7 @@ public class DM8Dialect extends AbstractDbDialect {
                 "FROM " +
                 "ALL_TAB_COLUMNS atc " +
                 "INNER JOIN ALL_COL_COMMENTS acc ON acc.COLUMN_NAME = atc.COLUMN_NAME AND acc.Table_Name = atc.Table_Name AND acc.OWNER = atc.OWNER " +
-                "LEFT JOIN DBA_CONS_COLUMNS dcc ON dcc.COLUMN_NAME = atc.COLUMN_NAME AND dcc.Table_Name = atc.Table_Name AND dcc.OWNER = atc.OWNER " +
+                "LEFT JOIN ALL_CONS_COLUMNS dcc ON dcc.COLUMN_NAME = atc.COLUMN_NAME AND dcc.Table_Name = atc.Table_Name AND dcc.OWNER = atc.OWNER " +
                 "LEFT JOIN ALL_CONSTRAINTS ac ON ac.CONSTRAINT_NAME = dcc.CONSTRAINT_NAME AND ac.Table_Name = atc.Table_Name AND ac.OWNER = atc.OWNER " +
                 "WHERE " +
                 "atc.OWNER =  '" + dbName + "'" +
@@ -96,7 +96,7 @@ public class DM8Dialect extends AbstractDbDialect {
                 "INNER JOIN ALL_COL_COMMENTS acc ON acc.COLUMN_NAME = atc.COLUMN_NAME " +
                 "AND acc.Table_Name = atc.Table_Name " +
                 "AND acc.OWNER = atc.OWNER " +
-                "LEFT JOIN DBA_CONS_COLUMNS dcc ON dcc.COLUMN_NAME = atc.COLUMN_NAME " +
+                "LEFT JOIN ALL_CONS_COLUMNS dcc ON dcc.COLUMN_NAME = atc.COLUMN_NAME " +
                 "AND dcc.Table_Name = atc.Table_Name " +
                 "AND dcc.OWNER = atc.OWNER " +
                 "LEFT JOIN ALL_CONSTRAINTS ac ON ac.CONSTRAINT_NAME = dcc.CONSTRAINT_NAME " +
@@ -127,7 +127,7 @@ public class DM8Dialect extends AbstractDbDialect {
                 "INNER JOIN ALL_COL_COMMENTS acc ON acc.COLUMN_NAME = atc.COLUMN_NAME " +
                 "AND acc.Table_Name = atc.Table_Name " +
                 "AND acc.OWNER = atc.OWNER " +
-                "LEFT JOIN DBA_CONS_COLUMNS dcc ON dcc.COLUMN_NAME = atc.COLUMN_NAME " +
+                "LEFT JOIN ALL_CONS_COLUMNS dcc ON dcc.COLUMN_NAME = atc.COLUMN_NAME " +
                 "AND dcc.Table_Name = atc.Table_Name " +
                 "AND dcc.OWNER = atc.OWNER " +
                 "LEFT JOIN ALL_CONSTRAINTS ac ON ac.CONSTRAINT_NAME = dcc.CONSTRAINT_NAME " +
@@ -141,8 +141,9 @@ public class DM8Dialect extends AbstractDbDialect {
 
     @Override
     public String generateCheckTableExistsSQL(DbQueryProperty dbQueryProperty, String tableName) {
-        return "SELECT COUNT(*) FROM all_tables WHERE owner = '" + dbQueryProperty.getDbName() + "' AND table_name = '" + tableName.toUpperCase() + "'";
-
+        return "SELECT COUNT(*) FROM all_tables WHERE UPPER(owner) = UPPER('"
+                + DatabaseUtil.escapeSingleQuotes(dbQueryProperty.getDbName()) + "') AND UPPER(table_name) = UPPER('"
+                + DatabaseUtil.escapeSingleQuotes(tableName) + "')";
     }
 
     @Override
@@ -156,15 +157,7 @@ public class DM8Dialect extends AbstractDbDialect {
 
     @Override
     public List<String> someInternalSqlGenerator(DbQueryProperty dbQueryProperty, String tableName, String tableComment, List<DbColumn> dbColumnList) {
-        String dbName = dbQueryProperty.getDbName();
-
-        if (StringUtils.isNotEmpty(dbName)) {
-            tableName = dbName + "." + tableName;
-        }
-
-        List<String> sqlList = generateDmCreateSql(tableName, tableComment, dbColumnList);
-
-        return sqlList;
+        return generateDmCreateSql(getTableName(dbQueryProperty, tableName), tableComment, dbColumnList);
     }
 
     private List<String> generateDmCreateSql(String tableName, String tableComment, List<DbColumn> columns) {
@@ -175,10 +168,11 @@ public class DM8Dialect extends AbstractDbDialect {
         createSql.append("CREATE TABLE ").append(tableName).append(" (");
         List<String> pkList = new ArrayList<>();
         for (DbColumn col : columns) {
-            createSql.append("\n  ").append(col.getColName()).append(" ");
+            createSql.append("\n  ").append(quoteIdentifier(col.getColName())).append(" ");
             createSql.append(mapDmColumnType(col));
 
             // N false cannot be empty Y true can be empty
+            createSql.append(identityColumnClause(col));
             if (!col.getNullable()) {
                 createSql.append(" NOT NULL");
             }
@@ -192,7 +186,7 @@ public class DM8Dialect extends AbstractDbDialect {
 //                }
             }
             if (col.getColKey()) {
-                pkList.add(col.getColName());
+                pkList.add(quoteIdentifier(col.getColName()));
             }
             createSql.append(",");
         }
@@ -216,7 +210,7 @@ public class DM8Dialect extends AbstractDbDialect {
         }
         for (DbColumn col : columns) {
             if (StringUtils.isNotEmpty(col.getColComment())) {
-                String colCmt = "COMMENT ON COLUMN " + tableName + "." + col.getColName()
+                String colCmt = "COMMENT ON COLUMN " + tableName + "." + quoteIdentifier(col.getColName())
                         + " IS '" + DatabaseUtil.escapeSingleQuotes(col.getColComment()) + "'";
                 sqlList.add(colCmt);
             }
@@ -354,6 +348,63 @@ public class DM8Dialect extends AbstractDbDialect {
     }
 
     @Override
+    public DbColumn toStandardColumn(DbColumn column) {
+        String type = normalizeTypeName(column == null ? null : column.getDataType());
+        switch (type) {
+            case "CHAR":
+            case "NCHAR":
+                return toStandardColumn(column, "CHAR");
+            case "VARCHAR":
+            case "VARCHAR2":
+            case "NVARCHAR":
+            case "NVARCHAR2":
+                return toStandardColumn(column, "VARCHAR2");
+            case "TEXT":
+            case "CLOB":
+            case "NCLOB":
+            case "LONG":
+            case "XML":
+                return toStandardColumn(column, "TEXT");
+            case "TINYINT":
+            case "SMALLINT":
+            case "INT":
+            case "INTEGER":
+            case "BIGINT":
+            case "DECIMAL":
+            case "NUMERIC":
+            case "NUMBER":
+                return toStandardColumn(column, "NUMBER");
+            case "FLOAT":
+            case "REAL":
+                return toStandardColumn(column, "FLOAT");
+            case "DOUBLE":
+                return toStandardColumn(column, "DOUBLE");
+            case "BIT":
+            case "BOOLEAN":
+                return toStandardColumn(column, "TINYINT");
+            case "DATE":
+                return toStandardColumn(column, "DATE");
+            case "TIME":
+                return toStandardColumn(column, "TIMESTAMP");
+            case "DATETIME":
+            case "TIMESTAMP":
+                return toStandardColumn(column, "DATETIME");
+            case "VARBINARY":
+            case "RAW":
+            case "LONG VARBINARY":
+            case "BLOB":
+            case "IMAGE":
+                return toStandardColumn(column, "BLOB");
+            case "JSON":
+                return toStandardColumn(column, "TEXT");
+            case "UUID":
+                return toStandardColumn(column, "VARCHAR2");
+            default:
+                return super.toStandardColumn(column);
+        }
+    }
+
+    @Override
     public RowMapper<DbTable> tableMapper() {
         return (ResultSet rs, int rowNum) -> {
             DbTable entity = new DbTable();
@@ -449,7 +500,7 @@ public class DM8Dialect extends AbstractDbDialect {
                 "'port' = '${port}' ," +
                 "'username' = '${username}' ," +
                 "'password' = '${password}'," +
-                "'database-name' = 'DAMENG' ," +//The following TODO can be dynamically passed by adding a configuration item in the data connection.
+                "'database-name' = 'DAMENG' ," +
                 "'schema-name' = '${dbName}'," +
                 "'table-name' = '${tableName}' ," +
                 " 'scan.startup.mode' = 'initial'," +
@@ -546,7 +597,7 @@ public class DM8Dialect extends AbstractDbDialect {
     @Override
     public String dropColumn(DbQueryProperty dbQueryProperty, String tableName, String colName) {
         String fullTableName = getTableName(dbQueryProperty, tableName);
-        return "ALTER TABLE " + fullTableName + " DROP COLUMN " + colName;
+        return "ALTER TABLE " + fullTableName + " DROP COLUMN " + quoteIdentifier(colName);
     }
 
     @Override
@@ -556,7 +607,7 @@ public class DM8Dialect extends AbstractDbDialect {
 
         StringBuilder sql = new StringBuilder();
         sql.append("ALTER TABLE ").append(fullTableName).append(" MODIFY ");
-        sql.append(column.getColName()).append(" ");
+        sql.append(quoteIdentifier(column.getColName())).append(" ");
         sql.append(mapDmColumnType(column));
 
         if (!column.getNullable()) {
@@ -579,8 +630,10 @@ public class DM8Dialect extends AbstractDbDialect {
 
         StringBuilder sql = new StringBuilder();
         sql.append("ALTER TABLE ").append(fullTableName).append(" ADD ");
-        sql.append(column.getColName()).append(" ");
+        sql.append(quoteIdentifier(column.getColName())).append(" ");
         sql.append(mapDmColumnType(column));
+
+        sql.append(identityColumnClause(column));
 
         if (!column.getNullable()) {
             sql.append(" NOT NULL");
@@ -593,7 +646,7 @@ public class DM8Dialect extends AbstractDbDialect {
         sqlList.add(sql.toString());
 
         if (StringUtils.isNotEmpty(column.getColComment())) {
-            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + column.getColName()
+            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + quoteIdentifier(column.getColName())
                     + " IS '" + DatabaseUtil.escapeSingleQuotes(column.getColComment()) + "'");
         }
 
@@ -653,5 +706,21 @@ public class DM8Dialect extends AbstractDbDialect {
             return "\"" + property.getDbName() + "\".\"" + tableName + "\"";
         }
         return tableName;
+    }
+
+    @Override
+    public String castToText(String expression) {
+        return "TO_CHAR(" + expression + ")";
+    }
+
+    @Override
+    protected String identityColumnClause() { return " IDENTITY(1,1)"; }
+
+    @Override
+    public boolean requiresIdentityInsert() { return true; }
+
+    @Override
+    public String identityInsertSql(String qualifiedTable, boolean enabled) {
+        return "SET IDENTITY_INSERT " + qualifiedTable + (enabled ? " ON" : " OFF");
     }
 }

@@ -1,14 +1,14 @@
 <!--
   Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
 
-  This document is part of the qData Master Data Platform (open source version).
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
 
-  qData master data platform is licensed under Apache License 2.0 with additional qData master data platform terms.
-  You may use qData for commercial purposes, but you may not remove, hide,
-  modify, or replace the qData master data platform logo, copyright notices, license notices,
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
   or attribution information without a separate commercial license.
 
-  White-label use, OEM distribution, rebranding, or presenting qData master data platform as
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
@@ -17,36 +17,37 @@
 -->
 
 <!--
-    qt-table component
-    Description: An Element Plus table wrapper with pagination, sorting, dictionaries, icons, links, and other features.
-    Note: Do not modify this component without authorization. Contact wy first if there are any issues.
+    qt-table 组件
+    说明：基于element-plus的表格封装，集成了分页、排序、字典、图标、链接等功能
+    注意：不要私自修改本组件中的代码 有问题先联系wy
 -->
 <template>
   <div class="qt-table" v-loading="store.loading">
     <div :class="['qt-table--main', config.table?.class]">
       <el-table
-        ref="elTableRef"
-        :data="tableData"
-        v-bind="config.table"
-        :default-sort="defaultTableSort"
-        @sort-change="handleSortChange"
-        v-if="store.showTable"
+          :key="store.tableVersion"
+          ref="elTableRef"
+          :data="tableData"
+          v-bind="config.table"
+          :default-sort="defaultTableSort"
+          @sort-change="handleSortChange"
+          v-if="store.showTable"
       >
         <template v-for="(column, index) in props.columns" :key="index">
           <el-table-column
-            v-bind="getElColumnData(column)"
-            v-if="!column.hide"
-            :align="column.align || 'center'"
+              v-bind="getElColumnData(column)"
+              v-if="!column.hide"
+              :align="column.align || 'center'"
           >
-            <template #header>
+            <template #header v-if="column.tip || (column.headerTooltip && column.showHeaderTooltip)">
               <div class="tip-wrap" v-if="column.tip">
                 <div class="tip-label">
                   {{ column.label }}
                 </div>
                 <el-tooltip
-                  v-bind="column.tip"
-                  :effect="column.tip.effect || 'light'"
-                  :placement="column.tip.placement || 'top'"
+                    v-bind="column.tip"
+                    :effect="column.tip.effect || 'light'"
+                    :placement="column.tip.placement || 'top'"
                 >
                   <template #content v-if="column.tip.custom">
                     <div class="tip-content" v-html="column.tip.content"></div>
@@ -56,173 +57,229 @@
                   </slot>
                 </el-tooltip>
               </div>
+              <div class="tip-wrap" v-else-if="column.headerTooltip && column.showHeaderTooltip">
+                <div class="tip-label">
+                  {{ column.label }}
+                </div>
+                <el-tooltip
+                    effect="light"
+                    placement="top"
+                >
+                  <template #content>
+                    <div v-html="column.headerTooltip"></div>
+                  </template>
+                  <el-icon><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
             </template>
             <template #default="scope">
-              <!-- Empty data processing -->
-              <template v-if="column.prop && [undefined, null].includes(scope.row[column.prop])">
+              <!-- 空数据处理 -->
+              <template
+                  v-if="
+                  column.prop &&
+                  !column.slot &&
+                  [undefined, null].includes(scope.row[column.prop])
+                "
+              >
                 {{ getFormatValue(scope.row[column.prop]) }}
               </template>
 
-              <!-- dictionary -->
+              <!-- 字典 -->
               <dict-tag
-                :options="getDictOptions(column.dict)"
-                v-if="column.dict"
-                :value="scope.row[column.prop]"
+                  :show-placeholder="false"
+                  :options="getDictOptions(column.dict)"
+                  v-if="column.dict"
+                  :value="getPropValue(column.prop, scope.row)"
               />
 
-              <!-- label -->
-              <el-tag
-                v-if="column.tag && scope.row[column.prop]"
-                v-bind="typeof column.tag === 'object' ? column.tag : {}"
-                :type="(typeof column.tag === 'object' ? column.tag.type : '') || 'primary'"
-                :class="typeof column.tag === 'object' ? column.tag.class : ''"
+              <!-- 标签 -->
+              <dict-tag
+                  v-if="column.tag && getPropValue(column.prop, scope.row)"
+                  v-bind="typeof column.tag === 'object' ? column.tag : {}"
+                  :type="
+                  (typeof column.tag === 'object' ? column.tag.type : '') ||
+                  'primary'
+                "
+                  :class="typeof column.tag === 'object' ? column.tag.class : ''"
               >
-                {{ scope.row[column.prop] }}
-              </el-tag>
+                {{ getPropValue(column.prop, scope.row) }}
+              </dict-tag>
 
-              <!-- link -->
+              <!-- 链接 -->
               <el-link
-                v-bind="column.link"
-                :underline="column.link?.underline || 'never'"
-                :type="column.link?.type || 'primary'"
-                v-if="column.link"
-                @click="handleLinkClick(column, scope.row)"
+                  v-bind="column.link"
+                  :underline="column.link?.underline || 'never'"
+                  :type="column.link?.type || 'primary'"
+                  v-if="column.link"
+                  @click="handleLinkClick(column, scope.row)"
               >
-                {{ scope.row[column.prop] }}
+                {{ getPropValue(column.prop, scope.row) }}
               </el-link>
 
-              <!-- icon -->
+              <!-- 图标 -->
               <svg-icon
-                v-bind="column.svg"
-                v-if="column.svg"
-                :icon-class="scope.row[column.prop]"
+                  v-bind="column.svg"
+                  v-if="column.svg"
+                  :icon-class="getPropValue(column.prop, scope.row)"
               />
 
-              <!-- Uniform processing time -->
+              <!-- 统一处理时间 -->
               <template v-if="column.date">
                 {{
                   parseTime(
-                    scope.row[column.prop],
-                    column.date === true ? '{y}-{m}-{d} {h}:{i}' : column.date
+                      getPropValue(column.prop, scope.row),
+                      column.date === true ? "{y}-{m}-{d} {h}:{i}" : column.date
                   )
                 }}
               </template>
 
-              <!-- Multi-field display -->
+              <!-- 多字段展示 -->
               <div
-                v-if="column.list"
-                :class="['flex-column', column.listClass || 'fz14']"
-                :style="{ alignItems: column.align || 'center' }"
+                  v-if="column.list"
+                  :class="[
+                  'flex-column',
+                  'flex-column-gap',
+                  column.listClass || 'fz14',
+                ]"
+                  :style="{ alignItems: column.align || 'center' }"
               >
                 <template v-for="(item, i) in column.list" :key="i">
-                  <span
-                    :class="['text-ellipsis', item.class]"
-                    :title="item.title ? scope.row[item.title] : scope.row[item.prop]"
+                  <div
+                      :class="['flex-center', item.class]"
+                      :title="
+                      item.title
+                        ? getPropValue(item.title, scope.row)
+                        : getPropValue(item.prop, scope.row)
+                    "
                   >
-                    {{ scope.row[item.prop] || '-' }}
-                  </span>
+                    <span v-if="item.label" class="mr5">{{ item.label }}</span>
+                    <dict-tag
+                        v-if="item.dict"
+                        :options="getDictOptions(item.dict)"
+                        :value="getPropValue(item.prop, scope.row)"
+                    />
+                    <span v-else class="text-ellipsis">
+                      {{ getPropValue(item.prop, scope.row) || "-" }}
+                    </span>
+                  </div>
                 </template>
               </div>
-              <!-- Information column (icon + title + label / description) -->
+              <!-- 信息列 (图标 + 标题 + 标签 / 描述) -->
               <div v-if="column.info" class="qt-table-info">
                 <div class="qt-table-info__main">
+                  <template v-if="column.info.iconSlot">
+                    <slot :name="column.info.iconSlot" v-bind="scope" />
+                  </template>
                   <img
-                    v-if="column.info.icon"
-                    :src="
-                      typeof column.info.icon === 'function'
-                        ? column.info.icon(scope.row)
-                        : scope.row[column.info.icon]
-                    "
-                    v-show="
-                      typeof column.info.icon === 'function'
-                        ? column.info.icon(scope.row)
-                        : scope.row[column.info.icon]
-                    "
-                    class="info-icon"
+                      v-else-if="column.info.icon"
+                      :src="getPropValue(column.info.icon, scope.row)"
+                      v-show="getPropValue(column.info.icon, scope.row)"
+                      class="info-icon"
                   />
-                  <el-link
-                    v-if="column.info.title"
-                    type="primary"
-                    :underline="false"
-                    class="info-title text-ellipsis"
-                    :title="
-                      typeof column.info.title === 'function'
-                        ? column.info.title(scope.row)
-                        : scope.row[column.info.title]
+                  <template v-if="column.info.title">
+                    <el-link
+                        v-if="column.info.click"
+                        type="primary"
+                        :underline="false"
+                        class="info-title text-ellipsis"
+                        :title="getPropValue(column.info.title, scope.row)"
+                        @click="column.info.click && column.info.click(scope.row)"
+                    >
+                      {{ getPropValue(column.info.title, scope.row) || "-" }}
+                    </el-link>
+                    <span
+                        v-else
+                        class="info-title text-ellipsis"
+                        :title="getPropValue(column.info.title, scope.row)"
+                    >
+                      {{ getPropValue(column.info.title, scope.row) || "-" }}
+                    </span>
+                  </template>
+                  <template v-if="column.info.tagGroup">
+                    <QtTagGroup
+                        v-bind="column.info.tagGroup"
+                        :items="
+                        getPropValue(column.info.tagGroup.items, scope.row)
+                      "
+                    />
+                  </template>
+                  <template v-if="column.info.custom">
+                    <slot :name="column.info.custom" v-bind="scope" />
+                  </template>
+                  <template v-else-if="column.info.tags">
+                    <dict-tag
+                        v-for="(tag, idx) in column.info.tags"
+                        :key="idx"
+                        :options="tag.options || getDictOptions(tag.dict)"
+                        :value="getPropValue(tag.value, scope.row)"
+                        :size="tag.size || 'small'"
+                        :type="tag.type || 'primary'"
+                        :class="[tag.class || '', idx > 0 ? 'ml4' : '']"
+                    />
+                  </template>
+                  <dict-tag
+                      v-else-if="column.info.tag"
+                      :options="
+                      column.info.tag.options ||
+                      getDictOptions(column.info.tag.dict)
                     "
-                    @click="column.info.click && column.info.click(scope.row)"
+                      :value="getPropValue(column.info.tag.value, scope.row)"
+                      :size="column.info.tag.size || 'small'"
+                      :type="column.info.tag.type || 'primary'"
+                      :class="column.info.tag.class || ''"
+                  />
+                  <dict-tag
+                      v-else-if="column.info.tag"
+                      type="primary"
+                      size="small"
                   >
-                    {{
-                      (typeof column.info.title === 'function'
-                        ? column.info.title(scope.row)
-                        : scope.row[column.info.title]) || '-'
-                    }}
-                  </el-link>
-                  <el-tag
-                    v-if="
-                      column.info.tag &&
-                      (typeof column.info.tag === 'function'
-                        ? column.info.tag(scope.row)
-                        : scope.row[column.info.tag])
-                    "
-                    type="primary"
-                    size="small"
-                    class="info-tag"
-                  >
-                    {{
-                      typeof column.info.tag === 'function'
-                        ? column.info.tag(scope.row)
-                        : scope.row[column.info.tag]
-                    }}
-                  </el-tag>
+                    {{ getPropValue(column.info.tag, scope.row) }}
+                  </dict-tag>
                 </div>
                 <div
-                  v-if="column.info.desc"
-                  class="info-desc text-ellipsis"
-                  :title="
-                    typeof column.info.desc === 'function'
-                      ? column.info.desc(scope.row)
-                      : scope.row[column.info.desc]
-                  "
+                    v-if="column.info.desc"
+                    class="info-desc text-ellipsis"
+                    :title="getPropValue(column.info.desc, scope.row)"
                 >
-                  {{
-                    (typeof column.info.desc === 'function'
-                      ? column.info.desc(scope.row)
-                      : scope.row[column.info.desc]) || '-'
-                  }}
+                  {{ getPropValue(column.info.desc, scope.row) || "-" }}
                 </div>
               </div>
 
-              <!-- Custom slot -->
+              <!-- 自定义slot -->
               <slot
-                v-if="scope.$index > -1 && column.slot"
-                :name="column.slot"
-                v-bind="scope"
-                :column_data="column"
+                  v-if="scope.$index > -1 && column.slot"
+                  :name="column.slot"
+                  v-bind="scope"
+                  :column_data="column"
               />
             </template>
           </el-table-column>
         </template>
 
         <template #empty>
-          <div class="emptyBg">
-            <img src="@/assets/common/images/empty-state/empty-nodata.png" alt="" />
-            <p>{{ td('common.noData') }}</p>
-          </div>
+          <slot name="empty">
+            <div class="qt-table__empty">
+              <img src="@/assets/common/images/empty-state/empty-nodata.png" alt="" />
+              <p>暂无记录</p>
+            </div>
+          </slot>
         </template>
       </el-table>
     </div>
-    <div :class="['qt-table--pagination', config.pagination?.class]" v-if="!config.notPagination">
+    <div
+        :class="['qt-table--pagination', config.pagination?.class]"
+        v-if="!config.notPagination && store.total > 0"
+    >
       <el-pagination
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="store.total"
-        v-model:current-page="store.params.pageNum"
-        v-model:page-size="store.params.pageSize"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-        v-bind="config.pagination"
-        :background="config.pagination?.background || true"
-        :pager-count="config.pagination?.pagerCount || store.pagerCount"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="store.total"
+          v-model:current-page="store.params.pageNum"
+          v-model:page-size="store.params.pageSize"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+          v-bind="config.pagination"
+          :background="config.pagination?.background || true"
+          :pager-count="config.pagination?.pagerCount || store.pagerCount"
       >
       </el-pagination>
     </div>
@@ -230,75 +287,75 @@
 </template>
 
 <script setup name="QtTable">
-import { reactive, computed, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
-import SvgIcon from '@/components/SvgIcon/index.vue';
-import { scrollTo } from '@/utils/scroll-to';
-import useDefaultLang from '@/composables/useDefaultLang';
+import { reactive, computed, nextTick } from "vue";
+import { useRouter } from "vue-router";
+import SvgIcon from "@/components/SvgIcon/index.vue";
+import QtTagGroup from "@/components/QtTagGroup/index.vue";
+import { scrollTo } from "@/utils/scroll-to";
 
 defineOptions({
-  inheritAttrs: false
+  inheritAttrs: false,
 });
 
 /**
  * props
- * @param {columns} table items
- * @param {Function} Method to obtain table data Parameters: params Need to return a Promise
- * @param {Object} config.table table configuration, please see el-table for details
- * @param {Object} config.pagination paging configuration. Please see el-pagination for details.
- * @param {Bollean} config.pagination.notAutoScroll The function specified after turning off paging
- * @param {Bollean} config.initResquest whether to initialize the request
- * @param {Boolean} config.notPagination does not use paging
- * @param {Boolean} config.notPaginationParams does not use the default pagination parameters
- * @param {Boolean} config.autoPagination front-end paging
- * @param {Object|Boolean} config.sort The key required for backend sorting. If true, use the default value.
- * @param {Object|Boolean} config.sort.prop The key of the sort field defaults to: orderByColumn
- * @param {Object|Boolean} config.sort.order The key of the sorting method defaults to: isAsc
- * @param {Array} column.dict dictionary data
- * @param {Object} column.svg svg icon data
- * @param {String} column.svg.color icon color
- * @param {String} column.svg.className icon class name
- * @param {Object} column.link jump parameter The specific parameters integrate el-link+router.push
- * @param {Object} column.slot Custom slot
- * @param {Object} column.date time parameter will automatically format the time and also supports custom formatting
- * @param {events} event callback
- * @param {Function} events.onLinkClick triggered when link is clicked
- * @param {Function} events.onPageSizeChange Pagination - number of items per page
- * @param {Function} events.onPageCurrentChange Pagination - current page
- * @param {Function} events.onSortChange triggered when sorting
- * @param {Function} events.formatParams The last params processed before the request must have a return value
- * @param {Function} events.formatData processing data must have a return value
+ * @param {columns} 表格项
+ * @param {Function} 获取表格数据的方法 参数:params 需返回一个Promise
+ * @param {Object} config.table 表格配置 具体请查看el-table
+ * @param {Object} config.pagination 分页配置 具体请查看 el-pagination
+ * @param {Bollean} config.pagination.notAutoScroll 关闭分页后指定的功能
+ * @param {Bollean} config.initResquest 是否初始化请求
+ * @param {Boolean} config.notPagination 不使用分页
+ * @param {Boolean} config.notPaginationParams 不使用默认的分页参数
+ * @param {Boolean} config.autoPagination 前端分页
+ * @param {Object|Boolean} config.sort 后端排序所需的key 如果为true则使用默认值
+ * @param {Object|Boolean} config.sort.prop 排序字段的key 默认为：orderByColumn
+ * @param {Object|Boolean} config.sort.order 排序方式的key 默认为：isAsc
+ * @param {Array} column.dict 字典数据
+ * @param {Object} column.svg svg图标数据
+ * @param {String} column.svg.color 图标颜色
+ * @param {String} column.svg.className 图标类名
+ * @param {Object} column.link 跳转参数 具体参数整合了el-link+router.push
+ * @param {Object} column.slot 自定义插槽
+ * @param {Object} column.date 时间参数 会自动格式化时间 也支持自定义格式化
+ * @param {events} 事件回调
+ * @param {Function} events.onLinkClick 点击link时触发
+ * @param {Function} events.onPageSizeChange 分页-每页条数
+ * @param {Function} events.onPageCurrentChange 分页-当前页
+ * @param {Function} events.onSortChange 排序时触发
+ * @param {Function} events.formatParams 请求前最后处理params必须有返回值
+ * @param {Function} events.formatData 处理data必须有返回值
  */
 const props = defineProps({
+  contextKey: { type: [String, Number], default: '' },
   config: {
     type: Object,
     default: () => {
       return {};
-    }
+    },
   },
   columns: {
     type: Array,
-    required: true
+    required: true,
   },
   func: {
     type: Function,
-    required: true
+    required: true,
   },
   params: {
     type: Object,
     default: () => {
       return {};
-    }
+    },
   },
   events: {
     type: Object,
     default: () => {
       return {};
-    }
-  }
+    },
+  },
 });
 
-const { td } = useDefaultLang();
 const { proxy } = getCurrentInstance();
 const router = useRouter();
 
@@ -306,36 +363,38 @@ const elTableRef = ref(null);
 
 const DEFAULT_PAGE_PARAMS = {
   pageNum: 1,
-  pageSize: 10
+  pageSize: 10,
 };
 
 const store = reactive({
+  tableVersion: 0,
   loading: false,
   params: {},
   total: 0,
   data: [],
   rows: [],
   defaultSort: {},
+  currentSort: null,
   sort: {
-    prop: 'orderByColumn',
-    order: 'isAsc'
+    prop: "orderByColumn",
+    order: "isAsc",
   },
   dict: {},
   showTable: true,
-  pagerCount: document.body.clientWidth < 1300 ? 4 : 7
+  pagerCount: document.body.clientWidth < 1300 ? 4 : 7,
 });
 
 const config = computed(() => {
-  // Reserved for subsequent collection and merging of default configuration items...
+  // 留作后续收集合并默认配置项处理...
   return props.config || {};
 });
 
 const defaultTableSort = computed(() => {
   const { table } = config.value;
-  return table?.defaultSort || store.defaultSort;
+  return store.currentSort || table?.defaultSort || store.defaultSort;
 });
 
-// tabular data
+// 表格数据
 const tableData = computed(() => {
   const { notPagination, autoPagination } = config.value;
   if (notPagination) return store.data;
@@ -346,40 +405,56 @@ const tableData = computed(() => {
   return store.data;
 });
 
-// Get data
+// 获取数据；只有最新请求可以提交结果，防止快速切换分类后旧响应覆盖新列表。
+let latestListRequest = 0
+let renderedContext = props.contextKey
+function syncTableContext() {
+  if (renderedContext === props.contextKey) return;
+  renderedContext = props.contextKey;
+  // 分类等数据范围改变后使用新表格实例，清理被复用行的斑马纹、悬停和选中状态。
+  // QtTable 的分页、排序和列配置仍保存在当前包装组件中。
+  store.tableVersion++;
+}
 function getList() {
+  const requestId = ++latestListRequest
   store.loading = true;
   const { formatParams, formatData } = props.events;
   const { notPagination, autoPagination } = config.value;
   let params = Object.assign({}, store.params, props.params);
   params = formatParams ? formatParams(params) : params;
   props
-    .func(params)
-    .then((res) => {
-      let data = Array.isArray(res.data) ? res.data : res.data.rows;
-      if (!notPagination) {
-        store.total = res.data.total;
-      }
-      if (autoPagination) {
-        store.total = data.length;
-      }
-      store.total = store.total || 0;
-      data = formatData ? formatData(data, params) : data;
-      store.data = data;
-      store.loading = false;
-    })
-    .catch(() => {
-      store.loading = false;
-    });
+      .func(params)
+      .then((res) => {
+        if (requestId !== latestListRequest) return;
+        let data = Array.isArray(res.data) ? res.data : res.data.rows;
+        if (!notPagination) {
+          store.total = res.data.total;
+        }
+        if (autoPagination) {
+          store.total = data.length;
+        }
+        store.total = store.total || 0;
+        data = formatData ? formatData(data, params) : data;
+        store.data = data;
+        syncTableContext();
+        store.loading = false;
+      })
+      .catch(() => {
+        if (requestId !== latestListRequest) return;
+        store.loading = false;
+        store.data = [];
+        store.total = 0;
+        syncTableContext();
+      });
 }
 
-// Reset data
+// 重置数据
 function resetQuery() {
   setupDefaultPageParams();
   getList();
 }
 
-// Pagination change-number of pages
+// 分页change-页数
 function handleSizeChange(pageSize) {
   const { onPageSizeChange } = props.events;
   const { pageNum } = store.params;
@@ -393,7 +468,7 @@ function handleSizeChange(pageSize) {
   scrollTo(0, 800);
 }
 
-// Pagination change-current page
+// 分页change-当前页
 function handleCurrentChange() {
   const { onPageCurrentChange } = props.events;
   const { pagination } = config.value;
@@ -403,25 +478,33 @@ function handleCurrentChange() {
   scrollTo(0, 800);
 }
 
-// Sort change
+// 排序change
 function handleSortChange({ column, order, prop }) {
+  store.currentSort = { prop, order };
   const { onSortChange } = props.events;
-  const index = column.getColumnIndex();
-  const data = props.columns[index];
   const sort = store.sort;
-  store.params[sort.prop] = data.sortableKey || prop;
-  store.params[sort.order] = order;
-  onSortChange && onSortChange({ ...store.params, ...props.params }, { ...sort });
+  // 排序字段与方向一起设置或清除，避免取消排序后后端补上默认方向。
+  if (order) {
+    const index = column.getColumnIndex();
+    const data = props.columns[index];
+    store.params[sort.prop] = data.sortableKey || prop;
+    store.params[sort.order] = order;
+  } else {
+    delete store.params[sort.prop];
+    delete store.params[sort.order];
+  }
+  onSortChange &&
+  onSortChange({ ...store.params, ...props.params }, { ...sort });
   getList();
 }
 
-// Filter Column data
+// 过滤Column数据
 function getElColumnData(column) {
-  const { hide, dict, link, ...otherData } = column;
+  const { hide, dict, link, headerTooltip, showHeaderTooltip, ...otherData } = column;
   return otherData;
 }
 
-// link click event
+// link点击事件
 function handleLinkClick(column, row) {
   const { onLinkClick } = props.events;
   const { type, path, name, external, ...other } = column.link;
@@ -433,11 +516,11 @@ function handleLinkClick(column, row) {
     name,
     path,
     params,
-    query
+    query,
   });
 }
 
-// Get dictionary data
+// 获取字典数据
 function getDictOptions(key) {
   if (store.dict[key]) return store.dict[key];
   const value = proxy.useDict(key)[key];
@@ -445,7 +528,12 @@ function getDictOptions(key) {
   return value;
 }
 
-// reload
+// 获取 prop 的值，支持函数
+function getPropValue(prop, row) {
+  return typeof prop === "function" ? prop(row) : row[prop];
+}
+
+// 重新加载
 function reload() {
   store.showTable = false;
   nextTick(() => {
@@ -453,13 +541,17 @@ function reload() {
   });
 }
 
-// Set paging parameters
+// 设置分页参数
 function setupDefaultPageParams() {
   const { notPagination, pagination } = config.value;
   if (pagination?.params) {
     const { notPaginationParams } = config.value;
     const defaultParams = notPaginationParams ? { ...DEFAULT_PAGE_PARAMS } : {};
-    const params = Object.assign({}, defaultParams, config.value.pagination.params);
+    const params = Object.assign(
+        {},
+        defaultParams,
+        config.value.pagination.params
+    );
     for (let key in params) {
       store.params[key] = params[key];
     }
@@ -473,19 +565,19 @@ function setupDefaultPageParams() {
   }
 }
 
-// Initialize sorting parameters
+// 初始化排序参数
 setupDefaultPageParams();
 
-// Initialize sorting parameters
+// 初始化排序参数
 if (config.value.sort) {
   let sort = config.value.sort;
-  if (typeof sort == 'boolean') {
+  if (typeof sort == "boolean") {
     sort = { ...store.sort };
   }
   store.sort = { ...sort };
   let defaultSort = defaultTableSort.value;
   if (!Object.keys(defaultSort).length) {
-    defaultSort = { prop: 'createTime', order: 'descending' };
+    defaultSort = { prop: "createTime", order: "descending" };
     store.defaultSort = { ...defaultSort };
   }
   store.params[sort.prop] = defaultSort.prop;
@@ -500,41 +592,26 @@ defineExpose({
   getList,
   resetQuery,
   reload,
-  elTableRef
+  elTableRef,
 });
 </script>
 
-<style lang="scss" scoped>
-::v-deep(.el-table) {
-  --el-table-header-bg-color: var(--qt-element-fixed-qt-table-header-background);
-  --el-table-header-text-color: var(--qt-element-fixed-qt-table-header-text);
-}
-
-.tip-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.is-center.el-table__cell {
-  .tip-wrap {
-    justify-content: center;
-  }
-}
-
-.qt-table--pagination {
-  padding: 20px 10px;
+<style scoped>
+.qt-table__empty {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  line-height: 20px;
 }
 
-.empty-wrap {
-  img {
-    width: 380px;
-  }
-  p {
-    font-size: var(--qt-font-size-base);
-    margin: 14px 0;
-  }
+.qt-table__empty img {
+  width: 250px;
+  max-width: 100%;
+  height: auto;
+}
+
+.qt-table__empty p {
+  margin: 0;
 }
 </style>
