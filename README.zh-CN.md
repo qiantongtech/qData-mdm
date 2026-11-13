@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Spring%20Boot-2.5.15-blue.svg" alt="Spring Boot">
   <img src="https://img.shields.io/badge/Vue-3.5.21-blue.svg" alt="Vue">
   <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License"/>
-  <img src="https://img.shields.io/badge/qData--MDM-v1.0.0-blue.svg" alt="qData-mdm v1.0.0"/>
+  <img src="https://img.shields.io/badge/qData--mdm-v1.0.0-blue.svg" alt="qData-mdm v1.0.0"/>
 
   <img src="https://gitee.com/qiantongtech/qData-mdm/badge/star.svg" alt="Gitee Stars"/>
   <img src="https://img.shields.io/github/stars/qiantongtech/qData-mdm?label=GitHub%20Stars" alt="GitHub Stars"/>
@@ -97,7 +97,7 @@ qData-mdm 平台采用前后端分离架构，后端基于 Spring Boot，前端�
 
 qData-mdm 提供 **专业版** 与 **开源版** 两种形态，满足不同规模与场景下的用户需求。两者既各具特色，又形成互补：开源版更像启蒙老师，帮助低成本起步；专业版更像专家顾问，提供深度与保障。无论选择哪种版本，qData-mdm 都将成为可靠的伙伴，帮助企业释放数据价值，加速数字化进程。
 
-> 👉 如需 **开源版品牌授权** 或 **咨询专业版**，请点击按钮查看详情：[💼 了解授权详情](https://qdata.tech/price/)
+> 👉 如需 **开源版品牌授权** 或 **咨询专业版**，请点击按钮查看详情：[💼 了解授权详情](https://community.qdata.tech/business/policy.html)
 
 ## 快速开始
 

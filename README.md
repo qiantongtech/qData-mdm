@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Spring%20Boot-2.5.15-blue.svg" alt="Spring Boot">
   <img src="https://img.shields.io/badge/Vue-3.5.21-blue.svg" alt="Vue">
   <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License"/>
-  <img src="https://img.shields.io/badge/qData--MDM-v1.0.0-blue.svg" alt="qData-mdm v1.0.0"/>
+  <img src="https://img.shields.io/badge/qData--mdm-v1.0.0-blue.svg" alt="qData-mdm v1.0.0"/>
 
   <img src="https://gitee.com/qiantongtech/qData-mdm/badge/star.svg" alt="Gitee Stars"/>
   <img src="https://img.shields.io/github/stars/qiantongtech/qData-mdm?label=GitHub%20Stars" alt="GitHub Stars"/>
@@ -94,7 +94,7 @@ qData-mdm separates the Spring Boot backend from the Vue 3 frontend and integrat
 
 qData-mdm provides two editions: **Professional Edition** and **Open-Source Edition**, meeting user needs across different scales and scenarios. Each has its own focus while complementing the other: the Open-Source Edition helps users get started at low cost, while the Professional Edition provides greater depth and support. Whichever edition you choose, qData-mdm aims to be a reliable partner that helps enterprises unlock data value and accelerate digital transformation.
 
-> 👉 For **Open-Source Edition brand authorization** or **Professional Edition consultation**, see [💼 Licensing Details](https://qdata.tech/en/price/).
+> 👉 For **Open-Source Edition brand authorization** or **Professional Edition consultation**, see [💼 Licensing Details](https://community.qdata.tech/business/policy.html).
 
 ## Quick Start
 

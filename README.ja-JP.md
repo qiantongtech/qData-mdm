@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Spring%20Boot-2.5.15-blue.svg" alt="Spring Boot">
   <img src="https://img.shields.io/badge/Vue-3.5.21-blue.svg" alt="Vue">
   <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License"/>
-  <img src="https://img.shields.io/badge/qData--MDM-v1.0.0-blue.svg" alt="qData-mdm v1.0.0"/>
+  <img src="https://img.shields.io/badge/qData--mdm-v1.0.0-blue.svg" alt="qData-mdm v1.0.0"/>
 
   <img src="https://gitee.com/qiantongtech/qData-mdm/badge/star.svg" alt="Gitee Stars"/>
   <img src="https://img.shields.io/github/stars/qiantongtech/qData-mdm?label=GitHub%20Stars" alt="GitHub Stars"/>
@@ -94,7 +94,7 @@ qData-mdm は、Spring Boot のバックエンドと Vue 3 のフロントエン
 
 qData-mdm は**プロフェッショナル版**と**オープンソース版**の2つの形態を提供し、さまざまな規模やシナリオのニーズに対応します。両者にはそれぞれ特長があり、相互に補完し合います。オープンソース版は低コストでの導入を支援し、プロフェッショナル版はより高度な機能と手厚いサポートを提供します。どちらを選択しても、qData-mdm は企業のデータ価値の創出とデジタル化の推進を支える信頼できるパートナーとなります。
 
-> 👉 **オープンソース版のブランド利用許諾**または**プロフェッショナル版に関するご相談**は、[💼 ライセンスの詳細](https://qdata.tech/ja/price/)をご覧ください。
+> 👉 **オープンソース版のブランド利用許諾**または**プロフェッショナル版に関するご相談**は、[💼 ライセンスの詳細](https://community.qdata.tech/business/policy.html)をご覧ください。
 
 ## クイックスタート
 
