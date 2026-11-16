@@ -8,6 +8,7 @@
 
   <img src="https://gitee.com/qiantongtech/qData-mdm/badge/star.svg" alt="Gitee Stars"/>
   <img src="https://img.shields.io/github/stars/qiantongtech/qData-mdm?label=GitHub%20Stars" alt="GitHub Stars"/>
+  <img src="https://atomgit.com/qiantongtech/qData-mdm/star/badge.svg"/>
 </p>
 
 <p align="center">
@@ -22,7 +23,7 @@
 
 ✨✨✨**オープンソース版デモ**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a>（ユーザー名 `qData`、パスワード `qData123`）
 
-✨✨✨**プロフェッショナル版デモ**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>。デモアカウントの取得は[カスタマーサービスにお問い合わせ](https://community.qdata.tech/business/policy.html)ください。
+✨✨✨**プロフェッショナル版デモ**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>。デモアカウントの取得は[カスタマーサービスにお問い合わせ](https://qdata.qiantong.tech/business/policy.html)ください。
 
 > qData-mdm が役に立ったら、開発を応援するために **Star ⭐️** をお願いします。
 
@@ -94,7 +95,7 @@ qData-mdm は、Spring Boot のバックエンドと Vue 3 のフロントエン
 
 qData-mdm は**プロフェッショナル版**と**オープンソース版**の2つの形態を提供し、さまざまな規模やシナリオのニーズに対応します。両者にはそれぞれ特長があり、相互に補完し合います。オープンソース版は低コストでの導入を支援し、プロフェッショナル版はより高度な機能と手厚いサポートを提供します。どちらを選択しても、qData-mdm は企業のデータ価値の創出とデジタル化の推進を支える信頼できるパートナーとなります。
 
-> 👉 **オープンソース版のブランド利用許諾**または**プロフェッショナル版に関するご相談**は、[💼 ライセンスの詳細](https://community.qdata.tech/business/policy.html)をご覧ください。
+> 👉 **オープンソース版のブランド利用許諾**または**プロフェッショナル版に関するご相談**は、[💼 ライセンスの詳細](https://qdata.qiantong.tech/business/policy.html)をご覧ください。
 
 ## クイックスタート
 
@@ -150,44 +151,59 @@ qData-mdm をデプロイする前に、次の実行環境とツールを用意�
 
 qData 公式 QQ コミュニティでは、最新情報の確認、技術的な相談、情報交換ができます。
 
-👉 <a href="https://community.qdata.tech/discuss.html">QQ コミュニティに参加</a>
+👉 <a href="https://qdata.qiantong.tech/discuss.html">QQ コミュニティに参加</a>
 
 ## システム画面
 
 スクリーンショットは簡体字中国語の画面です。
-
 <table>
     <tr>
-      <td><img src="images/zh-CN/system/login.png" alt="ログイン" width="400"/></td>
+      <td><img src="images/zh-CN/system/login.png" alt="ログインページ" width="400"/></td>
       <td><img src="images/zh-CN/system/index.png" alt="ホーム" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/master.png" alt="正式なマスターデータ" width="400"/></td>
-      <td><img src="images/zh-CN/system/project.png" alt="マスターデータドメイン" width="400"/></td>
+      <td><img src="images/zh-CN/system/master.png" alt="マスターデータ" width="400"/></td>
+      <td><img src="images/zh-CN/system/master_detail.png" alt="マスターデータ一覧" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/layer.png" alt="モデルカタログ" width="400"/></td>
+      <td><img src="images/zh-CN/system/project_detail.png" alt="データドメイン詳細" width="400"/></td>
+      <td><img src="images/zh-CN/system/layer_detail.png" alt="モデルカタログ詳細" width="400"/></td>
+    </tr>
+    <tr>
       <td><img src="images/zh-CN/system/model.png" alt="モデル定義" width="400"/></td>
+      <td><img src="images/zh-CN/system/model_detail.png" alt="モデル詳細" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/relation.png" alt="モデル間の関係" width="400"/></td>
-      <td><img src="images/zh-CN/system/match.png" alt="マッチングルール" width="400"/></td>
+      <td><img src="images/zh-CN/system/model_form_one.png" alt="基本情報" width="400"/></td>
+      <td><img src="images/zh-CN/system/model_form_four.png" alt="モデル設定" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/survivor.png" alt="サバイバーシップルール" width="400"/></td>
-      <td><img src="images/zh-CN/system/qualitys.png" alt="データ品質ルール" width="400"/></td>
+      <td><img src="images/zh-CN/system/relation.png" alt="モデル関係" width="400"/></td>
+      <td><img src="images/zh-CN/system/relation_detail.png" alt="モデル関係詳細" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/datasource.png" alt="データ取り込み" width="400"/></td>
+      <td><img src="images/zh-CN/system/match_form.png" alt="マッチングルールフォーム" width="400"/></td>
+      <td><img src="images/zh-CN/system/survivor_form.png" alt="サバイバールールフォーム" width="400"/></td>
+    </tr>
+    <tr>
+      <td><img src="images/zh-CN/system/quality_form.png" alt="品質ルールフォーム" width="400"/></td>
+      <td><img src="images/zh-CN/system/review.png" alt="マッチング審査" width="400"/></td>
+    </tr>
+    <tr>
+      <td><img src="images/zh-CN/system/datasource.png" alt="データソース" width="400"/></td>
       <td><img src="images/zh-CN/system/datasource_detail.png" alt="接続テスト" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/ingest_task.png" alt="データ取り込みタスク" width="400"/></td>
-      <td><img src="images/zh-CN/system/review.png" alt="照合結果のレビュー" width="400"/></td>
+      <td><img src="images/zh-CN/system/ingest_task.png" alt="取り込みタスク" width="400"/></td>
+      <td><img src="images/zh-CN/system/ingest_task_detail.png" alt="取り込みタスク詳細" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/manage.png" alt="マージ管理" width="400"/></td>
-      <td><img src="images/zh-CN/system/quality_task.png" alt="データ品質タスク" width="400"/></td>
+      <td><img src="images/zh-CN/system/quality_task.png" alt="品質タスク" width="400"/></td>
+      <td><img src="images/zh-CN/system/quality_task_form.png" alt="品質タスクフォーム" width="400"/></td>
+    </tr>
+    <tr>
+      <td><img src="images/zh-CN/system/data_auth_form_one.png" alt="エンティティとモデル" width="400"/></td>
+      <td><img src="images/zh-CN/system/data_auth_form_four.png" alt="操作と有効期限" width="400"/></td>
     </tr>
     <tr>
       <td><img src="images/zh-CN/system/quality_issue_task.png" alt="是正タスク" width="400"/></td>

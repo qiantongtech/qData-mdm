@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://qdata.qiantong.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.dist.dal.mapper.task.DistTaskMapper">
+
+    <!-- 任务责任人仅保存平台用户 ID；姓名和电话仅在详情查询时关联账号表回显。 -->
+    <resultMap type="DistTaskDO" id="DistTaskResult">
+        <result property="id"    column="ID"    />
+        <result property="code"    column="CODE"    />
+        <result property="name"    column="NAME"    />
+        <result property="modelId"    column="MODEL_ID"    />
+        <result property="modelVersionId"    column="MODEL_VERSION_ID"    />
+        <result property="targetSystemId"    column="TARGET_SYSTEM_ID"    />
+        <result property="responsibleUserId" column="RESP_USER_ID" />
+        <result property="type"    column="TYPE"    />
+        <result property="dataMode"    column="DATA_MODE"    />
+        <result property="triggerType"    column="TRIGGER_TYPE"    />
+        <result property="retryTriggerType" column="RETRY_TRIGGER_TYPE" />
+        <result property="failRetryFlag" column="FAIL_RETRY_FLAG" />
+        <result property="failRetryTimes" column="FAIL_RETRY_TIMES" />
+        <result property="failRetryInterval" column="FAIL_RETRY_INTERVAL" />
+        <result property="failRetryOutType" column="FAIL_RETRY_OUT_TYPE" />
+        <result property="cronExpression" column="CRON_EXPRESSION" />
+        <result property="incrementalStartTime" column="INCREMENTAL_START_TIME" />
+        <result property="dataScopeType"    column="DATA_SCOPE_TYPE"    />
+        <result property="apiUrl"    column="API_URL"    />
+        <result property="httpMethod"    column="HTTP_METHOD"    />
+        <result property="authType"    column="AUTH_TYPE"    />
+        <result property="authConfig"    column="AUTH_CONFIG"    />
+        <result property="headerConfig"    column="HEADER_CONFIG"    />
+        <result property="requestBodyMode"    column="REQUEST_BODY_MODE"    />
+        <result property="successCondition"    column="SUCCESS_CONDITION"    />
+        <result property="status"    column="STATUS"    />
+        <result property="lastSuccessTime"    column="LAST_SUCCESS_TIME"    />
+        <result property="validFlag"    column="VALID_FLAG"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="creatorId"    column="CREATOR_ID"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updaterId"    column="UPDATER_ID"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="remark"    column="REMARK"    />
+    </resultMap>
+
+    <!-- 列表补充信息仅查询当前页任务，避免前端拉取全部模型和目标系统。 -->
+    <resultMap id="DistTaskListDetailsResult" type="tech.qiantong.qdata.mdm.dist.controller.admin.task.vo.DistTaskRespVO">
+        <id property="id" column="TASK_ID" />
+        <result property="modelName" column="MODEL_NAME" />
+        <result property="projectName" column="PROJECT_NAME" />
+        <result property="projectIcon" column="PROJECT_ICON" />
+        <result property="layerName" column="LAYER_NAME" />
+        <result property="targetSystemCode" column="TARGET_SYSTEM_CODE" />
+        <result property="targetSystemName" column="TARGET_SYSTEM_NAME" />
+        <result property="responsibleUserName" column="RESPONSIBLE_USER_NAME" />
+        <result property="responsiblePhone" column="RESPONSIBLE_PHONE" />
+        <result property="creatorPhone" column="CREATOR_PHONE" />
+        <result property="lastRunTime" column="LAST_RUN_TIME" />
+        <result property="lastRunEndTime" column="LAST_RUN_END_TIME" />
+        <result property="lastRunStatus" column="LAST_RUN_STATUS" />
+        <result property="lastSuccessCount" column="LAST_SUCCESS_COUNT" />
+        <result property="lastFailureCount" column="LAST_FAILURE_COUNT" />
+    </resultMap>
+
+    <!-- 批量补充责任人姓名及电话，供任务基本信息展示，避免按任务逐条查询用户。 -->
+    <select id="selectListDetails" resultMap="DistTaskListDetailsResult">
+        SELECT t.ID AS TASK_ID,
+               CASE WHEN t.MODEL_ID = -1 THEN '供应商主数据' ELSE m.NAME END AS MODEL_NAME,
+               p.NAME AS PROJECT_NAME,
+               p.ICON AS PROJECT_ICON,
+               l.NAME AS LAYER_NAME,
+               s.CODE AS TARGET_SYSTEM_CODE,
+               s.NAME AS TARGET_SYSTEM_NAME,
+               COALESCE(owner.NICK_NAME, owner.USER_NAME) AS RESPONSIBLE_USER_NAME,
+               owner.PHONENUMBER AS RESPONSIBLE_PHONE,
+               u.PHONENUMBER AS CREATOR_PHONE,
+               i.START_TIME AS LAST_RUN_TIME,
+               i.END_TIME AS LAST_RUN_END_TIME,
+               i.RUN_STATUS AS LAST_RUN_STATUS,
+               i.SUCCESS_COUNT AS LAST_SUCCESS_COUNT,
+               i.FAILURE_COUNT AS LAST_FAILURE_COUNT
+        FROM DIST_TASK t
+        LEFT JOIN MODEL_BASE m ON m.ID = t.MODEL_ID
+        LEFT JOIN MODEL_PROJECT p ON p.ID = m.PROJECT_ID
+        LEFT JOIN MODEL_LAYER l ON l.ID = m.LAYER_ID AND l.PROJECT_ID = m.PROJECT_ID
+        LEFT JOIN DIST_TARGET_SYSTEM s ON s.ID = t.TARGET_SYSTEM_ID
+        LEFT JOIN SYSTEM_USER owner ON owner.USER_ID = t.RESP_USER_ID AND owner.DEL_FLAG = '0'
+        LEFT JOIN SYSTEM_USER u ON u.USER_ID = t.CREATOR_ID
+        LEFT JOIN (
+            SELECT TASK_ID, MAX(ID) AS LATEST_ID
+            FROM DIST_TASK_INSTANCE
+            WHERE TASK_ID IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+            GROUP BY TASK_ID
+        ) latest ON latest.TASK_ID = t.ID
+        LEFT JOIN DIST_TASK_INSTANCE i ON i.ID = latest.LATEST_ID
+        WHERE t.ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <sql id="selectDistTaskVo">
+        select ID, CODE, NAME, MODEL_ID, MODEL_VERSION_ID, TARGET_SYSTEM_ID, RESP_USER_ID, TYPE, DATA_MODE, TRIGGER_TYPE, RETRY_TRIGGER_TYPE, FAIL_RETRY_FLAG, FAIL_RETRY_TIMES, FAIL_RETRY_INTERVAL, FAIL_RETRY_OUT_TYPE, CRON_EXPRESSION, INCREMENTAL_START_TIME, DATA_SCOPE_TYPE, API_URL, HTTP_METHOD, AUTH_TYPE, AUTH_CONFIG, HEADER_CONFIG, REQUEST_BODY_MODE, SUCCESS_CONDITION, STATUS, LAST_SUCCESS_TIME, VALID_FLAG, DEL_FLAG, CREATE_BY, CREATOR_ID, CREATE_TIME, UPDATE_BY, UPDATER_ID, UPDATE_TIME, REMARK from DIST_TASK
+    </sql>
+
+    <select id="selectDistTaskList" parameterType="DistTaskDO" resultMap="DistTaskResult">
+        <include refid="selectDistTaskVo"/>
+        <where>
+            <if test="code != null  and code != ''"> and CODE = #{code}</if>
+            <if test="name != null  and name != ''"> and NAME like concat(concat('%', #{name}), '%')</if>
+            <if test="modelId != null "> and MODEL_ID = #{modelId}</if>
+            <if test="modelVersionId != null "> and MODEL_VERSION_ID = #{modelVersionId}</if>
+            <if test="targetSystemId != null "> and TARGET_SYSTEM_ID = #{targetSystemId}</if>
+            <if test="type != null  and type != ''"> and TYPE = #{type}</if>
+            <if test="dataMode != null  and dataMode != ''"> and DATA_MODE = #{dataMode}</if>
+            <if test="triggerType != null  and triggerType != ''"> and TRIGGER_TYPE = #{triggerType}</if>
+            <if test="dataScopeType != null  and dataScopeType != ''"> and DATA_SCOPE_TYPE = #{dataScopeType}</if>
+            <if test="apiUrl != null  and apiUrl != ''"> and API_URL = #{apiUrl}</if>
+            <if test="httpMethod != null  and httpMethod != ''"> and HTTP_METHOD = #{httpMethod}</if>
+            <if test="authType != null  and authType != ''"> and AUTH_TYPE = #{authType}</if>
+            <if test="authConfig != null  and authConfig != ''"> and AUTH_CONFIG = #{authConfig}</if>
+            <if test="headerConfig != null  and headerConfig != ''"> and HEADER_CONFIG = #{headerConfig}</if>
+            <if test="requestBodyMode != null  and requestBodyMode != ''"> and REQUEST_BODY_MODE = #{requestBodyMode}</if>
+            <if test="successCondition != null  and successCondition != ''"> and SUCCESS_CONDITION = #{successCondition}</if>
+            <if test="status != null  and status != ''"> and STATUS = #{status}</if>
+            <if test="lastSuccessTime != null "> and LAST_SUCCESS_TIME = #{lastSuccessTime}</if>
+            <if test="createTime != null "> and CREATE_TIME = #{createTime}</if>
+        </where>
+    </select>
+
+    <select id="selectDistTaskById" parameterType="Long" resultMap="DistTaskResult">
+        <include refid="selectDistTaskVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertDistTask" parameterType="DistTaskDO">
+        insert into DIST_TASK
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="code != null">CODE,</if>
+            <if test="name != null">NAME,</if>
+            <if test="modelId != null">MODEL_ID,</if>
+            <if test="modelVersionId != null">MODEL_VERSION_ID,</if>
+            <if test="targetSystemId != null">TARGET_SYSTEM_ID,</if>
+            <if test="responsibleUserId != null">RESP_USER_ID,</if>
+            <if test="type != null">TYPE,</if>
+            <if test="dataMode != null">DATA_MODE,</if>
+            <if test="triggerType != null">TRIGGER_TYPE,</if>
+            <if test="retryTriggerType != null">RETRY_TRIGGER_TYPE,</if>
+            <if test="failRetryFlag != null">FAIL_RETRY_FLAG,</if>
+            <if test="failRetryTimes != null">FAIL_RETRY_TIMES,</if>
+            <if test="failRetryInterval != null">FAIL_RETRY_INTERVAL,</if>
+            <if test="failRetryOutType != null">FAIL_RETRY_OUT_TYPE,</if>
+            <if test="cronExpression != null">CRON_EXPRESSION,</if>
+            <if test="incrementalStartTime != null">INCREMENTAL_START_TIME,</if>
+            <if test="dataScopeType != null">DATA_SCOPE_TYPE,</if>
+            <if test="apiUrl != null">API_URL,</if>
+            <if test="httpMethod != null">HTTP_METHOD,</if>
+            <if test="authType != null">AUTH_TYPE,</if>
+            <if test="authConfig != null">AUTH_CONFIG,</if>
+            <if test="headerConfig != null">HEADER_CONFIG,</if>
+            <if test="requestBodyMode != null">REQUEST_BODY_MODE,</if>
+            <if test="successCondition != null">SUCCESS_CONDITION,</if>
+            <if test="status != null">STATUS,</if>
+            <if test="lastSuccessTime != null">LAST_SUCCESS_TIME,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="remark != null">REMARK,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="code != null">#{code},</if>
+            <if test="name != null">#{name},</if>
+            <if test="modelId != null">#{modelId},</if>
+            <if test="modelVersionId != null">#{modelVersionId},</if>
+            <if test="targetSystemId != null">#{targetSystemId},</if>
+            <if test="responsibleUserId != null">#{responsibleUserId},</if>
+            <if test="type != null">#{type},</if>
+            <if test="dataMode != null">#{dataMode},</if>
+            <if test="triggerType != null">#{triggerType},</if>
+            <if test="retryTriggerType != null">#{retryTriggerType},</if>
+            <if test="failRetryFlag != null">#{failRetryFlag},</if>
+            <if test="failRetryTimes != null">#{failRetryTimes},</if>
+            <if test="failRetryInterval != null">#{failRetryInterval},</if>
+            <if test="failRetryOutType != null">#{failRetryOutType},</if>
+            <if test="cronExpression != null">#{cronExpression},</if>
+            <if test="incrementalStartTime != null">#{incrementalStartTime},</if>
+            <if test="dataScopeType != null">#{dataScopeType},</if>
+            <if test="apiUrl != null">#{apiUrl},</if>
+            <if test="httpMethod != null">#{httpMethod},</if>
+            <if test="authType != null">#{authType},</if>
+            <if test="authConfig != null">#{authConfig},</if>
+            <if test="headerConfig != null">#{headerConfig},</if>
+            <if test="requestBodyMode != null">#{requestBodyMode},</if>
+            <if test="successCondition != null">#{successCondition},</if>
+            <if test="status != null">#{status},</if>
+            <if test="lastSuccessTime != null">#{lastSuccessTime},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateDistTask" parameterType="DistTaskDO">
+        update DIST_TASK
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="code != null">CODE = #{code},</if>
+            <if test="name != null">NAME = #{name},</if>
+            <if test="modelId != null">MODEL_ID = #{modelId},</if>
+            <if test="modelVersionId != null">MODEL_VERSION_ID = #{modelVersionId},</if>
+            <if test="targetSystemId != null">TARGET_SYSTEM_ID = #{targetSystemId},</if>
+            <if test="responsibleUserId != null">RESP_USER_ID = #{responsibleUserId},</if>
+            <if test="type != null">TYPE = #{type},</if>
+            <if test="dataMode != null">DATA_MODE = #{dataMode},</if>
+            <if test="triggerType != null">TRIGGER_TYPE = #{triggerType},</if>
+            <if test="retryTriggerType != null">RETRY_TRIGGER_TYPE = #{retryTriggerType},</if>
+            <if test="failRetryFlag != null">FAIL_RETRY_FLAG = #{failRetryFlag},</if>
+            <if test="failRetryTimes != null">FAIL_RETRY_TIMES = #{failRetryTimes},</if>
+            <if test="failRetryInterval != null">FAIL_RETRY_INTERVAL = #{failRetryInterval},</if>
+            <if test="failRetryOutType != null">FAIL_RETRY_OUT_TYPE = #{failRetryOutType},</if>
+            <if test="cronExpression != null">CRON_EXPRESSION = #{cronExpression},</if>
+            <if test="incrementalStartTime != null">INCREMENTAL_START_TIME = #{incrementalStartTime},</if>
+            <if test="dataScopeType != null">DATA_SCOPE_TYPE = #{dataScopeType},</if>
+            <if test="apiUrl != null">API_URL = #{apiUrl},</if>
+            <if test="httpMethod != null">HTTP_METHOD = #{httpMethod},</if>
+            <if test="authType != null">AUTH_TYPE = #{authType},</if>
+            <if test="authConfig != null">AUTH_CONFIG = #{authConfig},</if>
+            <if test="headerConfig != null">HEADER_CONFIG = #{headerConfig},</if>
+            <if test="requestBodyMode != null">REQUEST_BODY_MODE = #{requestBodyMode},</if>
+            <if test="successCondition != null">SUCCESS_CONDITION = #{successCondition},</if>
+            <if test="status != null">STATUS = #{status},</if>
+            <if test="lastSuccessTime != null">LAST_SUCCESS_TIME = #{lastSuccessTime},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="remark != null">REMARK = #{remark},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteDistTaskById" parameterType="Long">
+        delete from DIST_TASK where ID = #{id}
+    </delete>
+
+    <delete id="deleteDistTaskByIds" parameterType="String">
+        delete from DIST_TASK where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

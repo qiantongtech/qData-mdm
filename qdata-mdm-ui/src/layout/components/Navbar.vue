@@ -12,7 +12,7 @@
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
-  Business License: https://community.qdata.tech/business/policy.html
+  Business License: https://qdata.qiantong.tech/business/policy.html
   See the LICENSE file in the project root for full license information.
 -->
 
@@ -464,7 +464,7 @@ function openDocumentation() {
   };
   const localePath = localePathMap[lang] || '';
   window.open(
-    `https://community.qdata.tech${localePath}/docs/overview/introduction.html`,
+    `https://qdata.qiantong.tech${localePath}/docs/overview/introduction.html`,
     '_blank'
   );
 }

@@ -8,6 +8,7 @@
 
   <img src="https://gitee.com/qiantongtech/qData-mdm/badge/star.svg" alt="Gitee Stars"/>
   <img src="https://img.shields.io/github/stars/qiantongtech/qData-mdm?label=GitHub%20Stars" alt="GitHub Stars"/>
+  <img src="https://atomgit.com/qiantongtech/qData-mdm/star/badge.svg"/>
 </p>
 
 <p align="center">
@@ -21,7 +22,7 @@
 
 ✨✨✨**开源版演示地址**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a>（账号 `qData`，密码 `qData123`）
 
-✨✨✨**专业版演示地址**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>，演示账号请 [联系客服获取](https://community.qdata.tech/business/policy.html)。
+✨✨✨**专业版演示地址**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>，演示账号请 [联系客服获取](https://qdata.qiantong.tech/business/policy.html)。
 
 > 如果 qData-mdm 对您有帮助，请点个 **Star ⭐️**，这是我们持续更新的动力！ 🚀
 
@@ -97,7 +98,7 @@ qData-mdm 平台采用前后端分离架构，后端基于 Spring Boot，前端�
 
 qData-mdm 提供 **专业版** 与 **开源版** 两种形态，满足不同规模与场景下的用户需求。两者既各具特色，又形成互补：开源版更像启蒙老师，帮助低成本起步；专业版更像专家顾问，提供深度与保障。无论选择哪种版本，qData-mdm 都将成为可靠的伙伴，帮助企业释放数据价值，加速数字化进程。
 
-> 👉 如需 **开源版品牌授权** 或 **咨询专业版**，请点击按钮查看详情：[💼 了解授权详情](https://community.qdata.tech/business/policy.html)
+> 👉 如需 **开源版品牌授权** 或 **咨询专业版**，请点击按钮查看详情：[💼 了解授权详情](https://qdata.qiantong.tech/business/policy.html)
 
 ## 快速开始
 
@@ -152,7 +153,7 @@ qData-mdm 提供 **专业版** 与 **开源版** 两种形态，满足不同规�
 ## QQ交流群
 欢迎加入 qData 官方 QQ 交流群，获取最新动态、技术支持与使用交流。
 
-👉 <a href="https://community.qdata.tech/discuss.html">点击加入 QQ 交流群</a>
+👉 <a href="https://qdata.qiantong.tech/discuss.html">点击加入 QQ 交流群</a>
 
 <!-- [![加入QQ群](https://img.shields.io/badge/QQ群-814145903（已满）-blue.svg)](https://qm.qq.com/q/Qz5NJut20y)
 [![加入QQ群](https://img.shields.io/badge/QQ群-236734346-blue.svg)](https://qm.qq.com/q/Bpml33lTWK)
@@ -162,39 +163,55 @@ qData-mdm 提供 **专业版** 与 **开源版** 两种形态，满足不同规�
 
 <table>
     <tr>
-      <td><img src="images/zh-CN/system/login.png" alt="Login" width="400"/></td>
-      <td><img src="images/zh-CN/system/index.png" alt="Home" width="400"/></td>
+      <td><img src="images/zh-CN/system/login.png" alt="登录页面" width="400"/></td>
+      <td><img src="images/zh-CN/system/index.png" alt="首页" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/master.png" alt="Authoritative Master Data" width="400"/></td>
-      <td><img src="images/zh-CN/system/project.png" alt="Master Data Domains" width="400"/></td>
+      <td><img src="images/zh-CN/system/master.png" alt="权威主数据" width="400"/></td>
+      <td><img src="images/zh-CN/system/master_detail.png" alt="权威主数据列表" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/layer.png" alt="Model Catalog" width="400"/></td>
-      <td><img src="images/zh-CN/system/model.png" alt="Model Definitions" width="400"/></td>
+      <td><img src="images/zh-CN/system/project_detail.png" alt="主数据域详情" width="400"/></td>
+      <td><img src="images/zh-CN/system/layer_detail.png" alt="模型目录详情" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/relation.png" alt="Model Relationships" width="400"/></td>
-      <td><img src="images/zh-CN/system/match.png" alt="Matching Rules" width="400"/></td>
+      <td><img src="images/zh-CN/system/model.png" alt="模型定义" width="400"/></td>
+      <td><img src="images/zh-CN/system/model_detail.png" alt="模型详情" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/survivor.png" alt="Survivorship Rules" width="400"/></td>
-      <td><img src="images/zh-CN/system/qualitys.png" alt="Data Quality Rules" width="400"/></td>
+      <td><img src="images/zh-CN/system/model_form_one.png" alt="基础信息" width="400"/></td>
+      <td><img src="images/zh-CN/system/model_form_four.png" alt="模子模型" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/datasource.png" alt="Data Ingestion" width="400"/></td>
-      <td><img src="images/zh-CN/system/datasource_detail.png" alt="Test Connection" width="400"/></td>
+      <td><img src="images/zh-CN/system/relation.png" alt="模型关系" width="400"/></td>
+      <td><img src="images/zh-CN/system/relation_detail.png" alt="模型关系详情" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/ingest_task.png" alt="Ingestion Tasks" width="400"/></td>
-      <td><img src="images/zh-CN/system/review.png" alt="Match Review" width="400"/></td>
+      <td><img src="images/zh-CN/system/match_form.png" alt="匹配规则表单" width="400"/></td>
+      <td><img src="images/zh-CN/system/survivor_form.png" alt="生存规则表单" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/manage.png" alt="Merge Management" width="400"/></td>
-      <td><img src="images/zh-CN/system/quality_task.png" alt="Data Quality Tasks" width="400"/></td>
+      <td><img src="images/zh-CN/system/quality_form.png" alt="质量规则表单" width="400"/></td>
+      <td><img src="images/zh-CN/system/review.png" alt="匹配审核" width="400"/></td>
     </tr>
     <tr>
-      <td><img src="images/zh-CN/system/quality_issue_task.png" alt="Remediation Tasks" width="400"/></td>
-      <td><img src="images/zh-CN/system/operation_log.png" alt="Operation Audit" width="400"/></td>
+      <td><img src="images/zh-CN/system/datasource.png" alt="数据连接" width="400"/></td>
+      <td><img src="images/zh-CN/system/datasource_detail.png" alt="测试连接" width="400"/></td>
+    </tr>
+    <tr>
+      <td><img src="images/zh-CN/system/ingest_task.png" alt="接入任务" width="400"/></td>
+      <td><img src="images/zh-CN/system/ingest_task_detail.png" alt="接入任务详情" width="400"/></td>
+    </tr>
+    <tr>
+      <td><img src="images/zh-CN/system/quality_task.png" alt="质量任务" width="400"/></td>
+      <td><img src="images/zh-CN/system/quality_task_form.png" alt="质量任务表单" width="400"/></td>
+    </tr>
+    <tr>
+      <td><img src="images/zh-CN/system/data_auth_form_one.png" alt="主体与模型" width="400"/></td>
+      <td><img src="images/zh-CN/system/data_auth_form_four.png" alt="操作与有效期" width="400"/></td>
+    </tr>
+    <tr>
+      <td><img src="images/zh-CN/system/quality_issue_task.png" alt="整改任务" width="400"/></td>
+      <td><img src="images/zh-CN/system/operation_log.png" alt="操作审计" width="400"/></td>
     </tr>
 </table>

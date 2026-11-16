@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://qdata.qiantong.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.dist.dal.mapper.target.DistTargetSystemMapper">
+
+    <resultMap type="DistTargetSystemDO" id="DistTargetSystemResult">
+        <result property="id"    column="ID"    />
+        <result property="code"    column="CODE"    />
+        <result property="name"    column="NAME"    />
+        <result property="type"    column="TYPE"    />
+        <result property="contactName"    column="CONTACT_NAME"    />
+        <result property="responsibleUserId" column="RESP_USER_ID" />
+        <result property="contactInfo"    column="CONTACT_INFO"    />
+        <result property="status"    column="STATUS"    />
+        <result property="description"    column="DESCRIPTION"    />
+        <result property="validFlag"    column="VALID_FLAG"    />
+        <result property="delFlag"    column="DEL_FLAG"    />
+        <result property="createBy"    column="CREATE_BY"    />
+        <result property="creatorId"    column="CREATOR_ID"    />
+        <result property="createTime"    column="CREATE_TIME"    />
+        <result property="updateBy"    column="UPDATE_BY"    />
+        <result property="updaterId"    column="UPDATER_ID"    />
+        <result property="updateTime"    column="UPDATE_TIME"    />
+        <result property="remark"    column="REMARK"    />
+    </resultMap>
+
+    <!-- 通过创建人 ID 批量查询其当前姓名和电话。 -->
+    <resultMap id="TargetCreatorProfileResult" type="tech.qiantong.qdata.mdm.dist.controller.admin.target.vo.DistTargetSystemRespVO">
+        <id property="id" column="TARGET_ID" />
+        <result property="createBy" column="CREATOR_NAME" />
+        <result property="creatorPhone" column="CREATOR_PHONE" />
+    </resultMap>
+
+    <select id="selectCreatorProfiles" resultMap="TargetCreatorProfileResult">
+        SELECT t.ID AS TARGET_ID,
+               u.NICK_NAME AS CREATOR_NAME,
+               u.PHONENUMBER AS CREATOR_PHONE
+        FROM DIST_TARGET_SYSTEM t
+        JOIN SYSTEM_USER u ON u.USER_ID = t.CREATOR_ID AND u.DEL_FLAG = '0'
+        WHERE t.ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!-- 与来源系统一致：责任人姓名和电话以平台用户 ID 查询，列表只查当前页。 -->
+    <resultMap id="TargetResponsibleContactResult" type="tech.qiantong.qdata.mdm.dist.controller.admin.target.vo.DistTargetSystemRespVO">
+        <id property="id" column="TARGET_ID" />
+        <result property="responsibleUserId" column="RESP_USER_ID" />
+        <result property="contactName" column="CONTACT_NAME" />
+        <result property="contactInfo" column="CONTACT_INFO" />
+    </resultMap>
+
+    <select id="selectResponsibleContacts" resultMap="TargetResponsibleContactResult">
+        SELECT t.ID AS TARGET_ID, t.RESP_USER_ID,
+               COALESCE(u.NICK_NAME, u.USER_NAME) AS CONTACT_NAME,
+               u.PHONENUMBER AS CONTACT_INFO
+        FROM DIST_TARGET_SYSTEM t
+        JOIN SYSTEM_USER u ON u.USER_ID = t.RESP_USER_ID AND u.DEL_FLAG = '0'
+        WHERE t.ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!-- 当前页批量统计关联任务；逻辑删除的分发任务不计入列表数量。 -->
+    <resultMap id="TargetTaskCountResult" type="tech.qiantong.qdata.mdm.dist.controller.admin.target.vo.DistTargetSystemRespVO">
+        <id property="id" column="TARGET_ID" />
+        <result property="taskCount" column="TASK_COUNT" />
+    </resultMap>
+
+    <select id="selectTaskCounts" resultMap="TargetTaskCountResult">
+        SELECT TARGET_SYSTEM_ID AS TARGET_ID, COUNT(*) AS TASK_COUNT
+        FROM DIST_TASK
+        WHERE DEL_FLAG = '0' AND TARGET_SYSTEM_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        GROUP BY TARGET_SYSTEM_ID
+    </select>
+
+    <resultMap id="TargetResponsibleUserResult" type="tech.qiantong.qdata.mdm.dist.controller.admin.target.vo.DistTargetSystemRespVO">
+        <result property="contactName" column="CONTACT_NAME" />
+        <result property="contactInfo" column="CONTACT_INFO" />
+    </resultMap>
+
+    <select id="selectResponsibleUserById" resultMap="TargetResponsibleUserResult">
+        SELECT COALESCE(NICK_NAME, USER_NAME) AS CONTACT_NAME,
+               PHONENUMBER AS CONTACT_INFO
+        FROM SYSTEM_USER
+        WHERE USER_ID = #{userId} AND DEL_FLAG = '0'
+    </select>
+
+    <sql id="selectDistTargetSystemVo">
+        select ID, CODE, NAME, TYPE, CONTACT_NAME, RESP_USER_ID, CONTACT_INFO, STATUS, DESCRIPTION, VALID_FLAG, DEL_FLAG, CREATE_BY, CREATOR_ID, CREATE_TIME, UPDATE_BY, UPDATER_ID, UPDATE_TIME, REMARK from DIST_TARGET_SYSTEM
+    </sql>
+
+    <select id="selectDistTargetSystemList" parameterType="DistTargetSystemDO" resultMap="DistTargetSystemResult">
+        <include refid="selectDistTargetSystemVo"/>
+        <where>
+            <if test="code != null  and code != ''"> and CODE = #{code}</if>
+            <if test="name != null  and name != ''"> and NAME like concat(concat('%', #{name}), '%')</if>
+            <if test="type != null  and type != ''"> and TYPE = #{type}</if>
+            <if test="contactName != null  and contactName != ''"> and CONTACT_NAME like concat(concat('%', #{contactName}), '%')</if>
+            <if test="contactInfo != null  and contactInfo != ''"> and CONTACT_INFO = #{contactInfo}</if>
+            <if test="status != null  and status != ''"> and STATUS = #{status}</if>
+            <if test="description != null  and description != ''"> and DESCRIPTION = #{description}</if>
+            <if test="createTime != null "> and CREATE_TIME = #{createTime}</if>
+        </where>
+    </select>
+
+    <select id="selectDistTargetSystemById" parameterType="Long" resultMap="DistTargetSystemResult">
+        <include refid="selectDistTargetSystemVo"/>
+        where ID = #{id}
+    </select>
+
+    <insert id="insertDistTargetSystem" parameterType="DistTargetSystemDO">
+        insert into DIST_TARGET_SYSTEM
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">ID,</if>
+            <if test="code != null">CODE,</if>
+            <if test="name != null">NAME,</if>
+            <if test="type != null">TYPE,</if>
+            <if test="contactName != null">CONTACT_NAME,</if>
+            <if test="responsibleUserId != null">RESP_USER_ID,</if>
+            <if test="contactInfo != null">CONTACT_INFO,</if>
+            <if test="status != null">STATUS,</if>
+            <if test="description != null">DESCRIPTION,</if>
+            <if test="validFlag != null">VALID_FLAG,</if>
+            <if test="delFlag != null">DEL_FLAG,</if>
+            <if test="createBy != null">CREATE_BY,</if>
+            <if test="creatorId != null">CREATOR_ID,</if>
+            <if test="createTime != null">CREATE_TIME,</if>
+            <if test="updateBy != null">UPDATE_BY,</if>
+            <if test="updaterId != null">UPDATER_ID,</if>
+            <if test="updateTime != null">UPDATE_TIME,</if>
+            <if test="remark != null">REMARK,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="code != null">#{code},</if>
+            <if test="name != null">#{name},</if>
+            <if test="type != null">#{type},</if>
+            <if test="contactName != null">#{contactName},</if>
+            <if test="responsibleUserId != null">#{responsibleUserId},</if>
+            <if test="contactInfo != null">#{contactInfo},</if>
+            <if test="status != null">#{status},</if>
+            <if test="description != null">#{description},</if>
+            <if test="validFlag != null">#{validFlag},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="creatorId != null">#{creatorId},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updaterId != null">#{updaterId},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateDistTargetSystem" parameterType="DistTargetSystemDO">
+        update DIST_TARGET_SYSTEM
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="code != null">CODE = #{code},</if>
+            <if test="name != null">NAME = #{name},</if>
+            <if test="type != null">TYPE = #{type},</if>
+            <if test="contactName != null">CONTACT_NAME = #{contactName},</if>
+            <if test="responsibleUserId != null">RESP_USER_ID = #{responsibleUserId},</if>
+            <if test="contactInfo != null">CONTACT_INFO = #{contactInfo},</if>
+            <if test="status != null">STATUS = #{status},</if>
+            <if test="description != null">DESCRIPTION = #{description},</if>
+            <if test="validFlag != null">VALID_FLAG = #{validFlag},</if>
+            <if test="delFlag != null">DEL_FLAG = #{delFlag},</if>
+            <if test="createBy != null">CREATE_BY = #{createBy},</if>
+            <if test="creatorId != null">CREATOR_ID = #{creatorId},</if>
+            <if test="createTime != null">CREATE_TIME = #{createTime},</if>
+            <if test="updateBy != null">UPDATE_BY = #{updateBy},</if>
+            <if test="updaterId != null">UPDATER_ID = #{updaterId},</if>
+            <if test="updateTime != null">UPDATE_TIME = #{updateTime},</if>
+            <if test="remark != null">REMARK = #{remark},</if>
+        </trim>
+        where ID = #{id}
+    </update>
+
+    <delete id="deleteDistTargetSystemById" parameterType="Long">
+        delete from DIST_TARGET_SYSTEM where ID = #{id}
+    </delete>
+
+    <delete id="deleteDistTargetSystemByIds" parameterType="String">
+        delete from DIST_TARGET_SYSTEM where ID in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

@@ -12,7 +12,7 @@
   another product requires separate commercial authorization from
   Jiangsu Qiantong Technology Co., Ltd.
 
-  Business License: https://community.qdata.tech/business/policy.html
+  Business License: https://qdata.qiantong.tech/business/policy.html
   See the LICENSE file in the project root for full license information.
 -->
 
@@ -47,7 +47,6 @@
                 type="primary"
                 plain
                 icon="Plus"
-                :disabled="!currentProject?.id"
                 @click="handleAdd()"
             >新增
             </el-button>
@@ -190,6 +189,7 @@ const statusChanging = reactive(new Set());
 
 const modelProjectTreeRef = ref(null);
 const projectOptions = ref([]);
+let projectListRequest;
 const tableRef = ref(null);
 const layerDialogRef = ref();
 const selectedProject = ref(null);
@@ -349,8 +349,7 @@ async function getProjectList() {
 }
 
 /** 按操作目标所属的域加载完整目录树，供弹窗选择上级。 */
-async function openLayerDialog(options, row) {
-  const projectId = row?.projectId ?? currentProject.value?.id;
+async function openLayerDialog(options, projectId) {
   if (!projectId) return;
 
   const project = String(currentProject.value?.id) === String(projectId)
@@ -366,12 +365,20 @@ async function openLayerDialog(options, row) {
   });
 }
 
-/** 优先新增到点击的目录下；详情页新增挂到当前目录，独立页面新增挂到顶级。 */
-function handleAdd(row) {
+/** 独立页面未选择主数据域时，默认使用树中的第一项。 */
+async function handleAdd(row) {
+  if (!props.embedded && !row?.projectId && !currentProject.value?.id) {
+    await projectListRequest;
+  }
+  const projectId = row?.projectId ?? currentProject.value?.id ?? projectOptions.value[0]?.id;
+  if (!projectId) {
+    proxy.$modal.msgWarning("暂无可用的主数据域");
+    return;
+  }
   return openLayerDialog({
     title: "新增模型目录",
     parentId: row?.id ?? props.parentId ?? 0,
-  }, row);
+  }, projectId);
 }
 
 /** 修改按钮操作 */
@@ -379,7 +386,7 @@ function handleUpdate(row) {
   return openLayerDialog({
     title: "修改模型目录",
     ...row,
-  }, row);
+  }, row.projectId ?? currentProject.value?.id);
 }
 
 /** 打开目录详情，默认展示子目录页签。 */
@@ -456,7 +463,9 @@ async function handleStatusChange(row) {
 
 // 只有独立页面首次打开需要查询左侧域树，嵌入列表直接使用外层传入的数据。
 onMounted(() => {
-  if (!props.embedded) getProjectList();
+  if (props.embedded) return;
+  projectListRequest = getProjectList();
+  return projectListRequest;
 });
 // 首次加载由表格发起，从详情返回缓存列表时再刷新。
 let hasActivated = false;

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+
+  This file is part of qData-mdm Master Data Platform (Open Source Edition).
+
+  qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+  You may use qData-mdm for commercial purposes, but you may not remove, hide,
+  modify, or replace the qData-mdm logo, copyright notices, license notices,
+  or attribution information without a separate commercial license.
+
+  White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+  another product requires separate commercial authorization from
+  Jiangsu Qiantong Technology Co., Ltd.
+
+  Business License: https://qdata.qiantong.tech/business/policy.html
+  See the LICENSE file in the project root for full license information.
+-->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.qiantong.qdata.mdm.dist.dal.mapper.service.DistServiceMapper">
+    <resultMap id="CreatorPhoneResult" type="tech.qiantong.qdata.mdm.dist.controller.admin.service.vo.DistServiceRespVO">
+        <id property="creatorId" column="USER_ID" />
+        <result property="creatorPhone" column="PHONENUMBER" />
+    </resultMap>
+
+    <!-- 按当前页创建人批量读取电话，与来源系统的用户展示查询保持一致。 -->
+    <select id="selectCreatorPhonesByIds" resultMap="CreatorPhoneResult">
+        SELECT USER_ID, PHONENUMBER
+        FROM SYSTEM_USER
+        WHERE DEL_FLAG = '0'
+          AND USER_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

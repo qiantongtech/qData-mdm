@@ -12,7 +12,7 @@
  * another product requires separate commercial authorization from
  * Jiangsu Qiantong Technology Co., Ltd.
  *
- * Business License: https://community.qdata.tech/business/policy.html
+ * Business License: https://qdata.qiantong.tech/business/policy.html
  * See the LICENSE file in the project root for full license information.
  */
 
@@ -113,7 +113,7 @@ export const guideTipHelpDocs = Object.freeze({
 });
 
 // Define document base path
-const DOCS_BASE_URL = 'https://community.qdata.tech';
+const DOCS_BASE_URL = 'https://qdata.qiantong.tech';
 
 export const guideTipConfig = {
     // 来源数据

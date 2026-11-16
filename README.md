@@ -8,6 +8,7 @@
 
   <img src="https://gitee.com/qiantongtech/qData-mdm/badge/star.svg" alt="Gitee Stars"/>
   <img src="https://img.shields.io/github/stars/qiantongtech/qData-mdm?label=GitHub%20Stars" alt="GitHub Stars"/>
+  <img src="https://atomgit.com/qiantongtech/qData-mdm/star/badge.svg"/>
 </p>
 
 <p align="center">
@@ -22,7 +23,7 @@
 
 ✨✨✨**Open-Source Edition Demo**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a> (username `qData`, password `qData123`).
 
-✨✨✨**Professional Edition Demo**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>. Please [contact customer service](https://community.qdata.tech/business/policy.html) to obtain a demo account.
+✨✨✨**Professional Edition Demo**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>. Please [contact customer service](https://qdata.qiantong.tech/business/policy.html) to obtain a demo account.
 
 > If qData-mdm helps you, give the project a **star ⭐️** to support its development.
 
@@ -94,7 +95,7 @@ qData-mdm separates the Spring Boot backend from the Vue 3 frontend and integrat
 
 qData-mdm provides two editions: **Professional Edition** and **Open-Source Edition**, meeting user needs across different scales and scenarios. Each has its own focus while complementing the other: the Open-Source Edition helps users get started at low cost, while the Professional Edition provides greater depth and support. Whichever edition you choose, qData-mdm aims to be a reliable partner that helps enterprises unlock data value and accelerate digital transformation.
 
-> 👉 For **Open-Source Edition brand authorization** or **Professional Edition consultation**, see [💼 Licensing Details](https://community.qdata.tech/business/policy.html).
+> 👉 For **Open-Source Edition brand authorization** or **Professional Edition consultation**, see [💼 Licensing Details](https://qdata.qiantong.tech/business/policy.html).
 
 ## Quick Start
 
@@ -150,47 +151,62 @@ Install the following prerequisites before deploying qData-mdm.
 
 Join the official qData QQ community for updates, technical support, and discussions.
 
-👉 <a href="https://community.qdata.tech/discuss.html">Join the QQ community</a>
+👉 <a href="https://qdata.qiantong.tech/discuss.html">Join the QQ community</a>
 
 ## System Screenshots
 
 The screenshots show the Simplified Chinese interface.
-
 <table>
   <tr>
-    <td><img src="images/zh-CN/system/login.png" alt="登录" width="400"/></td>
-    <td><img src="images/zh-CN/system/index.png" alt="首页" width="400"/></td>
-  </tr>
+    <td><img src="images/zh-CN/system/login.png" alt="Login Page" width="400"/></td>
+    <td><img src="images/zh-CN/system/index.png" alt="Home Page" width="400"/></td>
   <tr>
-    <td><img src="images/zh-CN/system/master.png" alt="权威主数据" width="400"/></td>
-    <td><img src="images/zh-CN/system/project.png" alt="主数据域" width="400"/></td>
-  </tr>
   <tr>
-    <td><img src="images/zh-CN/system/layer.png" alt="模型目录" width="400"/></td>
-    <td><img src="images/zh-CN/system/model.png" alt="模型定义" width="400"/></td>
-  </tr>
+    <td><img src="images/zh-CN/system/master.png" alt="Authoritative Master Data" width="400"/></td>
+    <td><img src="images/zh-CN/system/master_detail.png" alt="List of Authoritative Master Data" width="400"/></td>
   <tr>
-    <td><img src="images/zh-CN/system/relation.png" alt="模型关系" width="400"/></td>
-    <td><img src="images/zh-CN/system/match.png" alt="匹配规则" width="400"/></td>
-  </tr>
   <tr>
-    <td><img src="images/zh-CN/system/survivor.png" alt="生存规则" width="400"/></td>
-    <td><img src="images/zh-CN/system/qualitys.png" alt="质量规则" width="400"/></td>
-  </tr>
+    <td><img src="images/zh-CN/system/project_detail.png" alt="Main Data Field Details" width="400"/></td>
+    <td><img src="images/zh-CN/system/layer_detail.png" alt="Model Directory Details" width="400"/></td>
   <tr>
-    <td><img src="images/zh-CN/system/datasource.png" alt="数据接入" width="400"/></td>
-    <td><img src="images/zh-CN/system/datasource_detail.png" alt="测试连接" width="400"/></td>
-  </tr>
   <tr>
-    <td><img src="images/zh-CN/system/ingest_task.png" alt="接入任务" width="400"/></td>
-    <td><img src="images/zh-CN/system/review.png" alt="匹配审核" width="400"/></td>
-  </tr>
+    <td><img src="images/zh-CN/system/model.png" alt="Model Definition" width="400"/></td>
+    <td><img src="images/zh-CN/system/model_detail.png" alt="Model Details" width="400"/></td>
   <tr>
-    <td><img src="images/zh-CN/system/manage.png" alt="合并管理" width="400"/></td>
-    <td><img src="images/zh-CN/system/quality_task.png" alt="质量任务" width="400"/></td>
-  </tr>
   <tr>
-    <td><img src="images/zh-CN/system/quality_issue_task.png" alt="整改任务" width="400"/></td>
-    <td><img src="images/zh-CN/system/operation_log.png" alt="操作审计" width="400"/></td>
+    <td><img src="images/zh-CN/system/model_form_one.png" alt="Basic Information" width="400"/></td>
+    <td><img src="images/zh-CN/system/model_form_four.png" alt="Model Model" width="400"/></td>
+  <tr>
+  <tr>
+    <td><img src="images/zh-CN/system/relation.png" alt="Model Relationship" width="400"/></td>
+    <td><img src="images/zh-CN/system/relation_detail.png" alt="Model Relationship Details" width="400"/></td>
+  <tr>
+  <tr>
+    <td><img src="images/zh-CN/system/match_form.png" alt="Match Rules Form" width="400"/></td>
+    <td><img src="images/zh-CN/system/survivor_form.png" alt="Survival Rules Form" width="400"/></td>
+  <tr>
+  <tr>
+    <td><img src="images/zh-CN/system/quality_form.png" alt="Quality Rules Form" width="400"/></td>
+    <td><img src="images/zh-CN/system/review.png" alt="Match Review" width="400"/></td>
+  <tr>
+  <tr>
+    <td><img src="images/zh-CN/system/datasource.png" alt="Data Connection" width="400"/></td>
+    <td><img src="images/zh-CN/system/datasource_detail.png" alt="Test Connection" width="400"/></td>
+  <tr>
+  <tr>
+    <td><img src="images/zh-CN/system/ingest_task.png" alt="Ingestion Task" width="400"/></td>
+    <td><img src="images/zh-CN/system/ingest_task_detail.png" alt="Ingestion Task Details" width="400"/></td>
+  <tr>
+  <tr>
+    <td><img src="images/zh-CN/system/quality_task.png" alt="Quality Task" width="400"/></td>
+    <td><img src="images/zh-CN/system/quality_task_form.png" alt="Quality Task Form" width="400"/></td>
+  <tr>
+  <tr>
+    <td><img src="images/zh-CN/system/data_auth_form_one.png" alt="Subject and Model" width="400"/></td>
+    <td><img src="images/zh-CN/system/data_auth_form_four.png" alt="Operations and Validity Periods" width="400"/></td>
+  <tr>
+  <tr>
+    <td><img src="images/zh-CN/system/quality_issue_task.png" alt="Rectification Task" width="400"/></td>
+    <td><img src="images/zh-CN/system/operation_log.png" alt="Operation Audit" width="400"/></td>
   </tr>
 </table>
