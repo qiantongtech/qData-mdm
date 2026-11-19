@@ -104,6 +104,7 @@
       </template>
       <template #action="{ row }">
         <el-button link type="primary" icon="View"   @click="showResult(row)">查看结果</el-button>
+        <el-button link type="warning" icon="Download" @click="ElMessage.warning('功能开发中')">下载日志</el-button>
       </template>
       <template #empty><span class="muted">暂无运行记录</span></template>
     </qt-table>
@@ -158,6 +159,7 @@
 </template>
 <script setup>
 import { computed, nextTick, reactive, ref } from 'vue';
+import { ElMessage } from 'element-plus';
 import GuideTipPanel from '@/components/GuideTip/GuideTipPanel.vue';
 import {
   InfoFilled,
@@ -227,7 +229,7 @@ const tableStore = reactive({
     { label: '通过数量', prop: 'passCount', minWidth: 105 },
     { label: '问题数量', prop: 'failCount', minWidth: 105 },
     { label: '执行结果', prop: 'status', slot: 'status', minWidth: 125 },
-    { label: '操作', slot: 'action', width: 110, fixed: 'right' }
+    { label: '操作', slot: 'action', width: 220, fixed: 'right' }
   ],
   func: fetchRecords,
   params: {

@@ -371,11 +371,6 @@ const masterSearchStore = reactive({
       component: { is: "input", placeholder: "请输入主数据名称" },
     },
     {
-      label: "主数据ID",
-      prop: "objectId",
-      component: { is: "input", placeholder: "请输入主数据ID" },
-    },
-    {
       label: "操作类型",
       prop: "type",
       component: { is: "select", placeholder: "全部类型", options: MASTER_OPERATION_TYPES },

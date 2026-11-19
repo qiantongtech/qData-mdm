@@ -28,7 +28,17 @@
           :header="{ idKey: 'id', nameKey: 'displayName', statusKey: 'status', statusOptions: TASK_STATUS_OPTIONS }"
       >
         <template #modelInfo>
-          <rectification-model-info :model="modelInfo" :fallback="task" />
+          <div class="request-model-info flex-column">
+            <div class="request-model-main flex-center">
+              <img :src="getModelIcon(modelDisplayInfo)" alt="" class="request-info-icon" />
+              <span class="request-model-title text-ellipsis" :title="modelTitle">{{ modelTitle }}</span>
+              <dict-tag v-if="modelType" :options="model_type" :value="modelType" size="small" type="primary" />
+              <dict-tag v-if="modelVersion && modelInfo.version?.status != null"
+                        :options="versionTagOptions" :value="modelInfo.version.status" size="small"
+              />
+              <dict-tag v-else-if="modelVersion" :value="modelVersion" size="small" type="info" />
+            </div>
+          </div>
         </template>
         <template #location>
           <div v-if="locationText" class="request-model-location flex-center">
@@ -50,7 +60,17 @@
                   class="detail-descriptions"
               >
                 <template #modelInfo>
-                  <rectification-model-info :model="modelInfo" :fallback="task" />
+                  <div class="request-model-info flex-column">
+                    <div class="request-model-main flex-center">
+                      <img :src="getModelIcon(modelDisplayInfo)" alt="" class="request-info-icon" />
+                      <span class="request-model-title text-ellipsis" :title="modelTitle">{{ modelTitle }}</span>
+                      <dict-tag v-if="modelType" :options="model_type" :value="modelType" size="small" type="primary" />
+                      <dict-tag v-if="modelVersion && modelInfo.version?.status != null"
+                                :options="versionTagOptions" :value="modelInfo.version.status" size="small"
+                      />
+                      <dict-tag v-else-if="modelVersion" :value="modelVersion" size="small" type="info" />
+                    </div>
+                  </div>
                 </template>
               </descriptions-info>
 
@@ -289,8 +309,7 @@ import {usePageRefresh} from '@/composables/usePageRefresh';
 import {getQualityIssueTask, updateQualityIssueTask} from '@/api/quality/qualityIssueTask/qualityIssueTask';
 import {listQualityIssueTaskLog} from '@/api/quality/qualityIssueTaskLog/qualityIssueTaskLog';
 import {getBase} from '@/api/model/base/base';
-import {getProjectIcon} from '@/utils/imageUrl';
-import RectificationModelInfo from '../components/RectificationModelInfo.vue';
+import {getModelIcon, getProjectIcon} from '@/utils/imageUrl';
 
 const TASK_STATUS_OPTIONS = [
   {value: '1', label: '待审批', elTagType: 'warning'},
@@ -306,7 +325,7 @@ const ITEM_STATUS_OPTIONS = [
 ];
 
 const {proxy} = getCurrentInstance();
-const {rule_rulequality_type} = proxy.useDict('rule_rulequality_type');
+const {rule_rulequality_type, model_type, model_status} = proxy.useDict('rule_rulequality_type', 'model_type', 'model_status');
 const route = useRoute();
 // 保存本页路径，避免切换路由时误读其他详情页的 ID。
 const detailRoutePath = route.path;
@@ -314,6 +333,24 @@ const router = useRouter();
 const user = useUserStore();
 const task = ref();
 const modelInfo = ref({});
+const modelType = computed(() => modelInfo.value.type || task.value.modelType);
+const modelDisplayInfo = computed(() => ({
+  type: modelType.value,
+  icon: modelInfo.value.icon || task.value.modelIcon,
+  parentId: modelInfo.value.parentId || task.value.parentId,
+}));
+const modelTitle = computed(() => {
+  const name = modelInfo.value.name || task.value.modelName;
+  const code = modelInfo.value.code || task.value.modelCode;
+  return name ? (code ? `${name} (${code})` : name) : code || '-';
+});
+const modelVersion = computed(() => modelInfo.value.releaseVersion?.versionNo
+    || modelInfo.value.version?.versionNo || task.value.modelVersion);
+/** 保留状态字典的样式，标签文字使用模型版本号。 */
+const versionTagOptions = computed(() => model_status.value.map(item => ({
+  ...item,
+  label: modelVersion.value || '尚未发布',
+})));
 const locationText = computed(() => [
   modelInfo.value.projectName,
   modelInfo.value.layers?.at(-1)?.name,
@@ -398,7 +435,7 @@ const issueScope = computed(() => {
 const issueColumns = reactive([
   {label: '编号', prop: 'id', minWidth: 100, sortable: true},
   {label: '问题编码', prop: 'issueCode', minWidth: 220, align: 'left'},
-  {label: '主数据', prop: 'masterName', minWidth: 220, align: 'left'},
+  {label: '主数据名称', prop: 'masterName', minWidth: 220, align: 'left'},
   {label: '主数据编码', prop: 'masterCode', minWidth: 130, align: 'left'},
   {label: '问题字段', prop: 'modelColumnName', minWidth: 140, align: 'left'},
   {label: '问题类型', prop: 'ruleType', slot: 'ruleType', minWidth: 150, align: 'left'},
@@ -421,7 +458,7 @@ const historyColumns = reactive([
   {label: '编号', prop: 'id', minWidth: 100, sortable: true, align: 'left'},
   {label: '整改编号', prop: 'taskInfoId', minWidth: 130, sortable: true, align: 'left'},
   {label: '问题编码', prop: 'issueCode', minWidth: 220, align: 'left'},
-  {label: '主数据', prop: 'masterDataObject', minWidth: 220, align: 'left'},
+  {label: '主数据名称', prop: 'masterName', minWidth: 220, align: 'left'},
   {label: '整改字段', prop: 'rectificationField', minWidth: 140, align: 'left'},
   {label: '整改前值', prop: 'beforeValue', minWidth: 180, align: 'left'},
   {label: '整改后值', prop: 'afterValue', minWidth: 180, align: 'left'},
@@ -441,7 +478,7 @@ const logDetailItems = [
   {label: '日志 ID', key: 'id'},
   {label: '整改编号', key: 'taskInfoId'},
   {label: '问题编码', key: 'issueCode'},
-  {label: '主数据', key: 'masterDataObject'},
+  {label: '主数据名称', key: 'masterName'},
   {label: '整改字段', key: 'rectificationField'},
   {label: '执行结果', key: 'execResult'},
   {label: '整改时间', key: 'handlerTime', type: 'time'},
@@ -450,7 +487,7 @@ const logDetailItems = [
 ];
 const issueDetailItems = computed(() => [
   {label: '问题编码', key: 'issueCode'},
-  {label: '主数据', key: 'masterName'},
+  {label: '主数据名称', key: 'masterName'},
   {label: '主数据编码', key: 'masterCode'},
   {label: '问题字段', key: 'modelColumnName'},
   {label: '问题类型', key: 'ruleType', dictOptions: rule_rulequality_type.value},
@@ -460,14 +497,15 @@ const issueDetailItems = computed(() => [
   {label: '更新人', key: 'updateBy'},
   {label: '联系电话', key: 'updaterPhone'}
 ]);
-// 过滤下发日志，并关联问题编码。
+// 过滤下发日志，并关联问题编码和主数据名称。
 const historyRows = computed(() => {
-  const issueCodes = new Map((task.value?.issueItems || []).map(item => [String(item.issueId), item.issueCode]));
+  const issues = new Map((task.value?.issueItems || []).map(item => [String(item.issueId), item]));
   return logs.value
       .filter(entry => entry.remark !== 'rectification:v1:ASSIGN')
       .map(entry => ({
         ...entry,
-        issueCode: issueCodes.get(String(entry.issueId))
+        issueCode: issues.get(String(entry.issueId))?.issueCode,
+        masterName: issues.get(String(entry.issueId))?.masterName
       }));
 });
 const historySummary = computed(() => ({
@@ -842,6 +880,17 @@ function getRectificationProgress(task) {
 
 .basic-info {
   min-height: 480px;
+}
+
+.request-model-info {
+  width: 100%;
+  min-width: 0;
+}
+
+.request-model-main {
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
 }
 
 .request-model-location {

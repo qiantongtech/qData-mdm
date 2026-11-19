@@ -325,7 +325,7 @@ const assignTableStore = {
   func: async () => ({data: assignDialog.rows.map((item, index) => ({
     key: item.key,
     rowNo: index + 1,
-    masterInfo: `${item.issueRow.masterName || '未命名主数据'} (${item.issueRow.masterRecordId || '-'})`,
+    masterInfo: `${modelInfo(item.issueRow).name || '主数据'} (${item.issueRow.masterRecordId || '-'})`,
     fieldName: item.issueInfo?.modelColumnName || item.issueInfo?.fieldName || item.issueRow.problemFields || item.issueRow.fieldName || '-',
     ruleName: item.issueInfo?.qualityRuleName || item.issueInfo?.ruleName || item.issueRow.qualityRuleName || '-',
     failReason: item.issueInfo?.failReason || item.issueInfo?.reason || item.issueInfo?.errorMessage
@@ -607,33 +607,31 @@ async function submitAssign() {
     proxy.$modal.msgWarning('暂无待下发问题');
     return;
   }
+  const issueInfoIds = [...new Set(selectedItems.map(item => item.issueInfo?.id))];
+  if (issueInfoIds.some(id => !/^\d+$/.test(String(id ?? '')) || BigInt(id) <= 0n)) {
+    proxy.$modal.msgWarning('部分问题项缺少有效ID，请刷新后重新选择');
+    return;
+  }
+  if (issueInfoIds.length > 500) {
+    proxy.$modal.msgWarning('一次最多下发500个问题项');
+    return;
+  }
+  if (new Set(selectedItems.map(item => String(item.issueRow.modelId))).size !== 1) {
+    proxy.$modal.msgWarning('同一整改任务请选择同一主数据模型的问题');
+    return;
+  }
   assignDialog.submitting = true;
   try {
-    const assignedRows = new Map();
-    for (const item of selectedItems) {
-      const row = item.issueRow;
-      await addQualityIssueTask({
-        taskNo: `RT${Date.now()}${row.id}${item.key}`,
-        taskName: `${row.masterName || modelInfo(row).name || '-'}问题整改`.slice(0, 128),
-        ...(item.issueInfo?.id ? {issueInfoIds: [item.issueInfo.id]} : {issueId: row.id, qualityRuleId: item.issueInfo?.qualityRuleId || row.qualityRuleId}),
-        modelId: row.modelId,
-        modelVersion: row.modelVersion || getModelVersionNo(row),
-        masterRecordId: row.masterRecordId,
-        assigneeId: assignForm.assigneeId,
-        priority: assignForm.priority,
-        rectificationTime: `${assignForm.rectificationTime} 23:59:59`,
-        status: '1',
-        validFlag: true,
-        taskDescription: '请完成质量问题整改'
-      });
-      assignedRows.set(String(row.id), row);
-    }
-    for (const row of assignedRows.values()) {
-      await updateQualityIssue({
-        id: row.id,
-        status: '2',
-        rectificationStatus: '待处理'
-      });
+    const row = selectedItems[0].issueRow;
+    await addQualityIssueTask({
+      taskName: `${modelInfo(row).name || row.masterName || '-'}问题整改`.slice(0, 128),
+      issueInfoIds,
+      assigneeId: assignForm.assigneeId,
+      priority: assignForm.priority,
+      rectificationTime: `${assignForm.rectificationTime} 23:59:59`,
+      taskDescription: '请完成质量问题整改'
+    });
+    for (const row of new Set(selectedItems.map(item => item.issueRow))) {
       markRowAssigned(row);
     }
     proxy.$modal.msgSuccess(selectedItems.length > 1 ? '批量下发成功' : '下发成功');
@@ -641,7 +639,7 @@ async function submitAssign() {
     closeAssignDialog();
     getList();
   } catch {
-    proxy.$modal.msgError('下发整改失败，请稍后重试');
+    // 请求拦截器已统一提示业务警告或请求错误，避免重复提示。
   } finally {
     assignDialog.submitting = false;
   }

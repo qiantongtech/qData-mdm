@@ -431,40 +431,41 @@ async function submitAssign() {
     proxy.$modal.msgWarning('暂无待下发问题');
     return;
   }
+  const issueInfoIds = [...new Set(selectedItems.map(item => item.issueInfo?.id))];
+  if (issueInfoIds.some(id => !/^\d+$/.test(String(id ?? '')) || BigInt(id) <= 0n)) {
+    proxy.$modal.msgWarning('部分问题项缺少有效ID，请刷新后重新选择');
+    return;
+  }
+  if (issueInfoIds.length > 500) {
+    proxy.$modal.msgWarning('一次最多下发500个问题项');
+    return;
+  }
+  if (new Set(selectedItems.map(item => String(item.issueRow.modelId))).size !== 1) {
+    proxy.$modal.msgWarning('同一整改任务请选择同一主数据模型的问题');
+    return;
+  }
   assignDialog.submitting = true;
-  const item = selectedItems[0];
-  const row = item.issueInfo;
-  const taskNo = `RT${Date.now()}${issue.value.id}${item.key}`;
   try {
     await addQualityIssueTask({
-      taskNo,
       taskName: `${issue.value.masterName || model.value.name || '主数据'}问题整改`.slice(0, 128),
-      ...(row.id ? {issueInfoIds: [row.id]} : {issueId: issue.value.id, qualityRuleId: row.qualityRuleId || issue.value.qualityRuleId}),
-      modelId: issue.value.modelId,
-      modelVersion: issue.value.modelVersion,
-      masterRecordId: issue.value.masterRecordId,
+      issueInfoIds,
       assigneeId: assignForm.assigneeId,
       priority: assignForm.priority,
       rectificationTime: `${assignForm.rectificationTime} 23:59:59`,
-      status: '1',
-      validFlag: true,
       taskDescription: '请完成质量问题整改'
-    });
-    await updateQualityIssue({
-      id: issue.value.id,
-      status: '2',
-      rectificationStatus: '待处理'
     });
     issue.value.status = '2';
     issue.value.rectificationStatus = '待处理';
-    row.rectificationDesc = '待处理';
+    for (const item of selectedItems) {
+      item.issueInfo.rectificationDesc = '待处理';
+    }
     proxy.$modal.msgSuccess('下发成功');
     closeAssignDialog();
     await nextTick();
     issueTableRef.value?.getList();
     taskTableRef.value?.getList();
   } catch {
-    proxy.$modal.msgError('下发整改失败，请稍后重试');
+    // 请求拦截器已统一提示业务警告或请求错误，避免重复提示。
   } finally {
     assignDialog.submitting = false;
   }

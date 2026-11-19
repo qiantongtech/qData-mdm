@@ -188,7 +188,7 @@
                   </el-button>
                   <el-button link type="danger" icon="Delete" @click="handleDelete(row)"
                              v-hasPermi="['quality:qualitytask:remove']"
-                  >删除
+                  >删除任务
                   </el-button>
                 </div>
               </el-popover>

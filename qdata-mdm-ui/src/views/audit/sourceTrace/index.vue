@@ -429,11 +429,6 @@ const searchStore = reactive({
       component: { is: "input", placeholder: "请输入主数据名称" },
     },
     {
-      label: "主数据ID",
-      prop: "masterRecordId",
-      component: { is: "input", placeholder: "请输入主数据ID" },
-    },
-    {
       label: "来源记录标识",
       prop: "sourceRecordId",
       component: { is: "input", placeholder: "请输入来源记录标识" },

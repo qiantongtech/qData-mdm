@@ -18,7 +18,8 @@
 
 package tech.qiantong.qdata.mdm.quality.service.qualityTaskInstance.impl;
 
-import com.aliyun.oss.ServiceException;
+import tech.qiantong.qdata.mdm.common.exception.ServiceException;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -71,7 +72,7 @@ public class QualityTaskInstanceServiceImpl  extends ServiceImpl<QualityTaskInst
     public QualityTaskInstanceDO executeOnce(Long taskId, Long userId, String userName) {
         QualityTaskDO task = qualityTaskMapper.selectById(taskId);
         if (task == null || !"1".equals(task.getStatus()) || Boolean.FALSE.equals(task.getValidFlag())) {
-            throw new ServiceException("任务不存在或已停用，无法执行");
+            throw new ServiceException("任务不存在或已停用，无法执行", HttpStatus.WARN);
         }
         Date started = new Date();
         // 条件更新在事务内锁定任务，防止同一任务并发启动。
@@ -80,7 +81,7 @@ public class QualityTaskInstanceServiceImpl  extends ServiceImpl<QualityTaskInst
                 .and(query -> query.isNull(QualityTaskDO::getLastRunStatus).or().ne(QualityTaskDO::getLastRunStatus, "1"))
                 .set(QualityTaskDO::getLastRunStatus, "1").set(QualityTaskDO::getLastRunTime, started));
         if (claimed != 1) {
-            throw new ServiceException("任务已停用或正在执行，请稍后重试");
+            throw new ServiceException("任务已停用或正在执行，请稍后重试", HttpStatus.WARN);
         }
         QualityTaskInstanceDO instance = new QualityTaskInstanceDO();
         instance.setQualityTaskId(taskId);
@@ -207,7 +208,7 @@ public class QualityTaskInstanceServiceImpl  extends ServiceImpl<QualityTaskInst
         @Override
         public String importQualityTaskInstance(List<QualityTaskInstanceRespVO> importExcelList, boolean isUpdateSupport, String operName) {
             if (StringUtils.isNull(importExcelList) || importExcelList.size() == 0) {
-                throw new ServiceException("导入数据不能为空！");
+                throw new ServiceException("导入数据不能为空！", HttpStatus.WARN);
             }
 
             int successNum = 0;
