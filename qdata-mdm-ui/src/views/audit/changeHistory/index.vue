@@ -97,7 +97,7 @@
 <script setup name="AuditChangeHistory">
 import AuditOperationCell from '../operationLog/AuditOperationCell.vue'
 import GuideTipPanel from '@/components/GuideTip/GuideTipPanel.vue'
-import { listAuditChanges, listAuditModels } from '@/api/audit/trace'
+import { listAuditChanges } from '@/api/audit/trace'
 import QtTree from '@/components/QtTree/index.vue'
 import { usePublishedModelTree } from '@/composables/usePublishedModelTree'
 
@@ -154,7 +154,7 @@ const tableStore = reactive({
   events: { formatData: data => data },
 });
 
-const modelOptions = ref([{ value: '', label: '全部模型' }]);
+const modelOptions = reactive([]);
 function addTreeKeys(nodes = []) {
   return nodes.map(node => ({
     ...node,
@@ -184,8 +184,8 @@ function handleModelTreeClick(node) {
     return
   }
   selectedTreeKey.value = node.treeKey
-  if (!modelOptions.value.some(option => option.value === node.name)) {
-    modelOptions.value.push({ value: node.name, label: node.name })
+  if (!modelOptions.some(option => option.value === node.name)) {
+    modelOptions.push({ value: node.name, label: node.name })
   }
   queryParams.model = node.name
   tableRef.value?.resetQuery()
@@ -206,16 +206,32 @@ watch([() => queryParams.model, modelTreeData, modelOptions], async ([name, node
   const selected = matches.find(node => node.treeKey === selectedTreeKey.value)
     || (matches.length === 1 ? matches[0] : null)
   selectedTreeKey.value = selected?.treeKey || null
-  if (selected && !modelOptions.value.some(option => option.value === selected.name)) {
-    modelOptions.value.push({ value: selected.name, label: selected.name })
+  if (selected && !modelOptions.some(option => option.value === selected.name)) {
+    modelOptions.push({ value: selected.name, label: selected.name })
   }
   modelTreeRef.value?.setCurrentKey(selectedTreeKey.value, false)
 }, { flush: 'post' })
-onMounted(() => listAuditModels().then(res => {
-  if (res?.data) modelOptions.value = [{ value: '', label: '全部模型' }, ...res.data];
-}).catch(() => {
-  // 请求工具已提示错误，保留现有模型选项。
-}));
+/** 从模型树提取审计筛选项，接口按模型名称查询。 */
+function getAuditModelOptions(nodes = []) {
+  const options = new Map();
+  function visit(items) {
+    for (const node of items) {
+      if (node.nodeType === 'model' && node.modelId != null && node.name && !options.has(node.name)) {
+        options.set(node.name, {
+          value: node.name,
+          label: node.versionNo ? `${node.name}（${node.versionNo}）` : node.name,
+        });
+      }
+      visit(node.children || []);
+    }
+  }
+  visit(nodes);
+  return [...options.values()];
+}
+
+watch(modelTreeData, nodes => {
+  modelOptions.splice(0, modelOptions.length, ...getAuditModelOptions(nodes));
+}, { immediate: true });
 
 const searchStore = reactive({
   items: [
@@ -224,7 +240,7 @@ const searchStore = reactive({
       prop: "model",
       component: {
         is: "select",
-        placeholder: "全部模型",
+        placeholder: "全部",
         options: modelOptions,
       },
     },

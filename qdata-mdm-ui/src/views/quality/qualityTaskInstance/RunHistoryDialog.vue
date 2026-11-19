@@ -82,7 +82,7 @@
       <template #status="{ row }">
         <el-tag
           :type="statusType(row.status)"
-          :class="['status-tag', `status-tag--${String(row.status)}`]"
+          class="status-tag"
         >
           <span class="status-content">
             <el-icon
@@ -496,18 +496,6 @@ defineExpose({ open, showResult });
   padding: 3px 8px;
   justify-content: center;
   vertical-align: middle;
-}
-
-.status-tag--4 {
-  background: rgba(0, 158, 33, 0.1) !important;
-  border: 0 !important;
-  color: #009e21 !important;
-}
-
-.status-tag--2 {
-  background: rgba(236, 84, 77, 0.1) !important;
-  border: 0 !important;
-  color: #ec544d !important;
 }
 
 .status-content {

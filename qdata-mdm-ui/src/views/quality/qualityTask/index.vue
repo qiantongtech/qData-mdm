@@ -174,10 +174,6 @@
                   <el-button link type="primary" icon="ArrowDown">更多</el-button>
                 </template>
                 <div class="butgdlist">
-                  <el-button link type="primary" icon="Clock" @click="runHistoryRef.open(row, modelLabel(row.modelId))"
-                             v-hasPermi="['quality:qualitytaskinstance:list']"
-                  >运行记录
-                  </el-button>
                   <el-button
                       v-if="proxy.$auth.hasPermiAnd(['quality:qualitytask:edit', 'quality:qualitytaskinstance:add'])"
                       link
@@ -185,6 +181,10 @@
                       :disabled="String(row.status) !== '1' || String(row.lastRunStatus) === '1'"
                       @click="executeOnce(row, false)"
                   >执行一次
+                  </el-button>
+                  <el-button link type="primary" icon="Clock" @click="runHistoryRef.open(row, modelLabel(row.modelId))"
+                             v-hasPermi="['quality:qualitytaskinstance:list']"
+                  >运行实例
                   </el-button>
                   <el-button link type="danger" icon="Delete" @click="handleDelete(row)"
                              v-hasPermi="['quality:qualitytask:remove']"
@@ -1453,9 +1453,9 @@ const selectedModelOption = computed(() => modelOptions.find(item => String(item
 
 .butgdlist .el-button {
   width: 100%;
-  justify-content: flex-start;
+  justify-content: center;
   margin-left: 0;
-  padding-left: 14px;
+  padding-inline: 0;
 }
 
 @media (max-width: 700px) {

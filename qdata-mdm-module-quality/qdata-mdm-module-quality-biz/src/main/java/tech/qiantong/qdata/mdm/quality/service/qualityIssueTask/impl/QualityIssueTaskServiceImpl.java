@@ -566,7 +566,7 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
             List<QualityIssueTaskInfoDO> previous) {
         if (previous.stream().anyMatch(info -> info.getQualityRuleId() == null
                 || Arrays.asList(INFO_STATUS_PENDING, INFO_STATUS_PROCESSING).contains(info.getStatus()))) {
-            throw new ServiceException("同一问题项存在未完成任务，或旧任务关联不明确，不能重复下发");
+            throw new ServiceException("同一问题项存在未完成任务，或旧任务关联不明确，不能重复下发", HttpStatus.WARN);
         }
         Date completed = previous.stream().filter(info -> INFO_STATUS_COMPLETED.equals(info.getStatus()))
                 .map(QualityIssueTaskInfoDO::getRectificationTime).filter(Objects::nonNull).max(Date::compareTo).orElse(null);

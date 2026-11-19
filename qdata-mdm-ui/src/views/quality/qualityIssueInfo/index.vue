@@ -18,227 +18,112 @@
 
 <template>
   <div class="app-container" ref="app-container">
-    <div class="pagecont-top" v-show="showSearch">
-     <el-form class="btn-style" :model="queryParams" ref="queryRef" :inline="true" label-width="75px" v-show="showSearch" @submit.prevent>
-      <el-form-item label="质量问题ID" prop="issueId">
-        <el-input
-            class="el-form-input-width"
-            v-model="queryParams.issueId"
-            placeholder="请输入质量问题ID"
-            clearable
-            @keyup.enter="handleQuery"
+    <qt-wrap :columns="tableStore.columns" :table-ref="tableRef">
+      <template #search>
+        <qt-search-bar
+          :items="searchItems"
+          :params="queryParams"
+          :config="{ defaultExpand: true, form: { labelWidth: '75px' } }"
+          @query="handleQuery"
+          @reset="handleQuery"
         />
-      </el-form-item>
-      <el-form-item label="质量规则ID" prop="qualityRuleId">
-        <el-input
-            class="el-form-input-width"
-            v-model="queryParams.qualityRuleId"
-            placeholder="请输入质量规则ID"
-            clearable
-            @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="模型字段ID" prop="modelColumnId">
-        <el-input
-            class="el-form-input-width"
-            v-model="queryParams.modelColumnId"
-            placeholder="请输入模型字段ID"
-            clearable
-            @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="质量任务执行实例ID" prop="lastCheckInstanceId">
-        <el-input
-            class="el-form-input-width"
-            v-model="queryParams.lastCheckInstanceId"
-            placeholder="请输入质量任务执行实例ID"
-            clearable
-            @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="规则检测失败原因" prop="failReason">
-        <el-input
-            class="el-form-input-width"
-            v-model="queryParams.failReason"
-            placeholder="请输入规则检测失败原因"
-            clearable
-            @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="最近一次检测失败时间" prop="lastFoundTime">
-        <el-date-picker class="el-form-input-width"
-            clearable
-            v-model="queryParams.lastFoundTime"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="请选择最近一次检测失败时间">
-        </el-date-picker>
-      </el-form-item>
-      <el-form-item label="是否有效；0：无效，1：有效" prop="validFlag">
-        <el-input
-            class="el-form-input-width"
-            v-model="queryParams.validFlag"
-            placeholder="请输入是否有效；0：无效，1：有效"
-            clearable
-            @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="创建时间" prop="createTime">
-        <el-date-picker class="el-form-input-width"
-            clearable
-            v-model="queryParams.createTime"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="请选择创建时间">
-        </el-date-picker>
-      </el-form-item>
-
-      <el-form-item>
-        <el-button plain type="primary" @click="handleQuery" @mousedown="(e) => e.preventDefault()">
-          <i class="iconfont-mini icon-a-zu22377 mr5"></i>查询
+      </template>
+      <template #actions-data>
+        <el-button
+          type="primary"
+          plain
+          @click="handleAdd"
+          v-hasPermi="['quality:qualityissueinfo:add']"
+          @mousedown="(e) => e.preventDefault()"
+        >
+          <i class="iconfont-mini icon-xinzeng mr5"></i>新增
         </el-button>
-        <el-button @click="resetQuery" @mousedown="(e) => e.preventDefault()">
-          <i class="iconfont-mini icon-a-zu22378 mr5"></i>重置
+        <el-button
+          type="primary"
+          plain
+          :disabled="single"
+          @click="handleUpdate"
+          v-hasPermi="['quality:qualityissueinfo:edit']"
+          @mousedown="(e) => e.preventDefault()"
+        >
+          <i class="iconfont-mini icon-xiugai--copy mr5"></i>修改
         </el-button>
-      </el-form-item>
-     </el-form>
-    </div>
-
-    <div  class="pagecont-bottom">
-     <div class="justify-between mb15">
-       <el-row :gutter="15" class="btn-style">
-         <el-col :span="1.5">
-           <el-button type="primary" plain @click="handleAdd" v-hasPermi="['quality:qualityissueinfo:add']"
-                      @mousedown="(e) => e.preventDefault()">
-             <i class="iconfont-mini icon-xinzeng mr5"></i>新增
-           </el-button>
-         </el-col>
-         <el-col :span="1.5">
-           <el-button type="primary" plain :disabled="single" @click="handleUpdate" v-hasPermi="['quality:qualityissueinfo:edit']"
-                      @mousedown="(e) => e.preventDefault()">
-             <i class="iconfont-mini icon-xiugai--copy mr5"></i>修改
-           </el-button>
-         </el-col>
-         <el-col :span="1.5">
-           <el-button type="danger" plain :disabled="multiple" @click="handleDelete" v-hasPermi="['quality:qualityissueinfo:remove']"
-                      @mousedown="(e) => e.preventDefault()">
-             <i class="iconfont-mini icon-shanchu-huise mr5"></i>删除
-           </el-button>
-         </el-col>
-         <el-col :span="1.5">
-           <el-button type="info" plain  @click="handleImport" v-hasPermi="['quality:qualityissueinfo:export']"
-                      @mousedown="(e) => e.preventDefault()">
-             <i class="iconfont-mini icon-upload-cloud-line mr5"></i>导入
-           </el-button>
-         </el-col>
-         <el-col :span="1.5">
-           <el-button type="warning" plain @click="handleExport" v-hasPermi="['quality:qualityissueinfo:export']"
-                      @mousedown="(e) => e.preventDefault()">
-             <i class="iconfont-mini icon-download-line mr5"></i>导出
-           </el-button>
-         </el-col>
-       </el-row>
-       <div class="justify-end top-right-btn">
-         <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" :columns="columns"></right-toolbar>
-       </div>
-     </div>
-     <el-table stripe height="60vh" v-loading="loading" :data="qualityIssueInfoList" @selection-change="handleSelectionChange" :default-sort="defaultSort" @sort-change="handleSortChange">
-       <el-table-column type="selection" width="55" align="center" />
-       <el-table-column v-if="getColumnVisibility(0)" label="主键ID" align="center" prop="id" />
-       <el-table-column v-if="getColumnVisibility(1)" label="质量问题ID" align="center" prop="issueId">
-         <template #default="scope">
-           {{ scope.row.issueId || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(2)" label="质量规则ID" align="center" prop="qualityRuleId">
-         <template #default="scope">
-           {{ scope.row.qualityRuleId || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(3)" label="模型字段ID" align="center" prop="modelColumnId">
-         <template #default="scope">
-           {{ scope.row.modelColumnId || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(4)" label="质量任务执行实例ID" align="center" prop="lastCheckInstanceId">
-         <template #default="scope">
-           {{ scope.row.lastCheckInstanceId || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(5)" label="问题项状态：1未解决、2已解决" align="center" prop="status">
-         <template #default="scope">
-           {{ scope.row.status || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(6)" label="规则检测失败原因" align="center" prop="failReason">
-         <template #default="scope">
-           {{ scope.row.failReason || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(7)" label="最近一次检测失败时间" align="center" prop="lastFoundTime" width="180">
-         <template #default="scope">
-           <span>{{ parseTime(scope.row.lastFoundTime, '{y}-{m}-{d}') }}</span>
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(8)" label="是否有效；0：无效，1：有效" align="center" prop="validFlag">
-         <template #default="scope">
-           {{ scope.row.validFlag || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(10)" label="创建人" align="center" prop="createBy">
-         <template #default="scope">
-           {{ scope.row.createBy || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(12)" label="创建时间" align="center" prop="createTime" width="180">
-         <template #default="scope">
-           <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(13)" label="更新人" align="center" prop="updateBy">
-         <template #default="scope">
-           {{ scope.row.updateBy || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(15)" label="更新时间" align="center" prop="updateTime" width="180">
-         <template #default="scope">
-           <span>{{ parseTime(scope.row.updateTime, '{y}-{m}-{d}') }}</span>
-         </template>
-       </el-table-column>
-       <el-table-column v-if="getColumnVisibility(16)" label="备注" align="center" prop="remark">
-         <template #default="scope">
-           {{ scope.row.remark || '-' }}
-         </template>
-       </el-table-column>
-       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" fixed="right" width="240">
-         <template #default="scope">
-           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)"
-                      v-hasPermi="['quality:qualityissueinfo:edit']">修改</el-button>
-           <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)"
-                      v-hasPermi="['quality:qualityissueinfo:remove']">删除</el-button>
-           <el-button link type="primary" icon="view" @click="handleDetail(scope.row)"
-                      v-hasPermi="['quality:qualityissueinfo:edit']">详情</el-button>
-           <el-button link type="primary" icon="view" @click="routeTo('/tech/qiantong/qdata/mdm/quality/qualityIssueInfo/qualityIssueInfoDetail',scope.row)"
-                      v-hasPermi="['quality:qualityissueinfo:edit']">复杂详情</el-button>
-         </template>
-       </el-table-column>
-
-       <template #empty>
-         <div class="emptyBg">
-           <img src="@/assets/common/images/empty-state/noData.png" alt="" />
-           <p>暂无记录</p>
-         </div>
-       </template>
-     </el-table>
-
-     <pagination
-         v-show="total>0"
-         :total="total"
-         v-model:page="queryParams.pageNum"
-         v-model:limit="queryParams.pageSize"
-         @pagination="getList"
-     />
-    </div>
+        <el-button
+          type="danger"
+          plain
+          :disabled="multiple"
+          @click="handleDelete"
+          v-hasPermi="['quality:qualityissueinfo:remove']"
+          @mousedown="(e) => e.preventDefault()"
+        >
+          <i class="iconfont-mini icon-shanchu-huise mr5"></i>删除
+        </el-button>
+        <el-button
+          type="info"
+          plain
+          @click="handleImport"
+          v-hasPermi="['quality:qualityissueinfo:export']"
+          @mousedown="(e) => e.preventDefault()"
+        >
+          <i class="iconfont-mini icon-upload-cloud-line mr5"></i>导入
+        </el-button>
+        <el-button
+          type="warning"
+          plain
+          @click="handleExport"
+          v-hasPermi="['quality:qualityissueinfo:export']"
+          @mousedown="(e) => e.preventDefault()"
+        >
+          <i class="iconfont-mini icon-download-line mr5"></i>导出
+        </el-button>
+      </template>
+      <qt-table v-bind="tableStore" ref="tableRef">
+        <template #id="scope">{{ scope.row.id }}</template>
+        <template #issueId="scope">{{ scope.row.issueId || '-' }}</template>
+        <template #qualityRuleId="scope">{{ scope.row.qualityRuleId || '-' }}</template>
+        <template #modelColumnId="scope">{{ scope.row.modelColumnId || '-' }}</template>
+        <template #lastCheckInstanceId="scope">{{ scope.row.lastCheckInstanceId || '-' }}</template>
+        <template #status="scope">{{ scope.row.status || '-' }}</template>
+        <template #failReason="scope">{{ scope.row.failReason || '-' }}</template>
+        <template #lastFoundTime="scope"><span>{{ parseTime(scope.row.lastFoundTime, '{y}-{m}-{d}') }}</span></template>
+        <template #validFlag="scope">{{ scope.row.validFlag || '-' }}</template>
+        <template #createBy="scope">{{ scope.row.createBy || '-' }}</template>
+        <template #createTime="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span></template>
+        <template #updateBy="scope">{{ scope.row.updateBy || '-' }}</template>
+        <template #updateTime="scope"><span>{{ parseTime(scope.row.updateTime, '{y}-{m}-{d}') }}</span></template>
+        <template #remark="scope">{{ scope.row.remark || '-' }}</template>
+        <template #action="scope">
+          <el-button
+            link
+            type="primary"
+            icon="Edit"
+            @click="handleUpdate(scope.row)"
+            v-hasPermi="['quality:qualityissueinfo:edit']"
+          >修改</el-button>
+          <el-button
+            link
+            type="danger"
+            icon="Delete"
+            @click="handleDelete(scope.row)"
+            v-hasPermi="['quality:qualityissueinfo:remove']"
+          >删除</el-button>
+          <el-button
+            link
+            type="primary"
+            icon="view"
+            @click="handleDetail(scope.row)"
+            v-hasPermi="['quality:qualityissueinfo:edit']"
+          >详情</el-button>
+          <el-button
+            link
+            type="primary"
+            icon="view"
+            @click="routeTo('/tech/qiantong/qdata/mdm/quality/qualityIssueInfo/qualityIssueInfoDetail',scope.row)"
+            v-hasPermi="['quality:qualityissueinfo:edit']"
+          >复杂详情</el-button>
+        </template>
+      </qt-table>
+    </qt-wrap>
 
     <!-- 添加或修改问题数据明细对话框 -->
     <el-dialog :title="title" v-model="open" width="800px" :append-to="$refs['app-container']" draggable>
@@ -283,7 +168,7 @@
             <el-col :span="12">
               <el-form-item label="最近一次检测失败时间" prop="lastFoundTime">
                 <el-date-picker clearable
-                                style="width: 100%"
+                                class="full-width"
                                 v-model="form.lastFoundTime"
                                 type="date"
                                 value-format="YYYY-MM-DD"
@@ -373,7 +258,7 @@
             <el-col :span="12">
               <el-form-item label="最近一次检测失败时间" prop="lastFoundTime">
                 <el-date-picker clearable
-                                style="width: 100%"
+                                class="full-width"
                                 v-model="form.lastFoundTime"
                                 type="date"
                                 value-format="YYYY-MM-DD"
@@ -428,7 +313,7 @@
               <el-checkbox v-model="upload.updateSupport" />是否更新已经存在的问题数据明细数据
             </div>
             <span>仅允许导入xls、xlsx格式文件。</span>
-            <el-link type="primary" :underline="false" style="font-size:12px;vertical-align: baseline;" @click="importTemplate">下载模板</el-link>
+            <el-link type="primary" :underline="false" class="template-link" @click="importTemplate">下载模板</el-link>
           </div>
         </template>
       </el-upload>
@@ -444,52 +329,22 @@
 </template>
 
 <script setup name="QualityIssueInfo">
-  import { listQualityIssueInfo, getQualityIssueInfo, delQualityIssueInfo, addQualityIssueInfo, updateQualityIssueInfo } from "@/api/quality/qualityIssueInfo/qualityIssueInfo";
-  import {getToken} from "@/utils/auth.js";
+import { listQualityIssueInfo, getQualityIssueInfo, delQualityIssueInfo, addQualityIssueInfo, updateQualityIssueInfo } from "@/api/quality/qualityIssueInfo/qualityIssueInfo";
+import {getToken} from "@/utils/auth.js";
 
-  const { proxy } = getCurrentInstance();
+const { proxy } = getCurrentInstance();
 
-  const qualityIssueInfoList = ref([]);
+const open = ref(false);
+const openDetail = ref(false);
+const ids = ref([]);
+const single = ref(true);
+const multiple = ref(true);
+const title = ref("");
+const defaultSort = ref({ prop: "createTime", order: "desc" });
+const router = useRouter();
 
-  // 列显隐信息
-  const columns = ref([
-            { key: 1, label: "质量问题ID", visible: true },
-            { key: 2, label: "质量规则ID", visible: true },
-            { key: 3, label: "模型字段ID", visible: true },
-            { key: 4, label: "质量任务执行实例ID", visible: true },
-            { key: 5, label: "问题项状态：1未解决、2已解决", visible: true },
-            { key: 6, label: "规则检测失败原因", visible: true },
-            { key: 7, label: "最近一次检测失败时间", visible: true },
-            { key: 8, label: "是否有效；0：无效，1：有效", visible: true },
-            { key: 10, label: "创建人", visible: true },
-            { key: 12, label: "创建时间", visible: true },
-            { key: 13, label: "更新人", visible: true },
-            { key: 15, label: "更新时间", visible: true },
-            { key: 16, label: "备注", visible: true }
-  ]);
-
-  const getColumnVisibility = (key) => {
-    const column = columns.value.find(col => col.key === key);
-    // 如果没有找到对应列配置，默认显示
-    if (!column) return true;
-    // 如果找到对应列配置，根据visible属性来控制显示
-    return column.visible;
-  };
-
-  const open = ref(false);
-  const openDetail = ref(false);
-  const loading = ref(true);
-  const showSearch = ref(true);
-  const ids = ref([]);
-  const single = ref(true);
-  const multiple = ref(true);
-  const total = ref(0);
-  const title = ref("");
-  const defaultSort = ref({ prop: "createTime", order: "desc" });
-  const router = useRouter();
-
-  /*** 用户导入参数 */
-  const upload = reactive({
+/*** 用户导入参数 */
+const upload = reactive({
     // 是否显示弹出层（用户导入）
     open: false,
     // 弹出层标题（用户导入）
@@ -504,46 +359,88 @@
     url: import.meta.env.VITE_APP_BASE_API + "/tech/qiantong/qdata/mdm/quality/qualityIssueInfo/importData"
   });
 
-  const data = reactive({
-    form: {},
-    queryParams: {
-      pageNum: 1,
-      pageSize: 10,
-        issueId: null,
-        qualityRuleId: null,
-        modelColumnId: null,
-        lastCheckInstanceId: null,
-        status: null,
-        failReason: null,
-        lastFoundTime: null,
-        validFlag: null,
-        createTime: null,
-    },
-    rules: {
-    }
-  });
-
-  const { queryParams, form, rules } = toRefs(data);
-
-  /** 查询问题数据明细列表 */
-  function getList() {
-    loading.value = true;
-    listQualityIssueInfo(queryParams.value).then(response => {
-            qualityIssueInfoList.value = response.data.rows;
-      total.value = response.data.total;
-      loading.value = false;
-    });
+const data = reactive({
+  form: {},
+  queryParams: {
+    issueId: null,
+    qualityRuleId: null,
+    modelColumnId: null,
+    lastCheckInstanceId: null,
+    status: null,
+    failReason: null,
+    lastFoundTime: null,
+    validFlag: null,
+    createTime: null,
+  },
+  rules: {
   }
+});
 
-  // 取消按钮
-  function cancel() {
+const { queryParams, form, rules } = toRefs(data);
+
+const tableRef = ref(null);
+const listParams = ref({});
+const searchItems = [
+    {label: "质量问题ID", prop: "issueId", component: {is: "input"}},
+    {label: "质量规则ID", prop: "qualityRuleId", component: {is: "input"}},
+    {label: "模型字段ID", prop: "modelColumnId", component: {is: "input"}},
+    {label: "质量任务执行实例ID", prop: "lastCheckInstanceId", component: {is: "input"}},
+    {label: "规则检测失败原因", prop: "failReason", component: {is: "input"}},
+    {label: "最近一次检测失败时间", prop: "lastFoundTime", component: {is: "date-picker", type: "date", valueFormat: "YYYY-MM-DD"}},
+    {label: "是否有效；0：无效，1：有效", prop: "validFlag", component: {is: "input"}},
+    {label: "创建时间", prop: "createTime", component: {is: "date-picker", type: "date", valueFormat: "YYYY-MM-DD"}}
+  ];
+const tableStore = reactive({
+  config: {
+    table: {
+      stripe: true,
+      height: '60vh',
+      defaultSort: defaultSort.value,
+      onSelectionChange: handleSelectionChange,
+    },
+  },
+  columns: [
+    {type: "selection", width: 55, align: "center"},
+    {label: "主键ID", align: "center", prop: "id", slot: "id"},
+    {label: "质量问题ID", align: "center", prop: "issueId", slot: "issueId"},
+    {label: "质量规则ID", align: "center", prop: "qualityRuleId", slot: "qualityRuleId"},
+    {label: "模型字段ID", align: "center", prop: "modelColumnId", slot: "modelColumnId"},
+    {label: "质量任务执行实例ID", align: "center", prop: "lastCheckInstanceId", slot: "lastCheckInstanceId"},
+    {label: "问题项状态：1未解决、2已解决", align: "center", prop: "status", slot: "status"},
+    {label: "规则检测失败原因", align: "center", prop: "failReason", slot: "failReason"},
+    {label: "最近一次检测失败时间", align: "center", prop: "lastFoundTime", width: 180, slot: "lastFoundTime"},
+    {label: "是否有效；0：无效，1：有效", align: "center", prop: "validFlag", slot: "validFlag"},
+    {label: "创建人", align: "center", prop: "createBy", slot: "createBy"},
+    {label: "创建时间", align: "center", prop: "createTime", width: 180, slot: "createTime"},
+    {label: "更新人", align: "center", prop: "updateBy", slot: "updateBy"},
+    {label: "更新时间", align: "center", prop: "updateTime", width: 180, slot: "updateTime"},
+    {label: "备注", align: "center", prop: "remark", slot: "remark"},
+    {label: "操作", align: "center", className: "small-padding fixed-width", fixed: "right", width: 240, slot: "action", prop: "action"}
+  ],
+  func: listQualityIssueInfo,
+  params: queryParams.value,
+  events: {
+    formatParams(params) {
+      listParams.value = { ...params };
+      return params;
+    },
+  },
+});
+
+/** 查询问题数据明细列表 */
+function getList() {
+  tableRef.value?.getList();
+}
+
+// 取消按钮
+function cancel() {
     open.value = false;
     openDetail.value = false;
     reset();
   }
 
-  // 表单重置
-  function reset() {
+// 表单重置
+function reset() {
     form.value = {
         id: null,
         issueId: null,
@@ -566,42 +463,27 @@
     proxy.resetForm("qualityIssueInfoRef");
   }
 
-  /** 搜索按钮操作 */
-  function handleQuery() {
-    queryParams.value.pageNum = 1;
-    getList();
-  }
+/** 搜索按钮操作 */
+function handleQuery() {
+  tableRef.value?.resetQuery();
+}
 
-  /** 重置按钮操作 */
-  function resetQuery() {
-    proxy.resetForm("queryRef");
-    handleQuery();
-  }
-
-  // 多选框选中数据
-  function handleSelectionChange(selection) {
+// 多选框选中数据
+function handleSelectionChange(selection) {
     ids.value = selection.map(item => item.id);
     single.value = selection.length != 1;
     multiple.value = !selection.length;
   }
 
-
-  /** 排序触发事件 */
-  function handleSortChange(column, prop, order) {
-    queryParams.value.orderByColumn = column.prop;
-    queryParams.value.isAsc = column.order;
-    getList();
-  }
-
-  /** 新增按钮操作 */
-  function handleAdd() {
+/** 新增按钮操作 */
+function handleAdd() {
     reset();
     open.value = true;
     title.value = "添加问题数据明细";
   }
 
-  /** 修改按钮操作 */
-  function handleUpdate(row) {
+/** 修改按钮操作 */
+function handleUpdate(row) {
     reset();
     const _id = row.id || ids.value
     getQualityIssueInfo(_id).then(response => {
@@ -611,9 +493,8 @@
     });
   }
 
-
-  /** 详情按钮操作 */
-  function handleDetail(row) {
+/** 详情按钮操作 */
+function handleDetail(row) {
     reset();
     const _id = row.id || ids.value
     getQualityIssueInfo(_id).then(response => {
@@ -623,8 +504,8 @@
     });
   }
 
-  /** 提交按钮 */
-  function submitForm() {
+/** 提交按钮 */
+function submitForm() {
     proxy.$refs["qualityIssueInfoRef"].validate(valid => {
       if (valid) {
         if (form.value.id != null) {
@@ -646,8 +527,8 @@
     });
   }
 
-  /** 删除按钮操作 */
-  function handleDelete(row) {
+/** 删除按钮操作 */
+function handleDelete(row) {
     const _ids = row.id || ids.value;
     proxy.$modal.confirm('是否确认删除问题数据明细编号为"' + _ids + '"的数据项？').then(function() {
       return delQualityIssueInfo(_ids);
@@ -657,47 +538,48 @@
     }).catch(() => {});
   }
 
-  /** 导出按钮操作 */
-  function handleExport() {
-    proxy.download('tech/qiantong/qdata/mdm/quality/qualityIssueInfo/export', {
-      ...queryParams.value
-    }, `qualityIssueInfo_${new Date().getTime()}.xlsx`)
-  }
+/** 导出按钮操作 */
+function handleExport() {
+  proxy.download('tech/qiantong/qdata/mdm/quality/qualityIssueInfo/export', {
+    ...listParams.value,
+    ...queryParams.value
+  }, `qualityIssueInfo_${new Date().getTime()}.xlsx`)
+}
 
-  /** ---------------- 导入相关操作 -----------------**/
-  /** 导入按钮操作 */
-  function handleImport() {
+/** ---------------- 导入相关操作 -----------------**/
+/** 导入按钮操作 */
+function handleImport() {
     upload.title = "问题数据明细导入";
     upload.open = true;
   }
 
-  /** 下载模板操作 */
-  function importTemplate() {
+/** 下载模板操作 */
+function importTemplate() {
     proxy.download("system/user/importTemplate", {
     }, `qualityIssueInfo_template_${new Date().getTime()}.xlsx`)
   }
 
-  /** 提交上传文件 */
-  function submitFileForm() {
+/** 提交上传文件 */
+function submitFileForm() {
     proxy.$refs["uploadRef"].submit();
   };
 
-  /**文件上传中处理 */
-  const handleFileUploadProgress = (event, file, fileList) => {
+/**文件上传中处理 */
+const handleFileUploadProgress = (event, file, fileList) => {
     upload.isUploading = true;
   };
 
-  /** 文件上传成功处理 */
-  const handleFileSuccess = (response, file, fileList) => {
-    upload.open = false;
-    upload.isUploading = false;
-    proxy.$refs["uploadRef"].handleRemove(file);
-    proxy.$alert("<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + response.msg + "</div>", "导入结果", { dangerouslyUseHTMLString: true });
-    getList();
-  };
-  /** ---------------------------------**/
+/** 文件上传成功处理 */
+const handleFileSuccess = (response, file, fileList) => {
+  upload.open = false;
+  upload.isUploading = false;
+  proxy.$refs["uploadRef"].handleRemove(file);
+  proxy.$alert("<div class='quality-issue-info-import-result'>" + response.msg + "</div>", "导入结果", { dangerouslyUseHTMLString: true });
+  getList();
+};
+/** ---------------------------------**/
 
-  function routeTo(link, row) {
+function routeTo(link, row) {
     if (link !== "" && link.indexOf("http") !== -1) {
       window.location.href = link;
       return
@@ -716,5 +598,19 @@
     }
   }
 
-  getList();
 </script>
+<style scoped lang="scss">
+@use '@/styles/common/component-patterns.scss' as patterns;
+
+.full-width {
+  @include patterns.full-width;
+}
+
+.template-link {
+  @include patterns.template-link;
+}
+
+:global(.quality-issue-info-import-result) {
+  @include patterns.import-result-scroll;
+}
+</style>
