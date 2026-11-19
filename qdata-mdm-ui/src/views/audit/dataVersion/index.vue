@@ -61,8 +61,10 @@
               <div :title="`${displayValue(row.name)}（${displayValue(row.businessCode)}）`" class="version-name">
                 <el-link
                   v-if="getDisplayTitle(displayValue(row.name))"
-                  type="primary" :underline="false"
-                  role="link" tabindex="0"
+                  type="primary"
+                  :underline="false"
+                  role="link"
+                  tabindex="0"
                   class="qt-detail-link text-ellipsis version-name-text"
                   :title="String(displayValue(row.name))"
                   @click.stop="handleDetail(row)"
@@ -211,7 +213,6 @@ import { listAuditObjectVersions, listAuditVersions } from '@/api/audit/trace'
 import QtTree from '@/components/QtTree/index.vue'
 import { usePublishedModelTree } from '@/composables/usePublishedModelTree'
 import { getBase } from '@/api/model/base/base'
-
 
 const tableRef = ref(null);
 const { proxy } = getCurrentInstance();
@@ -508,13 +509,13 @@ const compareRows = computed(() => {
   const before = new Map(versionContentRows(left, false).map(item => [item.code, item]));
   const after = new Map(versionContentRows(right, false).map(item => [item.code, item]));
   return [...new Set([...before.keys(), ...after.keys()])]
-      .map(code => ({
-        field: before.get(code)?.field || after.get(code)?.field || code,
-        before: before.get(code)?.value ?? '-',
-        after: after.get(code)?.value ?? '-',
-      }))
-      .map(row => ({ ...row, changed: row.before !== row.after }))
-      .filter(row => !onlyChanged.value || row.changed);
+    .map(code => ({
+      field: before.get(code)?.field || after.get(code)?.field || code,
+      before: before.get(code)?.value ?? '-',
+      after: after.get(code)?.value ?? '-',
+    }))
+    .map(row => ({ ...row, changed: row.before !== row.after }))
+    .filter(row => !onlyChanged.value || row.changed);
 });
 
 /** 数据版本记录数（由表格数据回传，不依赖 qt-table 内部状态） */

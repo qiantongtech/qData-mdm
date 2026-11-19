@@ -39,7 +39,12 @@
           @keydown.space.prevent="openModelDetail()"
         >{{ modelTitle }}</span>
         <span v-else class="info-title">-</span>
-        <dict-tag v-if="row.modelType" :options="model_type" :value="row.modelType" size="small" type="primary" />
+        <dict-tag v-if="row.modelType"
+                  :options="model_type"
+                  :value="row.modelType"
+                  size="small"
+                  type="primary"
+        />
         <dict-tag
           v-if="modelVersion"
           class="ml4"
@@ -76,8 +81,10 @@
       <div :title="`${masterName}（${masterCode || '-'}）`" class="cell-main master-name">
         <el-link
           v-if="getDisplayTitle(masterName) && $auth.hasPermi('audit:log:query')"
-          type="primary" :underline="false"
-          role="link" tabindex="0"
+          type="primary"
+          :underline="false"
+          role="link"
+          tabindex="0"
           class="qt-detail-link text-ellipsis"
           :title="String(masterName)"
           @click.stop="$emit('open-detail', row)"

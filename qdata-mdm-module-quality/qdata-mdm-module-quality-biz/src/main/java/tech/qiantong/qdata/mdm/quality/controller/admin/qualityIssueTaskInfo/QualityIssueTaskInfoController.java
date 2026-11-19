@@ -49,7 +49,7 @@ public class QualityIssueTaskInfoController extends BaseController {
     private IQualityIssueTaskInfoService qualityIssueTaskInfoService;
 
     @Operation(summary = "查询整改任务的问题项明细列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:query')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:query')")
     @GetMapping("/list")
     public CommonResult<List<QualityIssueTaskInfoRespVO>> list(@RequestParam("taskId") Long taskId) {
         List<QualityIssueTaskInfoDO> list = qualityIssueTaskInfoService.listByTaskId(taskId);
@@ -57,7 +57,7 @@ public class QualityIssueTaskInfoController extends BaseController {
     }
 
     @Operation(summary = "获取问题项明细详情")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:query')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:query')")
     @GetMapping("/{id}")
     public CommonResult<QualityIssueTaskInfoRespVO> getInfo(@PathVariable("id") Long id) {
         QualityIssueTaskInfoDO detail = qualityIssueTaskInfoService.getById(id);

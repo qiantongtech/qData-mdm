@@ -74,7 +74,11 @@
           <qt-table v-bind="masterTableStore" ref="masterTableRef">
             <template #modelInfo="{ row }"><audit-operation-cell kind="model" :row="row" scope="master" /></template>
             <template #location="{ row }"><audit-operation-cell kind="location" :row="row" scope="master" /></template>
-            <template #masterData="{ row }"><audit-operation-cell kind="masterData" :row="row" scope="master" @open-detail="handleDetail" /></template>
+            <template #masterData="{ row }"><audit-operation-cell kind="masterData"
+                                                                  :row="row"
+                                                                  scope="master"
+                                                                  @open-detail="handleDetail"
+            /></template>
             <template #operationInfo="{ row }"><audit-operation-cell kind="operation" :row="row" scope="master" /></template>
             <template #operatorInfo="{ row }"><audit-operation-cell kind="operator" :row="row" scope="master" /></template>
             <template #action="{ row }">

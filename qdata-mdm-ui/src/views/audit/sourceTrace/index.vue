@@ -190,7 +190,6 @@ import { usePublishedModelTree } from '@/composables/usePublishedModelTree'
 // 详情暂未开放，恢复时取消以下导入注释。
 // import { getAuditSource } from '@/api/audit/trace'
 
-
 const tableRef = ref(null);
 const sourceWrapRef = ref(null);
 const treeHeight = ref('86vh');

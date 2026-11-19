@@ -81,7 +81,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getRulequality, listQualityMergeRecords } from '@/api/rule/quality/quality';
 import { getPublishedModelStructure } from '@/api/model/base/base';
-import { listQualitytask } from '@/api/quality/qualityTask/qualitytask';
+import { listQualitytask } from '@/api/quality/task/task';
 import DetailInfo from '@/components/DetailInfo/index.vue';
 import GuideTipPanel from '@/components/GuideTip/GuideTipPanel.vue';
 import RuleModelDisplay from '@/views/rule/components/RuleModelDisplay.vue';
