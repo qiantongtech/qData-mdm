@@ -29,9 +29,13 @@ import tech.qiantong.qdata.mdm.common.database.core.DbTable;
 import tech.qiantong.qdata.mdm.common.database.exception.DataQueryException;
 import tech.qiantong.qdata.mdm.common.database.utils.DatabaseUtil;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -41,6 +45,10 @@ import java.util.stream.Collectors;
  * @date 2022-11-14
  */
 public class MySqlDialect extends AbstractDbDialect {
+
+    private static final Pattern GENERATED_TEXT_HEX = Pattern.compile(
+            "(?i)^\\(*\\s*(?:convert\\(\\s*)?(?:_utf8mb4\\s*)?(?:x'([0-9a-f]*)'|0x([0-9a-f]*))"
+                    + "(?:\\s+using\\s+utf8mb4\\s*\\))?\\s*\\)*$");
 
     // Define a set containing common MySQL reserved keywords (all converted to uppercase for easier comparison)
     private static final String[] MYSQL_RESERVED_WORDS = {
@@ -92,7 +100,14 @@ public class MySqlDialect extends AbstractDbDialect {
             entity.setColKey("PRI".equals(rs.getString("COLKEY")));
             entity.setNullable("YES".equals(rs.getString("NULLABLE")));
             entity.setColPosition(rs.getInt("COLPOSITION"));
-            entity.setDataDefault(rs.getString("DATADEFAULT"));
+            String defaultValue = rs.getString("DATADEFAULT");
+            if (isTextType(entity.getDataType()) && DatabaseUtil.hasColumn(rs, "EXTRA")) {
+                String extra = rs.getString("EXTRA");
+                if (extra != null && extra.contains("DEFAULT_GENERATED")) {
+                    defaultValue = normalizeGeneratedTextDefault(defaultValue);
+                }
+            }
+            entity.setDataDefault(defaultValue);
             entity.setColComment(rs.getString("COLCOMMENT"));
             return entity;
         };
@@ -100,7 +115,7 @@ public class MySqlDialect extends AbstractDbDialect {
 
     @Override
     public String columns(DbQueryProperty dbQueryProperty, String tableName) {
-        return "select column_name AS COLNAME, ordinal_position AS COLPOSITION, column_default AS DATADEFAULT, is_nullable AS NULLABLE, data_type AS DATATYPE, " +
+        return "select column_name AS COLNAME, ordinal_position AS COLPOSITION, column_default AS DATADEFAULT, extra AS EXTRA, is_nullable AS NULLABLE, data_type AS DATATYPE, " +
                 "(CASE WHEN character_maximum_length=4294967295 THEN null ELSE character_maximum_length END) AS DATALENGTH, numeric_precision AS DATAPRECISION, numeric_scale AS DATASCALE, column_key AS COLKEY, column_comment AS COLCOMMENT " +
                 "from information_schema.columns where table_schema = '" + dbQueryProperty.getDbName() + "' and table_name = '" + tableName + "' order by ordinal_position ";
     }
@@ -111,7 +126,7 @@ public class MySqlDialect extends AbstractDbDialect {
                 "table_name              AS TABLENAME, " +
                 "column_name             AS COLNAME, " +
                 "ordinal_position        AS COLPOSITION, " +
-                "column_default          AS DATADEFAULT, " +
+                "column_default          AS DATADEFAULT, extra AS EXTRA, " +
                 "is_nullable             AS NULLABLE, " +
                 "data_type               AS DATATYPE, " +
                 "(CASE WHEN character_maximum_length=4294967295 THEN null ELSE character_maximum_length END) AS DATALENGTH, " +
@@ -235,12 +250,7 @@ public class MySqlDialect extends AbstractDbDialect {
 
                 // Default value handling
                 if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                    sql.append(" DEFAULT ").append(column.getDataDefault());
-//                    if (columnType.equals("VARCHAR") || columnType.equals("CHAR") || columnType.equals("TEXT")) {
-//                        sql.append(" DEFAULT '").append(column.getDataDefault()).append("'");
-//                    } else {
-//                        sql.append(" DEFAULT ").append(column.getDataDefault());
-//                    }
+                    appendMySqlDefaultClause(sql, columnType, column.getDataDefault());
                 } else if (column.getNullable() && !column.getColKey()) {//There is no default value and NULL is allowed
                     sql.append(" DEFAULT NULL");
                 }
@@ -601,7 +611,7 @@ public class MySqlDialect extends AbstractDbDialect {
         }
 
         if (StringUtils.isNotEmpty(column.getDataDefault())) {
-            sql.append(" DEFAULT ").append(column.getDataDefault());
+            appendMySqlDefaultClause(sql, columnType, column.getDataDefault());
         } else if (column.getNullable()) {
             sql.append(" DEFAULT NULL");
         }
@@ -696,7 +706,7 @@ public class MySqlDialect extends AbstractDbDialect {
         }
 
         if (StringUtils.isNotEmpty(column.getDataDefault())) {
-            sql.append(" DEFAULT ").append(column.getDataDefault());
+            appendMySqlDefaultClause(sql, columnType, column.getDataDefault());
         } else if (column.getNullable()) {
             sql.append(" DEFAULT NULL");
         }
@@ -791,6 +801,90 @@ public class MySqlDialect extends AbstractDbDialect {
             default:
                 return columnType; // Handle unknown types by default
         }
+    }
+
+    private void appendMySqlDefaultClause(StringBuilder sql, String columnType, String defaultValue) {
+        sql.append(" DEFAULT ");
+        String type = normalizeTypeName(columnType);
+        if (isTextType(type)) {
+            appendTextDefault(sql, defaultValue);
+            return;
+        }
+        if (isTemporalLiteral(type, defaultValue)) {
+            sql.append("'").append(defaultValue.trim()).append("'");
+            return;
+        }
+        if (!type.matches("CHAR|VARCHAR2?")) {
+            sql.append(defaultValue);
+            return;
+        }
+        // 兼容已经加引号的默认值，原始字符串按字面量处理并保留首尾空格。
+        boolean quoted = defaultValue.matches("(?s)'(?:[^']|'')*'");
+        if (defaultValue.indexOf('\\') < 0 && defaultValue.indexOf('\0') < 0) {
+            sql.append(quoted ? defaultValue : "'" + DatabaseUtil.escapeSingleQuotes(defaultValue) + "'");
+            return;
+        }
+        // 十六进制字面量在常规模式和 NO_BACKSLASH_ESCAPES 下表示同一个值。
+        String value = quoted ? defaultValue.substring(1, defaultValue.length() - 1).replace("''", "'") : defaultValue;
+        sql.append("_utf8mb4 X'");
+        for (byte unit : value.getBytes(StandardCharsets.UTF_8)) {
+            sql.append(Character.forDigit((unit & 0xff) >>> 4, 16));
+            sql.append(Character.forDigit(unit & 0x0f, 16));
+        }
+        sql.append("'");
+    }
+
+    private static boolean isTemporalLiteral(String type, String defaultValue) {
+        String value = defaultValue.trim();
+        if ("TIME".equals(type)) {
+            return value.matches("-?\\d{1,3}:\\d{2}:\\d{2}(?:\\.\\d+)?");
+        }
+        return ("DATE".equals(type) || "DATETIME".equals(type) || "TIMESTAMP".equals(type))
+                && value.matches("\\d{4}-\\d{1,2}-\\d{1,2}(?:[ T]\\d{1,2}:\\d{2}:\\d{2}(?:\\.\\d+)?)?");
+    }
+
+    private static boolean isTextType(String type) {
+        return type != null && type.toUpperCase(Locale.ROOT).matches("(?:TINY|MEDIUM|LONG)?TEXT");
+    }
+
+    private static void appendTextDefault(StringBuilder sql, String defaultValue) {
+        String value = defaultValue.trim();
+        if (value.startsWith("(") && value.endsWith(")")) {
+            sql.append(value);
+            return;
+        }
+        if ("NULL".equalsIgnoreCase(value)) {
+            sql.append(value);
+            return;
+        }
+        if (value.matches("(?s)'(?:[^']|'')*'")) {
+            defaultValue = value.substring(1, value.length() - 1).replace("''", "'");
+        }
+        // Use the same expression as the upstream dialect for a TEXT literal.
+        sql.append("(CONVERT(X'");
+        for (byte unit : defaultValue.getBytes(StandardCharsets.UTF_8)) {
+            sql.append(String.format(Locale.ROOT, "%02X", unit & 0xff));
+        }
+        sql.append("' USING utf8mb4))");
+    }
+
+    private static String normalizeGeneratedTextDefault(String defaultValue) {
+        if (defaultValue == null) {
+            return null;
+        }
+        Matcher matcher = GENERATED_TEXT_HEX.matcher(defaultValue.trim());
+        if (!matcher.matches()) {
+            return defaultValue;
+        }
+        String hex = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+        if (hex.length() % 2 != 0) {
+            return defaultValue;
+        }
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int index = 0; index < bytes.length; index++) {
+            bytes[index] = (byte) Integer.parseInt(hex.substring(index * 2, index * 2 + 2), 16);
+        }
+        return "'" + DatabaseUtil.escapeSingleQuotes(new String(bytes, StandardCharsets.UTF_8)) + "'";
     }
 
     @Override

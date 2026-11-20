@@ -57,7 +57,7 @@
         <el-input
           v-model="localForm.description"
           type="textarea"
-          maxlength="256个字符"
+          :maxlength="256"
           show-word-limit
           placeholder="请输入参考数据描述"
           :min-height="192"

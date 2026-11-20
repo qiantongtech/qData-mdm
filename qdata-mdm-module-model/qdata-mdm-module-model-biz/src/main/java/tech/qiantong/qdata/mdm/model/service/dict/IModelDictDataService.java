@@ -46,6 +46,11 @@ public interface IModelDictDataService extends IService<ModelDictDataDO> {
     PageResult<ModelDictDataDO> getModelDictDataPage(ModelDictDataPageReqVO pageReqVO);
 
     /**
+     * 按参考数据类型编码导出数据项。
+     */
+    List<ModelDictDataRespVO> getModelDictDataExportRows(ModelDictDataPageReqVO exportReqVO, String typeCode);
+
+    /**
      * 创建参考数据项
      *
      * @param createReqVO 参考数据项信息
@@ -60,10 +65,6 @@ public interface IModelDictDataService extends IService<ModelDictDataDO> {
      */
     int updateModelDictData(ModelDictDataSaveReqVO updateReqVO);
 
-    /**
-     * 校验参考数据项编码是否唯一
-     */
-    boolean checkCodeUnique(String code, Long id);
 
     /**
      * 更新参考数据项状态
@@ -101,10 +102,11 @@ public interface IModelDictDataService extends IService<ModelDictDataDO> {
      * 导入参考数据项数据
      *
      * @param importExcelList 参考数据项数据列表
+     * @param typeCode        当前集合编码，可由文件提供
      * @param isUpdateSupport 是否更新支持，如果已存在，则进行更新数据
      * @param operName        操作用户
      * @return 结果
      */
-    String importModelDictData(List<ModelDictDataRespVO> importExcelList, boolean isUpdateSupport, String operName);
+    String importModelDictData(List<ModelDictDataRespVO> importExcelList, String typeCode, boolean isUpdateSupport, String operName);
 
 }

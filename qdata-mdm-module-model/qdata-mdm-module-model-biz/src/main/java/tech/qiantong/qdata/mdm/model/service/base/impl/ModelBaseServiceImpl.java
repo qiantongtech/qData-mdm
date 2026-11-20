@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageParam;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
@@ -61,6 +62,8 @@ import tech.qiantong.qdata.mdm.model.service.layer.IModelLayerService;
 import tech.qiantong.qdata.mdm.model.service.project.IModelProjectService;
 import tech.qiantong.qdata.mdm.model.util.ModelVersionChangeDataUtils;
 import tech.qiantong.qdata.mdm.model.util.VersionNoUtils;
+
+import tech.qiantong.qdata.mdm.model.util.ModelCodeGuard;
 
 import javax.annotation.Resource;
 import java.lang.reflect.Field;
@@ -185,11 +188,18 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
 
     @Override
     public Long createModelBase(ModelBaseSaveReqVO createReqVO) {
+        ModelCodeGuard.BASE.lockTransaction();
+        validateUniqueCode(createReqVO.getCode(), null, createReqVO.getParentId());
+        if (isRootModel(createReqVO.getParentId())) {
+            validateRootModel(createReqVO);
+            createReqVO.setParentId(null);
+        }
         validateClassificationOptions(createReqVO);
         // 先创建模型主体；主模型需要版本，子模型通过 parentId 判断后不创建版本。
         ModelBaseDO dictType = BeanUtils.toBean(createReqVO, ModelBaseDO.class);
         dictType.setDelFlag(Boolean.FALSE);
-        modelBaseMapper.insert(dictType);
+        ModelCodeGuard.BASE.write(() -> modelBaseMapper.insert(dictType),
+                () -> duplicateModelCode(dictType.getCode(), dictType.getParentId()));
         // parentId 为空表示主模型，只有主模型才拥有版本记录。
         if (createReqVO.getParentId() == null) {
             ModelVersionDO version = new ModelVersionDO();
@@ -213,10 +223,13 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
 
     @Override
     public int updateModelBase(ModelBaseSaveReqVO updateReqVO) {
-        validateClassificationOptions(updateReqVO);
+        ModelCodeGuard.BASE.lockTransaction();
         // 查询旧模型，用于生成字段级版本变更记录。
         ModelBaseDO oldModel = getModelBaseById(updateReqVO.getId());
-        if (oldModel == null) throw new ServiceException("模型不存在");
+        if (oldModel == null) throw new ServiceException("模型不存在", HttpStatus.WARN);
+        validateUniqueCode(updateReqVO.getCode(), updateReqVO.getId(), oldModel.getParentId());
+        validateClassificationOptions(updateReqVO);
+        if (isRootModel(oldModel.getParentId())) validateRootModel(updateReqVO);
         // 转换为完整 DO，参与所有模型业务字段的比对。
         ModelBaseDO updateModel = BeanUtils.toBean(updateReqVO, ModelBaseDO.class);
         // 删除状态只能通过逻辑删除流程维护，普通编辑不能从请求中篡改。
@@ -226,12 +239,13 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
         Map<String, Object> beforeChanges = new LinkedHashMap<>();
         Map<String, Object> afterChanges = new LinkedHashMap<>();
         collectChanges(oldModel, updateModel, beforeChanges, afterChanges);
-        // 明细表不属于 MODEL_BASE 主体字段，单独精确比较，避免前端列表对象触发误变更。
-        boolean detailChanged = collectDetailChanges(oldModel.getId(), updateReqVO, beforeChanges, afterChanges);
-        ModelVersionDO oldVersion = oldModel.getVersionId() == null ? null : iModelVersionService.getModelVersionById(oldModel.getVersionId());
         // 首次成功发布也要保护结构；只认上次成功物化的对象，不把修订中刚保存的对象算进去。
         ModelPublishContext publishedContext = readRevisionStructure(oldModel);
         validateRevision(updateReqVO, oldModel, publishedContext);
+        // 明细表不属于 MODEL_BASE 主体字段，单独比较并校验修订中新字段的类型变更。
+        boolean detailChanged = collectDetailChanges(oldModel.getId(), updateReqVO,
+                beforeChanges, afterChanges, publishedContext != null);
+        ModelVersionDO oldVersion = oldModel.getVersionId() == null ? null : iModelVersionService.getModelVersionById(oldModel.getVersionId());
         // 草稿或修订中没有任何变化，直接结束，避免追加一条空操作记录。
         // 已发布版本不在这里结束，仍会进入下面的新建修订版本流程。
         if (beforeChanges.isEmpty() && !detailChanged && oldVersion != null && !Objects.equals(oldVersion.getStatus(), 1L))
@@ -253,7 +267,7 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
 
             // 保留当前版本关联、版本号和状态，防止请求参数误覆盖版本关联。
             updateModel.setVersionId(oldModel.getVersionId());
-            int result = updateModelInfo(updateModel);
+            int result = updateModelInfo(updateModel, oldModel.getParentId());
             saveRevisionChildren(updateReqVO, oldModel.getId());
             return result;
         }
@@ -277,7 +291,7 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
         newVersion.setCreateTime(updateReqVO.getUpdateTime());
         iModelVersionService.save(newVersion);
         updateModel.setVersionId(newVersion.getId());
-        int result = updateModelInfo(updateModel);
+        int result = updateModelInfo(updateModel, oldModel.getParentId());
         saveRevisionChildren(updateReqVO, oldModel.getId());
         return result;
     }
@@ -285,18 +299,33 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
     /**
      * 完整表单保存时允许清空负责人，不影响发布等流程的局部更新。
      */
-    private int updateModelInfo(ModelBaseDO model) {
-        return modelBaseMapper.update(model, new LambdaUpdateWrapper<ModelBaseDO>()
+    private int updateModelInfo(ModelBaseDO model, Long parentId) {
+        return ModelCodeGuard.BASE.write(() -> modelBaseMapper.update(model, new LambdaUpdateWrapper<ModelBaseDO>()
                 .eq(ModelBaseDO::getId, model.getId())
-                .set(model.getResponsibleUserId() == null, ModelBaseDO::getResponsibleUserId, null));
+                .set(model.getResponsibleUserId() == null, ModelBaseDO::getResponsibleUserId, null)),
+                () -> duplicateModelCode(model.getCode(), parentId));
     }
 
-    @Override
-    public boolean checkCodeUnique(String code, Long id) {
-        QueryWrapper<ModelBaseDO> wrapper = new QueryWrapper<>();
-        wrapper.eq("code", code);
-        if (id != null) wrapper.ne("id", id);
-        return modelBaseMapper.selectCount(wrapper) == 0;
+    private boolean isRootModel(Long parentId) {
+        return parentId == null || parentId == 0L;
+    }
+
+    private void validateRootModel(ModelBaseSaveReqVO request) {
+        if (request.getProjectId() == null) throw new ServiceException("主数据域不能为空", HttpStatus.WARN);
+        if (request.getLayerId() == null) throw new ServiceException("模型目录不能为空", HttpStatus.WARN);
+        if (StringUtils.isBlank(request.getType())) throw new ServiceException("模型类型不能为空", HttpStatus.WARN);
+    }
+
+    private void validateUniqueCode(String code, Long id, Long parentId) {
+        QueryWrapper<ModelBaseDO> query = new QueryWrapper<ModelBaseDO>()
+                .apply("LOWER(TRIM(code)) = {0}", code.toLowerCase(Locale.ROOT))
+                .ne(id != null, "id", id);
+        if (modelBaseMapper.selectCount(query) > 0) throw duplicateModelCode(code, parentId);
+    }
+
+    private ServiceException duplicateModelCode(String code, Long parentId) {
+        String modelLabel = isRootModel(parentId) ? "模型" : "子模型";
+        return new ServiceException(modelLabel + "“" + code + "”编码已存在", HttpStatus.WARN);
     }
 
     /**
@@ -315,7 +344,8 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ModelBaseBatchRespVO batchPublishModelBase(ModelBaseBatchPublishReqVO request, Long userId, String userName) {
-        if (request == null || request.getDatasourceId() == null) throw new ServiceException("请选择数据连接");
+        if (request == null || request.getDatasourceId() == null)
+            throw new ServiceException("请选择数据连接", HttpStatus.WARN);
         return executeBatchModels(batchModelIds(request.getIds()), Arrays.asList(0L, 2L), "仅草稿或修订中的模型可以发布", id -> {
             ModelBasePublishRespVO result = modelBaseService.publishModelBase(id, request, userId, userName);
             if (result == null || !"SUCCEEDED".equals(result.getStatus()))
@@ -345,7 +375,8 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
     }
 
     private Collection<Long> batchModelIds(List<Long> ids) {
-        if (ids == null || ids.isEmpty() || ids.contains(null)) throw new ServiceException("请选择模型");
+        if (ids == null || ids.isEmpty() || ids.contains(null))
+            throw new ServiceException("请选择模型", HttpStatus.WARN);
         return new LinkedHashSet<>(ids);
     }
 
@@ -362,11 +393,11 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                 // 每次执行前重新读当前版本，不能直接信任前端传来的状态。
                 ModelBaseDO model = modelBaseService.getById(id);
                 if (model == null || Boolean.TRUE.equals(model.getDelFlag()))
-                    throw new ServiceException("模型不存在或已删除");
+                    throw new ServiceException("模型不存在或已删除", HttpStatus.WARN);
                 result.setModelName(model.getName());
                 ModelVersionDO version = model.getVersionId() == null ? null : iModelVersionService.getModelVersionById(model.getVersionId());
                 if ((model.getParentId() != null && model.getParentId() != 0L) || version == null || !statuses.contains(version.getStatus()))
-                    throw new ServiceException(stateMessage);
+                    throw new ServiceException(stateMessage, HttpStatus.WARN);
                 result.setPublishResult(operation.apply(id));
                 result.setSuccess(true);
                 result.setMessage("操作成功");
@@ -385,7 +416,8 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
     public int disableModelBase(Long modelId, Long userId, String updateBy) {
         // 将模型当前版本设置为封存状态，模型主体仍保留用于历史查询。
         ModelBaseDO model = modelBaseMapper.selectById(modelId);
-        if (model == null || model.getVersionId() == null) throw new ServiceException("模型或当前版本不存在");
+        if (model == null || model.getVersionId() == null)
+            throw new ServiceException("模型或当前版本不存在", HttpStatus.WARN);
         ModelVersionDO version = iModelVersionService.getModelVersionById(model.getVersionId());
         if (version == null) throw new ServiceException("当前版本不存在");
         version.setStatus(3L);
@@ -397,12 +429,59 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
 
     @Override
     public int removeModelBase(Collection<Long> idList) {
-        // 主模型删除时递归逻辑删除其子模型及字段，保留数据库记录供审计追溯。
+        Set<Long> rootIds = idList.stream().filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        List<Long> modelIds = new ArrayList<>(rootIds);
+        Set<Long> removalScope = new HashSet<>(rootIds);
+        // 主模型与随之删除的子模型共用一个范围，范围内互相引用的字段也会一起删除。
+        for (int start = 0; start < modelIds.size(); ) {
+            int end = Math.min(start + LIST_BATCH_SIZE, modelIds.size());
+            List<ModelBaseDO> children = modelBaseMapper.selectList(new QueryWrapper<ModelBaseDO>()
+                    .select("id").in("parent_id", modelIds.subList(start, end)));
+            for (ModelBaseDO child : children) {
+                if (removalScope.add(child.getId())) modelIds.add(child.getId());
+            }
+            start = end;
+        }
+        validateRemovalReferences(modelIds, removalScope);
+
+        // 先删子模型及字段，再删主模型。返回值仍只统计请求删除的模型。
         int removed = 0;
-        for (Long id : idList) {
-            if (id != null) removed += removeModelTree(id);
+        for (int index = modelIds.size() - 1; index >= 0; index--) {
+            Long id = modelIds.get(index);
+            iModelColumnService.remove(new QueryWrapper<ModelColumnDO>().eq("model_id", id));
+            int count = modelBaseMapper.deleteById(id);
+            if (rootIds.contains(id)) removed += count;
         }
         return removed;
+    }
+
+    /**
+     * 删除前核对范围外的关联字段、分类字段，草稿的引用也计入。
+     */
+    private void validateRemovalReferences(List<Long> modelIds, Set<Long> removalScope) {
+        Set<Long> referencingIds = new TreeSet<>();
+        for (int start = 0; start < modelIds.size(); start += LIST_BATCH_SIZE) {
+            List<Long> batch = modelIds.subList(start, Math.min(start + LIST_BATCH_SIZE, modelIds.size()));
+            modelColumnMapper.selectList(new QueryWrapper<ModelColumnDO>().select("model_id")
+                            .in("related_model_id", batch)
+                            .in("column_category", ModelColumnCategoryEnum.RELATION.getValue(), ModelColumnCategoryEnum.CLASS.getValue()))
+                    .stream().map(ModelColumnDO::getModelId)
+                    .filter(id -> id != null && !removalScope.contains(id))
+                    .forEach(referencingIds::add);
+        }
+        List<Long> sourceIds = new ArrayList<>(referencingIds);
+        for (int start = 0; start < sourceIds.size(); start += LIST_BATCH_SIZE) {
+            List<Long> batch = sourceIds.subList(start, Math.min(start + LIST_BATCH_SIZE, sourceIds.size()));
+            List<ModelBaseDO> sources = modelBaseMapper.selectList(new QueryWrapper<ModelBaseDO>()
+                    .select("id", "name", "code").in("id", batch).orderByAsc("id"));
+            if (!sources.isEmpty()) {
+                ModelBaseDO source = sources.get(0);
+                String name = StringUtils.defaultIfEmpty(source.getName(),
+                        StringUtils.defaultIfEmpty(source.getCode(), String.valueOf(source.getId())));
+                throw new ServiceException("当前模型已被“" + name + "”模型引用", HttpStatus.WARN);
+            }
+        }
     }
 
     @Override
@@ -420,13 +499,13 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
         String relationType = StringUtils.trim(query.getRelationType());
         if (StringUtils.isNotEmpty(relationType)
                 && !Arrays.asList(ModelRelationTypeEnum.CHILD.getValue(), ModelRelationTypeEnum.REFERENCE.getValue()).contains(relationType)) {
-            throw new ServiceException("关系类型仅支持 主子关系 或 引用关系");
+            throw new ServiceException("关系类型仅支持 主子关系 或 引用关系", HttpStatus.WARN);
         }
 
         List<ModelBaseDO> roots;
         if (query.getId() != null) {
             ModelBaseDO root = getModelBaseById(query.getId());
-            if (root == null) throw new ServiceException("模型不存在");
+            if (root == null) throw new ServiceException("模型不存在", HttpStatus.WARN);
             roots = Collections.singletonList(root);
         } else {
             ModelBasePageReqVO pageReqVO = new ModelBasePageReqVO();
@@ -643,7 +722,7 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
         ModelBaseDO root = model;
         if (model.getParentId() != null && model.getParentId() != 0L) {
             root = modelBaseMapper.selectById(model.getParentId());
-            if (root == null) throw new ServiceException("所属主模型不存在");
+            if (root == null) throw new ServiceException("所属主模型不存在", HttpStatus.WARN);
         }
         // 草稿从未物化，没有需要保护的旧物理对象，仍按原流程正常保存。
         if (root.getPublishedInstanceId() == null) return null;
@@ -677,12 +756,12 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                     .findFirst().orElseThrow(() -> new ServiceException("成功配置缺少已物化模型，不能判断修订范围"));
             if (!Objects.equals(published.getString("code"), req.getCode())
                     || !Objects.equals(published.getString("type"), req.getType())) {
-                throw new ServiceException("已发布模型不能修改模型编码或模型类型");
+                throw new ServiceException("已发布模型不能修改模型编码或模型类型", HttpStatus.WARN);
             }
             // 嵌套子模型请求可以不传parentId，此时沿用原归属；显式换父模型仍要拦截。
             Long parentId = req.getParentId() == null ? old.getParentId() : req.getParentId();
             if (published.getLongValue("parentId") != (parentId == null ? 0L : parentId)) {
-                throw new ServiceException("已发布模型不能修改主子归属");
+                throw new ServiceException("已发布模型不能修改主子归属", HttpStatus.WARN);
             }
             validateFields(req.getFields(), published, table);
         }
@@ -690,7 +769,7 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
             if (sub.getId() == null) continue;
             ModelBaseDO existing = modelBaseMapper.selectById(sub.getId());
             if (existing == null || !Objects.equals(existing.getParentId(), old.getId())) {
-                throw new ServiceException("子模型不存在或不属于当前模型");
+                throw new ServiceException("子模型不存在或不属于当前模型", HttpStatus.WARN);
             }
             validateRevision(sub, existing, context);
         }
@@ -720,28 +799,29 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                 // 删除后换一个ID重新添加同编码，也不能绕过已发布字段的结构限制。
                 boolean reusedCode = table.getColumns().stream().anyMatch(column ->
                         Objects.equals(column.getColumnName(), field.getCode()));
-                if (reusedCode) throw new ServiceException("字段" + field.getCode() + "已发布，请恢复原字段后再保存");
+                if (reusedCode)
+                    throw new ServiceException("字段" + field.getCode() + "已发布，请恢复原字段后再保存", HttpStatus.WARN);
                 continue;
             }
             JSONObject current = JSONObject.from(field);
             if ("SYSTEM".equals(published.getString("columnCategory")) && !sameRevisionProperty(published, current, "defaultValue")) {
-                throw new ServiceException("不能修改系统字段的固定默认值");
+                throw new ServiceException("不能修改系统字段的固定默认值", HttpStatus.WARN);
             }
             for (String property : Arrays.asList("code", "columnCategory", "dataType", "dataScale")) {
                 if (!sameRevisionProperty(published, current, property)) {
-                    throw new ServiceException("已发布字段不能修改：" + property);
+                    throw new ServiceException("已发布字段不能修改：" + property, HttpStatus.WARN);
                 }
             }
             // 已发布字段允许从必填改为非必填，但不能收紧为必填；null与false均表示非必填。
             if (!Boolean.TRUE.equals(ModelPublishUtils.flag(published, "requiredFlag"))
                     && Boolean.TRUE.equals(ModelPublishUtils.flag(current, "requiredFlag"))) {
-                throw new ServiceException("已发布字段不能修改约束：requiredFlag");
+                throw new ServiceException("已发布字段不能修改约束：requiredFlag", HttpStatus.WARN);
             }
             for (String property : Arrays.asList("uniqueFlag", "primaryKeyFlag")) {
                 // 未勾选和false按同一含义比较，与CHANGE保持一致，不把空值误认为修改约束。
                 if (Boolean.TRUE.equals(ModelPublishUtils.flag(published, property))
                         != Boolean.TRUE.equals(ModelPublishUtils.flag(current, property))) {
-                    throw new ServiceException("已发布字段不能修改约束：" + property);
+                    throw new ServiceException("已发布字段不能修改约束：" + property, HttpStatus.WARN);
                 }
             }
             Long before = published.getLong("dataLength");
@@ -750,9 +830,9 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                 // 未填写STRING长度按255处理；和上次成功长度比较，未发布的扩长允许反复调整。
                 before = before == null ? 255L : before;
                 after = after == null ? 255L : after;
-                if (after < before) throw new ServiceException("已发布STRING字段不能缩小长度");
+                if (after < before) throw new ServiceException("已发布STRING字段不能缩小长度", HttpStatus.WARN);
             } else if (!Objects.equals(before, after)) {
-                throw new ServiceException("已发布字段不能修改数值精度或其他类型的长度");
+                throw new ServiceException("已发布字段不能修改数值精度或其他类型的长度", HttpStatus.WARN);
             }
         }
     }
@@ -797,14 +877,16 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                     if (!activeFieldIds.contains(f.getId())) {
                         // 先恢复原行，再按正常更新流程保存配置；类上的事务确保后续失败时一起撤销。
                         if (modelColumnMapper.restoreDeletedField(f.getId(), modelId, f.getCode()) != 1) {
-                            throw new ServiceException("待恢复字段不存在或不属于当前模型");
+                            throw new ServiceException("待恢复字段不存在或不属于当前模型", HttpStatus.WARN);
                         }
                         value.setDelFlag(Boolean.FALSE);
                     }
-                    // 完整字段快照中的空参考数据表示解除关联，必须显式更新，避免忽略 null 后回显旧值。
+                    // 完整快照中的 null 表示清空，避免更新时跳过 null 后回显旧值。
                     iModelColumnService.update(value, new LambdaUpdateWrapper<ModelColumnDO>()
                             .eq(ModelColumnDO::getId, value.getId())
                             .eq(ModelColumnDO::getModelId, modelId)
+                            .set(value.getDataLength() == null, ModelColumnDO::getDataLength, null)
+                            .set(value.getDataScale() == null, ModelColumnDO::getDataScale, null)
                             .set(value.getDictTypeId() == null, ModelColumnDO::getDictTypeId, null));
                 }
             }
@@ -817,11 +899,8 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                     .collect(Collectors.toSet());
             List<ModelBaseDO> existingSubModels = modelBaseMapper.selectList(
                     new QueryWrapper<ModelBaseDO>().eq("parent_id", modelId));
-            for (ModelBaseDO existingSubModel : existingSubModels) {
-                if (!requestedSubModelIds.contains(existingSubModel.getId())) {
-                    removeModelTree(existingSubModel.getId());
-                }
-            }
+            List<Long> removedSubModelIds = existingSubModels.stream().map(ModelBaseDO::getId)
+                    .filter(id -> !requestedSubModelIds.contains(id)).collect(Collectors.toList());
 
             for (ModelBaseSaveReqVO sub : req.getSubModels()) {
                 // 新子模型走完整创建流程，以便同时初始化版本和字段数据。
@@ -833,30 +912,21 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                 ModelBaseDO existing = modelBaseMapper.selectById(sub.getId());
                 // 更新前确认子模型存在且确实属于当前父模型，避免误绑定其他模型。
                 if (existing == null || !Objects.equals(existing.getParentId(), modelId)) {
-                    throw new ServiceException("子模型不存在或不属于当前模型");
+                    throw new ServiceException("子模型不存在或不属于当前模型", HttpStatus.WARN);
                 }
                 ModelBaseDO value = BeanUtils.toBean(sub, ModelBaseDO.class);
                 value.setId(sub.getId());
                 value.setParentId(modelId);
                 value.setVersionId(existing.getVersionId());
                 value.setDelFlag(existing.getDelFlag());
-                modelBaseMapper.updateById(value);
+                validateUniqueCode(sub.getCode(), sub.getId(), modelId);
+                ModelCodeGuard.BASE.write(() -> modelBaseMapper.updateById(value),
+                        () -> duplicateModelCode(value.getCode(), modelId));
                 saveRevisionChildren(sub, sub.getId());
             }
+            // 先保存保留子模型的字段，允许在同一次提交中解除对子模型的引用后再删除它。
+            removeModelBase(removedSubModelIds);
         }
-    }
-
-    /**
-     * 递归逻辑删除模型及其字段。子模型不再展示时，其字段也必须同步失效，避免形成有效孤儿数据。
-     */
-    private int removeModelTree(Long modelId) {
-        List<ModelBaseDO> children = modelBaseMapper.selectList(
-                new QueryWrapper<ModelBaseDO>().eq("parent_id", modelId));
-        for (ModelBaseDO child : children) {
-            removeModelTree(child.getId());
-        }
-        iModelColumnService.remove(new QueryWrapper<ModelColumnDO>().eq("model_id", modelId));
-        return modelBaseMapper.deleteById(modelId);
     }
 
 
@@ -953,10 +1023,10 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
             String nodeRule = field.getNodeRule();
             String displayMode = field.getDisplayMode();
             if (!Arrays.asList("ANY", "LEAF").contains(nodeRule)) {
-                throw new ServiceException("分类字段节点选择规则仅支持 ANY 或 LEAF");
+                throw new ServiceException("分类字段节点选择规则仅支持 ANY 或 LEAF", HttpStatus.WARN);
             }
             if (!Arrays.asList("NAME", "FULL_PATH").contains(displayMode)) {
-                throw new ServiceException("分类字段展示方式仅支持 NAME 或 FULL_PATH");
+                throw new ServiceException("分类字段展示方式仅支持 NAME 或 FULL_PATH", HttpStatus.WARN);
             }
         }
         for (ModelBaseSaveReqVO subModel : Optional.ofNullable(request.getSubModels()).orElse(Collections.emptyList())) {
@@ -970,7 +1040,7 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
      * 返回 true 表示至少有一处变化；子模型里面的字段和更下一级子模型也按同样规则处理。
      */
     private boolean collectDetailChanges(Long modelId, ModelBaseSaveReqVO request,
-                                         Map<String, Object> before, Map<String, Object> after) {
+                                         Map<String, Object> before, Map<String, Object> after, boolean revision) {
         boolean changed = false;
         // null 表示这次没有提交字段，不处理；空列表表示提交了“一个字段都不要”的完整列表。
         if (request.getFields() != null) {
@@ -986,7 +1056,7 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                 boolean restored = false;
                 if (field.getId() != null && old == null) {
                     old = modelColumnMapper.selectDeletedField(field.getId(), modelId, field.getCode());
-                    if (old == null) throw new ServiceException("模型字段不存在或不属于当前模型");
+                    if (old == null) throw new ServiceException("模型字段不存在或不属于当前模型", HttpStatus.WARN);
                     // 此处只读取和记录恢复意图；通过后续修订校验后，才在保存阶段恢复原记录。
                     restored = true;
                 }
@@ -994,6 +1064,11 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                     // 新字段以前不存在，没有旧值可记；把它的全部信息放到 after 即可。
                     afterFields.add(BeanUtils.toBean(field, ModelColumnDO.class));
                     continue;
+                }
+                String dataType = field.getDataType();
+                if (revision && !Objects.equals(old.getDataType(), dataType)
+                        && !"STRING".equals(dataType) && !"TEXT".equals(dataType)) {
+                    throw new ServiceException("修订时字段" + field.getCode() + "的数据类型只能改为字符串或文本", HttpStatus.WARN);
                 }
                 Map<String, Object> fieldBefore = new LinkedHashMap<>();
                 Map<String, Object> fieldAfter = new LinkedHashMap<>();
@@ -1034,7 +1109,8 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
             List<Object> afterSubs = new ArrayList<>();
             for (ModelBaseSaveReqVO sub : request.getSubModels()) {
                 ModelBaseDO old = sub.getId() == null ? null : remaining.remove(sub.getId());
-                if (sub.getId() != null && old == null) throw new ServiceException("子模型不存在或不属于当前模型");
+                if (sub.getId() != null && old == null)
+                    throw new ServiceException("子模型不存在或不属于当前模型", HttpStatus.WARN);
                 if (old == null) {
                     // 新子模型整个都是新增内容，连同它的字段和下级子模型一起记录。
                     afterSubs.add(sub);
@@ -1044,7 +1120,7 @@ public class ModelBaseServiceImpl extends ServiceImpl<ModelBaseMapper, ModelBase
                 Map<String, Object> subAfter = new LinkedHashMap<>();
                 // 先比较子模型自身的名称、说明等，再递归比较它里面的字段和子模型。
                 collectChanges(old, BeanUtils.toBean(sub, ModelBaseDO.class), subBefore, subAfter);
-                collectDetailChanges(sub.getId(), sub, subBefore, subAfter);
+                collectDetailChanges(sub.getId(), sub, subBefore, subAfter, revision);
                 // 自身属性没改，但里面新增了字段，也要记这条子模型变化。
                 if (!subBefore.isEmpty() || !subAfter.isEmpty()) {
                     identify(subBefore, old.getId(), old.getCode());

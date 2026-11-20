@@ -103,8 +103,6 @@ public class ModelProjectController extends BaseController {
     @Log(title = "主数据域", businessType = BusinessType.INSERT)
     @PostMapping
     public CommonResult<Long> add(@Valid @RequestBody ModelProjectSaveReqVO modelProject) {
-        if (!modelProjectService.checkCodeUnique(modelProject.getCode(), null))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "新增主数据域'" + modelProject.getCode() + "'失败，编码已存在");
         modelProject.setCreatorId(getUserId());
         modelProject.setCreateBy(getNickName());
         modelProject.setCreateTime(DateUtil.date());
@@ -116,8 +114,6 @@ public class ModelProjectController extends BaseController {
     @Log(title = "主数据域", businessType = BusinessType.UPDATE)
     @PutMapping
     public CommonResult<Integer> edit(@Valid @RequestBody ModelProjectSaveReqVO modelProject) {
-        if (!modelProjectService.checkCodeUnique(modelProject.getCode(), modelProject.getId()))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "修改主数据域'" + modelProject.getCode() + "'失败，编码已存在");
         modelProject.setUpdatorId(getUserId());
         modelProject.setUpdateBy(getNickName());
         modelProject.setUpdateTime(DateUtil.date());

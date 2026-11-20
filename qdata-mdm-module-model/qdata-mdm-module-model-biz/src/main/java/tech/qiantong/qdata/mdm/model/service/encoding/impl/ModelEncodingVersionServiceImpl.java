@@ -25,6 +25,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.StringUtils;
@@ -82,7 +83,7 @@ public class ModelEncodingVersionServiceImpl extends ServiceImpl<ModelEncodingVe
         ModelEncodingVersionDO dictType = BeanUtils.toBean(createReqVO, ModelEncodingVersionDO.class);
         // 在同一事务中锁定方案后再读取历史和分配版本号，串行处理同一方案的新增请求。
         if (dictType.getEncodingId() == null || modelEncodingMapper.lockScheme(dictType.getEncodingId()) == null) {
-            throw new ServiceException("编码方案不存在，无法新增版本");
+            throw new ServiceException("编码方案不存在，无法新增版本", HttpStatus.WARN);
         }
         fillVersionInfo(dictType);
         modelEncodingVersionMapper.insert(dictType);
@@ -111,14 +112,14 @@ public class ModelEncodingVersionServiceImpl extends ServiceImpl<ModelEncodingVe
     public int updateModelEncodingVersionStatus(Long id, Integer status) {
         ModelEncodingVersionDO modelEncodingVersionDO = modelEncodingVersionMapper.selectById(id);
         if (modelEncodingVersionDO == null) {
-            throw new ServiceException("编码方案版本不存在");
+            throw new ServiceException("编码方案版本不存在", HttpStatus.WARN);
         }
 
         String versionNo = modelEncodingVersionDO.getVersionNo();
         String remark = "历史版本";
         if (Integer.valueOf(3).equals(status)) {
             if (modelEncodingVersionDO.getEncodingId() == null) {
-                throw new ServiceException("编码方案版本未关联编码方案，无法发布");
+                throw new ServiceException("编码方案版本未关联编码方案，无法发布", HttpStatus.WARN);
             }
             // 发布前仅停用同一编码方案下其他正在发布的版本，草稿状态保持不变。
             LambdaUpdateWrapper<ModelEncodingVersionDO> historyUpdateWrapper = new LambdaUpdateWrapper<>();
@@ -150,17 +151,17 @@ public class ModelEncodingVersionServiceImpl extends ServiceImpl<ModelEncodingVe
         java.util.Set<Long> ids = new java.util.LinkedHashSet<>(idList);
         List<ModelEncodingVersionDO> versions = modelEncodingVersionMapper.selectList(
                 new QueryWrapper<ModelEncodingVersionDO>().in("id", ids));
-        if (versions.size() != ids.size()) throw new ServiceException("编码方案版本不存在，请刷新后重试");
+        if (versions.size() != ids.size()) throw new ServiceException("编码方案版本不存在，请刷新后重试", HttpStatus.WARN);
         if (versions.stream().anyMatch(version -> !Integer.valueOf(1).equals(version.getStatus()))) {
-            throw new ServiceException("仅草稿状态的编码方案版本允许删除");
+            throw new ServiceException("仅草稿状态的编码方案版本允许删除", HttpStatus.WARN);
         }
         if (modelColumnMapper.selectCount(new QueryWrapper<ModelColumnDO>().in("encoding_version_id", ids)) > 0) {
-            throw new ServiceException("编码方案版本已被模型字段引用，无法删除");
+            throw new ServiceException("编码方案版本已被模型字段引用，无法删除", HttpStatus.WARN);
         }
         // 删除时再次约束草稿状态，防止校验后版本已发布；整批不一致时回滚。
         int count = modelEncodingVersionMapper.delete(new QueryWrapper<ModelEncodingVersionDO>()
                 .in("id", ids).eq("status", 1));
-        if (count != ids.size()) throw new ServiceException("编码方案版本状态已变化，请刷新后重试");
+        if (count != ids.size()) throw new ServiceException("编码方案版本状态已变化，请刷新后重试", HttpStatus.WARN);
         modelEncodingItemMapper.delete(new QueryWrapper<ModelEncodingItemDO>().in("encoding_version_id", ids));
 
         java.util.Set<Long> encodingIds = versions.stream().map(ModelEncodingVersionDO::getEncodingId)
@@ -201,7 +202,7 @@ public class ModelEncodingVersionServiceImpl extends ServiceImpl<ModelEncodingVe
                 .filter(history -> !Boolean.TRUE.equals(history.getDelFlag()))
                 .collect(java.util.stream.Collectors.toList()));
         if (latestVersion != null && Integer.valueOf(1).equals(latestVersion.getStatus())) {
-            throw new ServiceException("当前最新版本（" + latestVersion.getVersionNo() + "）仍为草稿，请先发布后再新增版本");
+            throw new ServiceException("当前最新版本（" + latestVersion.getVersionNo() + "）仍为草稿，请先发布后再新增版本", HttpStatus.WARN);
         }
         String latestVersionNo = latestVersion == null ? null : latestVersion.getVersionNo();
 
