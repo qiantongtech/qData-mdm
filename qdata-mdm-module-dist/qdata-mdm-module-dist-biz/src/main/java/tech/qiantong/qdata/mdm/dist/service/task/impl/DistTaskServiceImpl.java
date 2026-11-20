@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.domain.entity.SysUser;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
@@ -351,7 +352,7 @@ public class DistTaskServiceImpl extends ServiceImpl<DistTaskMapper, DistTaskDO>
     @Override
     public Long cloneDistTask(Long sourceId, Long operatorId, String operatorName) {
         DistTaskDO source = distTaskMapper.selectById(sourceId);
-        if (source == null) throw new ServiceException("分发任务不存在或已删除");
+        if (source == null) throw new ServiceException("分发任务不存在或已删除", HttpStatus.WARN);
 
         Date now = new Date();
         DistTaskDO clone = BeanUtils.toBean(source, DistTaskDO.class);
@@ -504,7 +505,7 @@ public class DistTaskServiceImpl extends ServiceImpl<DistTaskMapper, DistTaskDO>
         LambdaQueryWrapper<DistTaskDO> query = new LambdaQueryWrapper<DistTaskDO>()
                 .eq(DistTaskDO::getCode, code);
         if (currentTaskId != null) query.ne(DistTaskDO::getId, currentTaskId);
-        if (distTaskMapper.selectCount(query) > 0) throw new ServiceException("任务编码已存在，请更换编码");
+        if (distTaskMapper.selectCount(query) > 0) throw new ServiceException("任务编码已存在，请更换编码", HttpStatus.WARN);
     }
 
     /**
@@ -530,7 +531,7 @@ public class DistTaskServiceImpl extends ServiceImpl<DistTaskMapper, DistTaskDO>
         String triggerType = req.getTriggerType();
         if (triggerType == null) {
             DistTaskDO existing = distTaskMapper.selectById(req.getId());
-            if (existing == null) throw new ServiceException("分发任务不存在或已删除");
+        if (existing == null) throw new ServiceException("分发任务不存在或已删除", HttpStatus.WARN);
             triggerType = existing.getTriggerType();
             if (req.getFailRetryFlag() == null) req.setFailRetryFlag(existing.getFailRetryFlag());
             if (req.getFailRetryTimes() == null) req.setFailRetryTimes(existing.getFailRetryTimes());
@@ -573,12 +574,12 @@ public class DistTaskServiceImpl extends ServiceImpl<DistTaskMapper, DistTaskDO>
         // 新任务或更换接收方只能选择启用的目标系统；已有关联在系统停用后仍保留配置。
         if (req.getTargetSystemId() != null) {
             DistTargetSystemDO targetSystem = distTargetSystemMapper.selectById(req.getTargetSystemId());
-            if (targetSystem == null) throw new ServiceException("目标系统不存在或已删除，请重新选择");
+            if (targetSystem == null) throw new ServiceException("目标系统不存在或已删除，请重新选择",HttpStatus.WARN);
             if (!"1".equals(targetSystem.getStatus())) {
                 DistTaskDO existingTask = creating ? null : distTaskMapper.selectById(req.getId());
                 if (creating || existingTask == null
                         || !req.getTargetSystemId().equals(existingTask.getTargetSystemId())) {
-                    throw new ServiceException("目标系统已禁用，不能用于新建或更换分发任务");
+                    throw new ServiceException("目标系统已禁用，不能用于新建或更换分发任务",HttpStatus.WARN);
                 }
             }
         }
@@ -686,7 +687,7 @@ public class DistTaskServiceImpl extends ServiceImpl<DistTaskMapper, DistTaskDO>
         if (!creating && reqVO.getId() == null) throw new ServiceException("分发任务ID不能为空");
         // 详情接口不回显凭据；编辑请求未传配置时沿用数据库原值，不要求用户重新输入。
         DistTaskDO existing = creating ? null : distTaskMapper.selectById(reqVO.getId());
-        if (!creating && existing == null) throw new ServiceException("分发任务不存在");
+        if (!creating && existing == null) throw new ServiceException("分发任务不存在", HttpStatus.WARN);
         if (!creating) mergeMaskedApiConfig(reqVO, existing);
         String apiUrl = reqVO.getApiUrl();
         String httpMethod = reqVO.getHttpMethod();
