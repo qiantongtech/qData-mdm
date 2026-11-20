@@ -38,3 +38,5 @@ UPDATE "QDATA_MDM"."SYSTEM_MENU" SET "PERMS" = 'quality:issueTask:add' WHERE "ME
 UPDATE "QDATA_MDM"."SYSTEM_MENU" SET "PERMS" = 'quality:issueTask:edit' WHERE "MENU_ID" = 2377;
 UPDATE "QDATA_MDM"."SYSTEM_MENU" SET "PERMS" = 'quality:issueTask:export' WHERE "MENU_ID" = 2378;
 UPDATE "QDATA_MDM"."SYSTEM_MENU" SET "PERMS" = 'quality:issueTask:remove' WHERE "MENU_ID" = 2397;
+-- 更新编码方案版本新增按钮权限
+UPDATE "QDATA_MDM"."SYSTEM_MENU" SET "PERMS" = 'model:encoding:version:add' WHERE "MENU_ID" = 2394;
