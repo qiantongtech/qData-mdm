@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.core.domain.entity.SysUser;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.dist.controller.admin.service.vo.*;
@@ -264,11 +265,11 @@ public class DistServiceServiceImpl extends ServiceImpl<DistServiceMapper, DistS
     public int publishDistService(Long id, Long operatorId, String operatorName) {
         DistServiceDO entity = requireService(id);
         if (!DistServiceConstants.STATUS_ENABLED.equals(entity.getStatus())) {
-            throw new ServiceException("只有启用状态的数据服务才可以发布");
+            throw new ServiceException("只有启用状态的数据服务才可以发布", HttpStatus.WARN);
         }
         if (DistServiceConstants.PUBLISH_STATUS_PUBLISHED.equals(
                 normalizePublishStatus(entity.getPublishStatus(), entity.getPublishTime()))) {
-            throw new ServiceException("数据服务已发布，请勿重复发布");
+            throw new ServiceException("数据服务已发布，请勿重复发布", HttpStatus.WARN);
         }
         Date now = new Date();
         /*
@@ -287,7 +288,7 @@ public class DistServiceServiceImpl extends ServiceImpl<DistServiceMapper, DistS
                 .set("UPDATE_BY", operatorName)
                 .set("UPDATE_TIME", now));
         if (rows != 1) {
-            throw new ServiceException("发布失败，服务状态已发生变化，请刷新后重试");
+            throw new ServiceException("发布失败，服务状态已发生变化，请刷新后重试", HttpStatus.WARN);
         }
         publishRouteChanged(id);
         return rows;
@@ -321,7 +322,7 @@ public class DistServiceServiceImpl extends ServiceImpl<DistServiceMapper, DistS
         }
         DistServiceDO entity = distServiceMapper.selectById(id);
         if (entity == null) {
-            throw new ServiceException("数据服务不存在或已删除");
+            throw new ServiceException("数据服务不存在或已删除", HttpStatus.WARN);
         }
         return entity;
     }
@@ -349,7 +350,7 @@ public class DistServiceServiceImpl extends ServiceImpl<DistServiceMapper, DistS
                 .eq(DistServiceDO::getServicePath, path)
                 .ne(excludedId != null, DistServiceDO::getId, excludedId));
         if (count > 0) {
-            throw new ServiceException("服务路径已存在");
+            throw new ServiceException("服务路径已存在", HttpStatus.WARN);
         }
         List<DistServiceFieldSaveReqVO> fields = request.getFields();
         if (fields == null || fields.isEmpty()) {

@@ -38,6 +38,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Resource;
 import org.springframework.stereotype.Service;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.dist.controller.admin.task.vo.DistTaskInstanceRespVO;
@@ -85,13 +86,13 @@ public class DistTaskExecutionService implements IDistTaskExecutionService {
      */
     @Override
     public DistTaskInstanceRespVO execute(Long taskId, Long operatorId, String operator) {
-        if (taskId == null || !runningTasks.add(taskId)) throw new ServiceException("任务正在执行，请稍后查看执行记录");
+        if (taskId == null || !runningTasks.add(taskId)) throw new ServiceException("任务正在执行，请稍后查看执行记录", HttpStatus.WARN);
         try {
             DistTaskDO task = taskMapper.selectById(taskId);
-            if (task == null) throw new ServiceException("分发任务不存在");
+            if (task == null) throw new ServiceException("分发任务不存在",HttpStatus.WARN);
             if (Long.valueOf(-1L).equals(task.getModelId()))
-                throw new ServiceException("示例模型不能执行真实分发，请改选已发布主数据模型");
-            if (!"ENABLED".equals(task.getStatus())) throw new ServiceException("未上线的任务不能执行");
+                throw new ServiceException("示例模型不能执行真实分发，请改选已发布主数据模型",HttpStatus.WARN);
+            if (!"ENABLED".equals(task.getStatus())) throw new ServiceException("未上线的任务不能执行", HttpStatus.WARN);
             if (!"POST".equals(task.getHttpMethod())) throw new ServiceException("当前仅支持 POST 分发");
             List<DistTaskFieldMappingDO> mappings = mappingMapper.selectList(new LambdaQueryWrapper<DistTaskFieldMappingDO>()
                     .eq(DistTaskFieldMappingDO::getTaskId, taskId).orderByAsc(DistTaskFieldMappingDO::getSortOrder));
@@ -102,7 +103,7 @@ public class DistTaskExecutionService implements IDistTaskExecutionService {
                 throw new ServiceException("请先配置数据范围筛选条件");
             // 根据模型 ID 选择真实主数据取数适配器。
             DistTaskRecordSource source = recordSources.stream().filter(item -> item.supports(task.getModelId()))
-                    .findFirst().orElseThrow(() -> new ServiceException("当前主数据模型不可用"));
+                    .findFirst().orElseThrow(() -> new ServiceException("当前主数据模型不可用", HttpStatus.WARN));
             Map<String, String> headers = requestHeaders(task);
             JsonNode successCondition = json(task.getSuccessCondition(), "成功判定配置");
             Date started = new Date();

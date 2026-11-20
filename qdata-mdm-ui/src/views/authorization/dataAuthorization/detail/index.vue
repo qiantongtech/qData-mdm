@@ -217,7 +217,10 @@ const detailItems = computed(() => [
   ...(detail.value.inactiveReason ? [
     { label: '状态说明', formatter: () => inactiveReasons[detail.value.inactiveReason] || detail.value.inactiveReason }
   ] : [])
-])
+].map(item=>({
+  ...item,
+  className: 'mb2'
+})))
 
 function formatModelName({ name, code }) {
   return name ? (code ? `${name} (${code})` : name) : code || detail.value.modelId || '-'

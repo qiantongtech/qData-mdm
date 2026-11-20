@@ -309,7 +309,7 @@
                 </el-option>
               </el-select>
             </qt-form-item>
-            <qt-form-item label="模型目录" prop="layerId" class="row-full">
+            <qt-form-item label="模型目录" prop="layerId" class="row-full" required>
               <el-tree-select
                 v-model="grantForm.layerId"
                 :data="grantLayerOptions"
@@ -725,7 +725,7 @@ const tableStore = reactive({
     /* 内容列采用接近的最小宽度，剩余空间按列分配，避免列间距忽近忽远。 */
     { type: 'selection', width: 50, minWidth: 50 },
     { label: '编号', prop: 'id', width: 70, minWidth: 70, sortable: true },
-    { label: '授权主体', info: { custom: 'subjectTitle', desc: 'subjectDescription' }, minWidth: 180, align: 'left' },
+    { label: '授权主体', info: { custom: 'subjectTitle',desc:'remark'}, minWidth: 180, align: 'left' },
     { label: '主数据模型', slot: 'modelInfo', minWidth: 320, align: 'left', showOverflowTooltip: { effect: 'light' } },
     { label: '数据范围', slot: 'scope', minWidth: 180, align: 'left' },
     { label: '字段权限', slot: 'fields', minWidth: 180, align: 'left' },
@@ -741,7 +741,7 @@ const searchStore = reactive({
   items: [
     { label: '授权主体', prop: 'subjectId', component: { is: 'select', options: [] } },
     { label: '主体类型', prop: 'subjectType', component: { is: 'select', options: [{ label: '用户', value: 'user' }, { label: '角色', value: 'role' }, { label: '组织', value: 'organization' }] } },
-    { label: '主数据模型', prop: 'modelId', component: { is: 'select', options: [], onChange: handleModelSelect } },
+
     { label: '授权状态', prop: 'status', component: { is: 'select', options: [{ label: '有效', value: 'active' }, { label: '未生效', value: 'pending' }] } }
   ]
 })
@@ -832,7 +832,14 @@ const scopeGroupErrors = computed(() => {
   return Object.fromEntries(grantForm.scopeGroups.map((group, index) => [group.id, scopeGroupMessage(group, index)]))
 })
 const stepFields = {
-  1: () => ['subjectType', grantMode.value === 'batch' ? 'subjectIds' : 'subjectId', 'projectId', 'modelId', 'remark'],
+  1: () => [
+          'subjectType',
+    grantMode.value === 'batch' ? 'subjectIds' : 'subjectId',
+    'projectId',
+    'modelId',
+    'layerId',
+    'remark'
+  ],
   2: () => ['scopeType'],
   3: () => [],
   4: () => ['startDate', 'endDate']
@@ -891,6 +898,7 @@ const grantRules = {
   subjectIds: [{ validator: validateSubjectIds, trigger: 'change' }],
   projectId: [{ required: true, message: '请选择主数据域', trigger: 'change' }],
   modelId: [{ required: true, message: '请选择主数据模型', trigger: 'change' }],
+  layerId:[{required:true,message:'请选择模型目录',trigger:'change'}],
   remark: [{ max: 256, message: '描述不能超过256个字符', trigger: 'blur' }],
   scopeType: [{ required: true, message: '请选择数据范围模式', trigger: 'change' }],
   startDate: [{ required: true, message: '请选择生效时间', trigger: 'change' }],
@@ -948,8 +956,7 @@ async function submitGrant() {
       ? formatBatchResult(batchResult)
       : '授权成功')
   } catch {
-    // 批量接口失败时反馈整批未保存；单条接口错误由项目统一请求处理器提示。
-    if (isBatchCreate) proxy.$modal.msgError(`批量授权失败：成功 0 条，失败 ${subjectIds.length} 条；本次未保存任何授权`)
+    // 请求失败由统一请求处理器显示后端提示，保留弹窗供用户处理后重试。
   } finally {
     grantSubmitting.value = false
   }

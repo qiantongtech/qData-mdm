@@ -322,11 +322,14 @@
         {
             label: "分发任务信息",
             prop: "name",
-            minWidth: 220,
+            minWidth: 400,
             align: "left",
             headerAlign: "left",
             info: {
-                title: "name",
+                title: row => {
+                    const name = row.name || '-';
+                    return row.code ? `${name}（${row.code}）` : name;
+                },
                 desc: "remark",
                 get click() {
                     return proxy.$auth.hasPermi('dist:task:query')
@@ -337,13 +340,13 @@
         },
 
       { label: "归属位置", prop: "projectName", minWidth: 160, align: "left", headerAlign: "left", slot: "location" },
-      { label: "分发类型 / 接收接口", prop: "dataMode", minWidth: 200, align: "left", headerAlign: "left", slot: "distribution" },
-      { label: "最近执行信息", prop: "lastRunTime", minWidth: 255, align: "left", headerAlign: "left", slot: "lastExecution", className: "last-execution-column", labelClassName: "last-execution-column" },
+      { label: "分发类型 / 接收接口", prop: "dataMode", minWidth: 255, align: "left", headerAlign: "left", slot: "distribution" },
+      { label: "最近执行信息", prop: "lastRunTime", minWidth: 165, align: "left", headerAlign: "left", slot: "lastExecution", className: "last-execution-column", labelClassName: "last-execution-column" },
       { label: "运行控制", prop: "status", minWidth: 165, align: "left", headerAlign: "left", slot: "status" },
-      { label: "调度类型 / 周期", prop: "triggerType", minWidth: 200, align: "left", headerAlign: "left", slot: "schedule" },
-      { label: "负责人", prop: "responsibleUserName", minWidth: 140, align: "left", headerAlign: "left", slot: "responsible" },
-      { label: "创建人", prop: "createBy", minWidth: 115, align: "left", headerAlign: "left", slot: "creator" },
-      { label: "创建时间", prop: "createTime", width: 175, align: "center", date: "{y}-{m}-{d} {h}:{i}", sortable: "custom", sortableKey: "create_time" },
+      { label: "调度类型 / 周期", prop: "triggerType", minWidth: 165, align: "left", headerAlign: "left", slot: "schedule" },
+      { label: "负责人", prop: "responsibleUserName", minWidth: 165, align: "left", headerAlign: "left", slot: "responsible" },
+      { label: "创建人", prop: "createBy", minWidth: 165, align: "left", headerAlign: "left", slot: "creator" },
+      { label: "创建时间", prop: "createTime", width: 165, align: "center", date: "{y}-{m}-{d} {h}:{i}", sortable: "custom", sortableKey: "create_time" },
       { label: "操作", width: 240, align: "center", fixed: "right", slot: "handle" }
     ],
     func: listTASK,
@@ -368,8 +371,6 @@
     items: [
       { label: "分发任务名称", prop: "name", component: { is: "input", placeholder: "请输入分发任务名称" } },
       { label: "分发任务编码", prop: "code", component: { is: "input", placeholder: "请输入分发任务编码" } },
-      { label: "目标系统名称", prop: "targetSystemName", component: { is: "input", placeholder: "请输入目标系统名称" } },
-      { label: "主数据模型", prop: "modelId", component: { is: "select", placeholder: "请选择主数据模型", options: modelOptions } },
       { label: "分发类型", prop: "dataMode", component: { is: "select", placeholder: "请选择分发类型", options: [
         { label: "全量", value: "FULL" }, { label: "增量", value: "INCREMENTAL" }
       ] } },

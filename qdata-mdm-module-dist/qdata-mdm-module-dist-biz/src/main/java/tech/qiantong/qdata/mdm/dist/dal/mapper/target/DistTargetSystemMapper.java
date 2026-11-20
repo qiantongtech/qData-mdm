@@ -83,7 +83,7 @@ public interface DistTargetSystemMapper extends BaseMapperX<DistTargetSystemDO> 
 
         // 构造动态查询条件
         return selectPage(reqVO, new LambdaQueryWrapperX<DistTargetSystemDO>()
-                .eqIfPresent(DistTargetSystemDO::getCode, reqVO.getCode())
+                .likeIfPresent(DistTargetSystemDO::getCode, reqVO.getCode())
                 .likeIfPresent(DistTargetSystemDO::getName, reqVO.getName())
                 .eqIfPresent(DistTargetSystemDO::getType, reqVO.getType())
                 .likeIfPresent(DistTargetSystemDO::getContactName, reqVO.getContactName())
