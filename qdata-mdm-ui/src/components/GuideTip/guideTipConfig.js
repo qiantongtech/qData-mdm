@@ -216,7 +216,7 @@ export const guideTipConfig = {
     'da/daDatasource.list': {
         title: '<strong>数据连接</strong> — 统一管理多源异构数据接入',
         content: `用于配置和管理平台所需的数据源连接，支持关系型数据库连接。作为<u>数据采集</u>、<u>元数据同步</u>和<u>任务执行</u>的基础，保障<u>资产地图</u>等模块的数据可发现与可访问。
-        <a href="" target="_blank">查看帮助文档</a>
+        
     `,
         type: 'remind', version: '1.0'
     },

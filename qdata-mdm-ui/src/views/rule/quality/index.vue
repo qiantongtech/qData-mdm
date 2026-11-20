@@ -167,6 +167,7 @@
                   link
                   type="danger"
                   icon="Delete"
+                  :disabled="row.validFlag !== false"
                   @click="handleDelete(row)"
                   v-hasPermi="['rule:rulequality:remove']"
               >删除
@@ -645,8 +646,9 @@ const statusLoading = reactive({});
 
 const open = ref(false);
 const openDetail = ref(false);
-const ids = ref([]);
-const multiple = ref(true);
+const selectedRows = ref([]);
+const ids = computed(() => selectedRows.value.map((row) => row.id));
+const multiple = computed(() => !selectedRows.value.length || selectedRows.value.some(row => row.validFlag !== false));
 const title = ref("");
 const usersLoading = ref(false);
 const usersError = ref(false);
@@ -1599,8 +1601,7 @@ function serializeRuleConfig() {
 
 // 多选框选中数据
 function handleSelectionChange(selection) {
-  ids.value = selection.map((item) => item.id);
-  multiple.value = !selection.length;
+  selectedRows.value = selection;
 }
 
 /** 改变启用状态 */
@@ -1737,8 +1738,13 @@ function submitForm() {
 
 /** 删除按钮操作 */
 function handleDelete(row) {
+  const rows = row?.id == null ? selectedRows.value : [row];
+  if (!rows.length) return;
+  if (rows.some((item) => item.validFlag !== false)) {
+    proxy.$modal.msgWarning("请先禁用所选规则再删除");
+    return;
+  }
   const _ids = row?.id ?? ids.value;
-  if (!_ids || (Array.isArray(_ids) && !_ids.length)) return;
   proxy.$modal.confirm('是否确认删除质量规则编号为"' + _ids + '"的数据项？').then(function () {
     return delRulequality(_ids);
   }).then(() => {

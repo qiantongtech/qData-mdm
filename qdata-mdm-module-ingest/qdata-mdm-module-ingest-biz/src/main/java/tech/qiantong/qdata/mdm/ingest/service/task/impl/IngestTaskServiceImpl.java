@@ -18,13 +18,18 @@
 
 package tech.qiantong.qdata.mdm.ingest.service.task.impl;
 
+import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson2.JSONWriter;
+import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageParam;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
@@ -61,11 +66,12 @@ import tech.qiantong.qdata.mdm.ingest.mapping.FieldMappingPlan;
 import tech.qiantong.qdata.mdm.ingest.service.task.IIngestTaskService;
 import tech.qiantong.qdata.mdm.ingest.service.task.IIngestTaskScheduleService;
 import tech.qiantong.qdata.mdm.ingest.service.task.IIngestTaskSubmitService;
+import tech.qiantong.qdata.mdm.ingest.service.task.IIngestRunLogService;
 import tech.qiantong.qdata.mdm.model.service.base.IModelBaseService;
 import tech.qiantong.qdata.mdm.model.service.base.service.ModelPublishedApi;
 import tech.qiantong.qdata.mdm.model.base.dto.ModelPublishedColumnRespDTO;
 
-import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -76,13 +82,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 import javax.annotation.Resource;
 
+import static tech.qiantong.qdata.mdm.ingest.reader.task.IngestFileReader.getConfiguredFileToken;
 import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.API;
 import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.DATABASE;
 import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.DISABLED;
@@ -100,7 +106,10 @@ import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.UNIQ
 import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.VALID_FLAG_YES;
 
 /**
- * 接入任务管理服务，负责查询、配置维护、校验及执行入口。
+ * 接入任务管理服务，负责配置查询、保存、复制、启停和执行前校验。
+ *
+ * <p>配置维护在事务内完成，修改和删除任务前锁定主记录；调度在事务提交后同步。
+ * 实际执行由提交服务和执行服务负责，本服务提供执行所需的完整配置。</p>
  *
  * @author chentangwen
  */
@@ -153,30 +162,7 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     private IIngestTaskScheduleService taskScheduleService;
 
     @Resource
-    private tech.qiantong.qdata.mdm.ingest.service.task.IIngestRunLogService runLogService;
-
-    /**
-     * 优先读取文件路径字段，兼容仅传入文件令牌的配置。
-     *
-     * @param file 文件配置
-     * @return 文件路径或令牌，未配置时返回 null
-     */
-    private static String getConfiguredFilePath(IngestTaskFileConfigVO file) {
-        if (file == null) {
-            return null;
-        }
-        if (!isBlank(file.getFilePath())) {
-            return file.getFilePath();
-        }
-        return file.getFileToken();
-    }
-
-    /**
-     * 按历史 trim 规则判断空值，避免改变配置字段的空白字符语义。
-     */
-    private static boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
+    private IIngestRunLogService runLogService;
 
     /**
      * 查询历史运行记录，合并 Redis 实时进度并计算当前耗时。
@@ -187,8 +173,8 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
      */
     @Override
     public PageResult<IngestTaskRunRespVO> runs(Long id, PageParam req) {
-        if (id == null || taskMapper.selectById(id) == null) {
-            throw new ServiceException("接入任务不存在");
+        if (ObjectUtil.isNull(id) || ObjectUtil.isNull(taskMapper.selectById(id))) {
+            throw new ServiceException("接入任务不存在", HttpStatus.WARN);
         }
         PageHelper.startPage(req.getPageNum(), req.getPageSize());
         try {
@@ -197,9 +183,10 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
             List<IngestTaskRunRespVO> rows = instances.stream().map(instance -> {
                 instance = runLogService.latest(instance);
                 IngestTaskRunRespVO row = BeanUtils.toBean(instance, IngestTaskRunRespVO.class);
-                if (instance.getStartTime() != null) {
-                    row.setDurationMillis(Math.max(0L,
-                            (instance.getEndTime() == null ? System.currentTimeMillis() : instance.getEndTime().getTime()) - instance.getStartTime().getTime()));
+                if (ObjectUtil.isNotNull(instance.getStartTime())) {
+                    long endTime = ObjectUtil.isNull(instance.getEndTime())
+                            ? System.currentTimeMillis() : instance.getEndTime().getTime();
+                    row.setDurationMillis(Math.max(0L, endTime - instance.getStartTime().getTime()));
                 }
                 return row;
             }).collect(Collectors.toList());
@@ -230,7 +217,7 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     @Override
     public IngestTaskRespVO prepareExecution(Long id) {
         IngestTaskRespVO taskConfig = detail(id);
-        validate(taskConfig, true);
+        validateConfig(taskConfig, true);
         return taskConfig;
     }
 
@@ -249,10 +236,10 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
             fillUniqueFields(rows);
             rows.forEach(row -> {
                 fillDataFetchDescription(row);
-                if (row.getLastRunTime() != null) {
-                    row.setLastRunDurationMillis(Math.max(0L,
-                            (row.getLastRunEndTime() == null ? System.currentTimeMillis() : row.getLastRunEndTime().getTime())
-                                    - row.getLastRunTime().getTime()));
+                if (ObjectUtil.isNotNull(row.getLastRunTime())) {
+                    long endTime = ObjectUtil.isNull(row.getLastRunEndTime())
+                            ? System.currentTimeMillis() : row.getLastRunEndTime().getTime();
+                    row.setLastRunDurationMillis(Math.max(0L, endTime - row.getLastRunTime().getTime()));
                 }
             });
             return new PageResult<>(rows, total);
@@ -267,14 +254,14 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
      * @param task 接入任务列表项
      */
     private void fillDataFetchDescription(IngestTaskRespVO task) {
-        if (DATABASE.equals(task.getType()) && !isBlank(task.getFetchSourceObject())) {
-            String datasourceName = isBlank(task.getDatasourceName()) ? "—" : task.getDatasourceName();
+        if (DATABASE.equals(task.getType()) && !StringUtils.isBlank(task.getFetchSourceObject())) {
+            String datasourceName = StringUtils.isBlank(task.getDatasourceName()) ? "—" : task.getDatasourceName();
             String ingestModeName = INCREMENTAL.equals(task.getIngestMode()) ? "增量更新" : "追加";
             task.setDataFetch(String.join(" · ", datasourceName, task.getFetchSourceObject(), ingestModeName));
-        } else if (API.equals(task.getType()) && !isBlank(task.getFetchApiUrl())) {
-            String methodPrefix = isBlank(task.getFetchHttpMethod()) ? "" : task.getFetchHttpMethod() + " ";
+        } else if (API.equals(task.getType()) && !StringUtils.isBlank(task.getFetchApiUrl())) {
+            String methodPrefix = StringUtils.isBlank(task.getFetchHttpMethod()) ? "" : task.getFetchHttpMethod() + " ";
             task.setDataFetch(methodPrefix + task.getFetchApiUrl());
-        } else if (FILE.equals(task.getType()) && !isBlank(task.getFetchFileName())) {
+        } else if (FILE.equals(task.getType()) && !StringUtils.isBlank(task.getFetchFileName())) {
             task.setDataFetch(task.getFetchFileName());
         }
     }
@@ -285,12 +272,12 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
      * @param rows 接入任务列表
      */
     private void fillUniqueFields(List<IngestTaskRespVO> rows) {
-        if (rows == null || rows.isEmpty()) {
+        if (CollectionUtils.isEmpty(rows)) {
             return;
         }
         List<Long> taskIds = rows.stream().map(IngestTaskRespVO::getId)
-                .filter(Objects::nonNull).collect(Collectors.toList());
-        if (taskIds.isEmpty()) {
+                .filter(ObjectUtil::isNotNull).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(taskIds)) {
             return;
         }
         Map<Long, List<String>> uniqueFieldsByTask = taskMapper.selectMappingsByTaskIds(taskIds).stream()
@@ -316,8 +303,8 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     @Override
     public IngestTaskRespVO detail(Long id) {
         IngestTaskRespVO result = taskMapper.selectDetail(id);
-        if (result == null) {
-            throw new ServiceException("接入任务不存在");
+        if (ObjectUtil.isNull(result)) {
+            throw new ServiceException("接入任务不存在", HttpStatus.WARN);
         }
         List<IngestTaskFieldMappingDO> mappings = taskMapper.selectMappings(id);
         result.setMappings(mappings.stream().map(this::toMappingVO).collect(Collectors.toList()));
@@ -358,19 +345,19 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
      */
     private void fillTypeConfigs(Long id, IngestTaskRespVO result) {
         IngestTaskDbConfigDO db = taskMapper.selectDb(id);
-        if (db != null) {
+        if (ObjectUtil.isNotNull(db)) {
             result.setDbConfig(BeanUtils.toBean(db, IngestTaskDbConfigVO.class));
             result.setDbConfigId(db.getId());
             result.setCurrentIncrementValue(db.getCurrentIncrementValue());
         }
         IngestTaskFileConfigDO file = taskMapper.selectFile(id);
-        if (file != null) {
+        if (ObjectUtil.isNotNull(file)) {
             IngestTaskFileConfigVO fileConfig = BeanUtils.toBean(file, IngestTaskFileConfigVO.class);
             fileConfig.setFileToken(file.getFilePath());
             result.setFileConfig(fileConfig);
         }
         IngestTaskApiConfigDO api = taskMapper.selectApi(id);
-        if (api != null) {
+        if (ObjectUtil.isNotNull(api)) {
             result.setApiConfig(toApiConfig(api));
         }
     }
@@ -386,10 +373,10 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
         apiConfig.setUrl(api.getUrl());
         apiConfig.setHttpMethod(api.getHttpMethod());
         JSONObject headers = JSON.parseObject(api.getHeaderConfig());
-        if (headers != null) {
+        if (ObjectUtil.isNotNull(headers)) {
             Map<String, String> headerConfig = new LinkedHashMap<>();
             headers.forEach(
-                    (key, value) -> headerConfig.put(key, value == null ? "" : value.toString()));
+                    (key, value) -> headerConfig.put(key, ObjectUtil.isNull(value) ? "" : value.toString()));
             apiConfig.setHeaderConfig(headerConfig);
         }
         IngestApiConfigCodec.decode(api.getParamConfig(), apiConfig);
@@ -406,7 +393,7 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(IngestTaskSaveReqVO req) {
         // 创建和更新共用同一套配置校验，确保任务落库前引用对象均有效。
-        validate(req);
+        validateConfig(req, false);
         IngestTaskDO task = BeanUtils.toBean(req, IngestTaskDO.class);
         if (!DATABASE.equals(req.getType())) {
             task.setIngestMode(null);
@@ -415,14 +402,14 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
                 SCHEDULED.equals(req.getTriggerType()) ? req.getCronExpression().trim() : null);
         task.setId(null);
         task.setCode("tmp" + System.nanoTime());
-        task.setStatus(req.getStatus() == null ? DISABLED : req.getStatus());
+        task.setStatus(ObjectUtil.isNull(req.getStatus()) ? DISABLED : req.getStatus());
         task.setSchedulerStatus(DISABLED);
         task.setValidFlag(VALID_FLAG_YES);
         task.setDelFlag(NOT_DELETED);
         task.setCreateTime(new Date());
         task.setUpdateTime(new Date());
         taskMapper.insert(task);
-        if (task.getId() == null) {
+        if (ObjectUtil.isNull(task.getId())) {
             throw new ServiceException("任务ID生成失败");
         }
         assignGeneratedTaskCode(task);
@@ -442,10 +429,10 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     @Transactional(rollbackFor = Exception.class)
     public int update(IngestTaskSaveReqVO req) {
         IngestTaskDO previous = getTaskForUpdate(req.getId());
-        if (previous.getActiveRunId() != null) {
+        if (ObjectUtil.isNotNull(previous.getActiveRunId())) {
             throw new ServiceException("任务正在执行，请等待执行结束后修改配置");
         }
-        validate(req);
+        validateConfig(req, false);
         String currentIncrementValue = retainedIncrementValue(previous, req);
         IngestTaskDO task = BeanUtils.toBean(req, IngestTaskDO.class);
         if (!DATABASE.equals(req.getType())) {
@@ -454,7 +441,7 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
         task.setCronExpression(
                 SCHEDULED.equals(req.getTriggerType()) ? req.getCronExpression().trim() : null);
         task.setCode(previous.getCode());
-        task.setStatus(req.getStatus() == null ? previous.getStatus() : req.getStatus());
+        task.setStatus(ObjectUtil.isNull(req.getStatus()) ? previous.getStatus() : req.getStatus());
         // 编辑不擅自启用调度；改成人工执行时清除调度开关。
         task.setSchedulerStatus(ENABLED.equals(task.getStatus()) && SCHEDULED.equals(req.getTriggerType())
                 ? previous.getSchedulerStatus() : DISABLED);
@@ -466,7 +453,7 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
         task.setUpdateTime(new Date());
         int changed = taskMapper.update(task, Wrappers.<IngestTaskDO>lambdaUpdate()
                 .eq(IngestTaskDO::getId, task.getId())
-                .set(req.getResponsibleUserId() == null, IngestTaskDO::getResponsibleUserId, null));
+                .set(ObjectUtil.isNull(req.getResponsibleUserId()), IngestTaskDO::getResponsibleUserId, null));
         // 配置保存方法负责清理旧配置并按任务类型重建关联数据。
         saveConfig(task.getId(), req, currentIncrementValue);
         taskScheduleService.syncAfterCommit(task.getId());
@@ -507,12 +494,11 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     @Transactional(rollbackFor = Exception.class)
     public int changeStatus(Long id, String status, String operator) {
         if (!ENABLED.equals(status) && !DISABLED.equals(status)) {
-            throw new ServiceException("任务状态不正确");
+            throw new ServiceException("任务状态不正确", HttpStatus.WARN);
         }
         IngestTaskDO task = getTaskForUpdate(id);
-        IngestTaskRespVO config = detail(id);
         if (ENABLED.equals(status)) {
-            validate(config);
+            validateConfig(detail(id), false);
         }
         task.setStatus(status);
         if (DISABLED.equals(status)) {
@@ -537,17 +523,17 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     @Transactional(rollbackFor = Exception.class)
     public int changeScheduleStatus(Long id, String status, String operator) {
         if (!ENABLED.equals(status) && !DISABLED.equals(status)) {
-            throw new ServiceException("调度状态不正确");
+            throw new ServiceException("调度状态不正确", HttpStatus.WARN);
         }
         IngestTaskDO task = getTaskForUpdate(id);
         if (ENABLED.equals(status)) {
             if (!ENABLED.equals(task.getStatus())) {
-                throw new ServiceException("请先启用任务");
+                throw new ServiceException("请先启用任务", HttpStatus.WARN);
             }
             if (!SCHEDULED.equals(task.getTriggerType())) {
-                throw new ServiceException("请先配置 Cron 调度周期");
+                throw new ServiceException("请先配置 Cron 调度周期", HttpStatus.WARN);
             }
-            validate(detail(id));
+            validateConfig(detail(id), false);
         }
         task.setSchedulerStatus(status);
         task.setUpdateBy(operator);
@@ -558,7 +544,8 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     }
 
     /**
-     * 逻辑删除接入任务并移除调度，保留配置、来源数据和运行历史。
+     * 逻辑删除未在执行的接入任务，保留配置、来源数据和运行历史。
+     * 提交后逐条清理调度，失败项由后台校正重试。
      *
      * @param ids 接入任务编号集合
      * @return 删除行数
@@ -566,14 +553,21 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int remove(Collection<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
+        if (CollectionUtils.isEmpty(ids)) {
             return 0;
         }
+        // 按固定顺序锁定并检查全部任务，通过后再统一删除，避免与提交执行交叉。
         for (Long id : new TreeSet<>(ids)) {
-            getTaskForUpdate(id);
+            IngestTaskDO task = getTaskForUpdate(id);
+            if (!DISABLED.equals(task.getStatus())) {
+                throw new ServiceException("接入任务已上线，请先下线后再删除", HttpStatus.WARN);
+            }
+            if (task.getActiveRunId() != null) {
+                throw new ServiceException("接入任务存在未结束的执行实例，请等待执行结束后再删除", HttpStatus.WARN);
+            }
         }
         int changed = taskMapper.deleteBatchIds(ids);
-        ids.forEach(taskScheduleService::syncAfterCommit);
+        taskScheduleService.syncAfterCommit(ids.toArray(new Long[0]));
         return changed;
     }
 
@@ -591,7 +585,12 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
                 .collect(Collectors.toList());
     }
 
-    /** 将成功发布快照中的字段转换为接入映射所需的轻量结构。 */
+    /**
+     * 将成功发布快照中的字段转换为接入映射所需的结构，不读取当前草稿字段。
+     *
+     * @param column 成功发布的模型业务字段
+     * @return 供映射校验和类型转换使用的字段定义
+     */
     private IngestModelFieldRespVO toIngestField(ModelPublishedColumnRespDTO column) {
         IngestModelFieldRespVO field = new IngestModelFieldRespVO();
         field.setId(column.getId());
@@ -599,79 +598,71 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
         field.setColumnCode(column.getCode());
         field.setColumnCategory("BUSINESS");
         field.setDataType(column.getDataType());
-        field.setDataLength(column.getDataLength() == null ? null : Math.toIntExact(column.getDataLength()));
-        field.setDataScale(column.getDataScale() == null ? null : Math.toIntExact(column.getDataScale()));
+        field.setDataLength(ObjectUtil.isNull(column.getDataLength()) ? null : Math.toIntExact(column.getDataLength()));
+        field.setDataScale(ObjectUtil.isNull(column.getDataScale()) ? null : Math.toIntExact(column.getDataScale()));
         return field;
     }
 
     /**
-     * 校验接入任务配置。
-     *
-     * @param req 接入任务信息
-     */
-    @Override
-    public void validate(IngestTaskSaveReqVO req) {
-        validate(req, false);
-    }
-
-    /**
-     * 按公共信息、唯一字段、映射和接入类型依次校验配置。
+     * 按公共信息、运行策略、字段映射和接入类型依次校验配置。
      *
      * @param req          接入任务信息
      * @param forExecution 是否为执行前校验
      */
-    private void validate(IngestTaskSaveReqVO req, boolean forExecution) {
+    private void validateConfig(IngestTaskSaveReqVO req, boolean forExecution) {
         validateBasicConfig(req, forExecution);
-        if ((req.getStatus() != null && !Arrays.asList(ENABLED, DISABLED).contains(req.getStatus()))
+        if ((ObjectUtil.isNotNull(req.getStatus()) && !Arrays.asList(ENABLED, DISABLED).contains(req.getStatus()))
                 || !Arrays.asList("STOP", "CONTINUE").contains(req.getErrorStrategy())
                 || !Arrays.asList("IGNORE", "WARN", "FAIL").contains(req.getNullStrategy())
-                || req.getRetryCount() == null || req.getRetryCount() < 0 || req.getRetryCount() > 10
-                || req.getRetryIntervalSeconds() == null || req.getRetryIntervalSeconds() < 0
+                || ObjectUtil.isNull(req.getRetryCount()) || req.getRetryCount() < 0 || req.getRetryCount() > 10
+                || ObjectUtil.isNull(req.getRetryIntervalSeconds()) || req.getRetryIntervalSeconds() < 0
                 || req.getRetryIntervalSeconds() > 3600
                 || (req.getRetryCount() > 0 && req.getRetryIntervalSeconds() < 1)) {
-            throw new ServiceException("运行策略配置不正确，重试次数为0至10；启用重试时，间隔为1至3600秒");
+            throw new ServiceException("运行策略配置不正确，重试次数为0至10；启用重试时，间隔为1至3600秒", HttpStatus.WARN);
         }
-        List<String> uniqueFields = validateUniqueFields(req, forExecution);
-        validateMappings(req, uniqueFields);
+        validateMappings(req);
         if (DATABASE.equals(req.getType())) {
             validateDb(req);
         } else if (FILE.equals(req.getType())) {
             validateFile(req);
         } else if (API.equals(req.getType())) {
-            validateApi(req);
+            validateApi(req, forExecution);
         }
     }
 
     /**
      * 校验任务基础信息、引用对象和触发配置。
      *
-     * @param req 接入任务信息
+     * @param req          接入任务信息
+     * @param forExecution 是否为执行前校验；执行时不再检查 Cron 是否仍有未来触发时间
      */
     private void validateBasicConfig(IngestTaskSaveReqVO req, boolean forExecution) {
         // 先校验公共字段和外部引用，再校验不同接入类型的专属配置。
-        if (req == null || isBlank(req.getName()) || req.getName().length() > TASK_NAME_MAX_LENGTH) {
-            throw new ServiceException("任务名称不能为空且不能超过64个字符");
+        if (ObjectUtil.isNull(req) || StringUtils.isBlank(req.getName())
+                || req.getName().length() > TASK_NAME_MAX_LENGTH) {
+            throw new ServiceException("任务名称不能为空且不能超过64个字符", HttpStatus.WARN);
         }
         if (!TASK_NAME_PATTERN.matcher(req.getName()).matches()) {
-            throw new ServiceException("任务名称支持中文、英文字符、数字、下划线和短横线");
+            throw new ServiceException("任务名称支持中文、英文字符、数字、下划线和短横线", HttpStatus.WARN);
         }
-        if (req.getSourceId() == null || sourceMapper.selectById(req.getSourceId()) == null) {
-            throw new ServiceException("来源系统不存在");
+        if (ObjectUtil.isNull(req.getSourceId()) || ObjectUtil.isNull(sourceMapper.selectById(req.getSourceId()))) {
+            throw new ServiceException("来源系统不存在", HttpStatus.WARN);
         }
-        if (req.getModelId() == null || modelBaseService.getModelBaseById(req.getModelId()) == null) {
-            throw new ServiceException("主数据模型不存在");
+        if (ObjectUtil.isNull(req.getModelId())
+                || ObjectUtil.isNull(modelBaseService.getModelBaseById(req.getModelId()))) {
+            throw new ServiceException("主数据模型不存在", HttpStatus.WARN);
         }
-        if (req.getResponsibleUserId() != null && taskMapper.countUser(req.getResponsibleUserId()) == 0) {
-            throw new ServiceException("责任人不存在");
+        if (ObjectUtil.isNotNull(req.getResponsibleUserId()) && taskMapper.countUser(req.getResponsibleUserId()) == 0) {
+            throw new ServiceException("责任人不存在", HttpStatus.WARN);
         }
         if (!Arrays.asList(DATABASE, FILE, API).contains(req.getType())) {
-            throw new ServiceException("接入类型不正确");
+            throw new ServiceException("接入类型不正确", HttpStatus.WARN);
         }
         if (!Arrays.asList(MANUAL, SCHEDULED).contains(req.getTriggerType())) {
-            throw new ServiceException("执行方式不正确");
+            throw new ServiceException("执行方式不正确", HttpStatus.WARN);
         }
-        if (SCHEDULED.equals(req.getTriggerType()) && isBlank(req.getCronExpression())) {
-            throw new ServiceException("请输入 Cron 表达式");
+        if (SCHEDULED.equals(req.getTriggerType()) && StringUtils.isBlank(req.getCronExpression())) {
+            throw new ServiceException("请输入 Cron 表达式", HttpStatus.WARN);
         }
         if (SCHEDULED.equals(req.getTriggerType()) && !forExecution) {
             IngestTaskScheduleServiceImpl.validateCron(req.getCronExpression());
@@ -679,52 +670,44 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     }
 
     /**
-     * 校验来源唯一字段；保存时允许暂不配置，执行前必须配置。
-     *
-     * @param req          接入任务信息
-     * @param forExecution 是否为执行前校验
-     * @return 按配置顺序排列的唯一字段
-     */
-    private List<String> validateUniqueFields(IngestTaskSaveReqVO req, boolean forExecution) {
-        List<String> uniqueFields = Optional.ofNullable(req.getUniqueFields()).orElse(Collections.emptyList());
-        if (forExecution && uniqueFields.isEmpty()) {
-            throw new ServiceException("请先配置来源记录唯一标识后再执行");
-        }
-        if (uniqueFields.stream().anyMatch(IngestTaskServiceImpl::isBlank)
-                || new HashSet<>(uniqueFields).size() != uniqueFields.size()) {
-            throw new ServiceException("唯一标识字段不能为空或重复");
-        }
-        return uniqueFields;
-    }
-
-    /**
      * 校验目标字段、来源字段和转换规则，并检查唯一字段映射。
      *
-     * @param req          接入任务信息
-     * @param uniqueFields 来源唯一字段
+     * @param req 接入任务信息，包含必填的来源唯一字段和字段映射
      */
-    private void validateMappings(IngestTaskSaveReqVO req, List<String> uniqueFields) {
-        if (req.getMappings() == null || req.getMappings().isEmpty()) {
-            throw new ServiceException("请配置字段映射");
+    private void validateMappings(IngestTaskSaveReqVO req) {
+        // 保存、复制、启用及执行共用此校验，避免非 Controller 入口绕过必填要求。
+        List<String> uniqueFields = req.getUniqueFields();
+        if (CollectionUtils.isEmpty(uniqueFields)) {
+            throw new ServiceException("请配置来源记录唯一标识", HttpStatus.WARN);
+        }
+        if (uniqueFields.stream().anyMatch(StringUtils::isBlank)
+                || new HashSet<>(uniqueFields).size() != uniqueFields.size()) {
+            throw new ServiceException("唯一标识字段不能为空或重复", HttpStatus.WARN);
+        }
+        if (CollectionUtils.isEmpty(req.getMappings())) {
+            throw new ServiceException("请配置字段映射", HttpStatus.WARN);
         }
         FieldMappingPlan.compile(req.getMappings(), modelFields(req.getModelId()), req.getType());
         Set<String> sourceFields = new HashSet<>();
         for (IngestTaskMappingVO mapping : req.getMappings()) {
             // 未选目标时不执行处理规则，仍保留该来源字段用于唯一标识和配置回显。
-            boolean fixed = mapping.getTargetFieldId() != null && TRANSFORM_FIXED.equals(mapping.getTransformType());
+            boolean fixed = ObjectUtil.isNotNull(mapping.getTargetFieldId())
+                    && TRANSFORM_FIXED.equals(mapping.getTransformType());
             if (fixed && uniqueFields.contains(mapping.getSourceFieldName())) {
-                throw new ServiceException("固定值不能作为来源记录唯一标识");
+                throw new ServiceException("固定值不能作为来源记录唯一标识", HttpStatus.WARN);
             }
-            if (mapping.getSourceFieldType() != null && mapping.getSourceFieldType().length() > 32) {
-                throw new ServiceException("来源字段类型不能超过32个字符");
+            if (ObjectUtil.isNotNull(mapping.getSourceFieldType()) && mapping.getSourceFieldType().length() > 32) {
+                throw new ServiceException("来源字段类型不能超过32个字符", HttpStatus.WARN);
             }
-            if (mapping.getRemark() != null && mapping.getRemark().length() > 500) {
-                throw new ServiceException("字段映射备注不能超过500个字符");
+            if (ObjectUtil.isNotNull(mapping.getRemark()) && mapping.getRemark().length() > 500) {
+                throw new ServiceException("字段映射备注不能超过500个字符", HttpStatus.WARN);
             }
-            if (!fixed) sourceFields.add(mapping.getSourceFieldName());
+            if (!fixed) {
+                sourceFields.add(mapping.getSourceFieldName());
+            }
         }
         if (!sourceFields.containsAll(uniqueFields)) {
-            throw new ServiceException("唯一标识字段必须包含在来源字段映射中");
+            throw new ServiceException("唯一标识字段必须包含在来源字段映射中", HttpStatus.WARN);
         }
     }
 
@@ -735,42 +718,29 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
      */
     private void validateFile(IngestTaskSaveReqVO req) {
         IngestTaskFileConfigVO file = req.getFileConfig();
-        String path = getConfiguredFilePath(file);
-        if (file == null
+        String path = getConfiguredFileToken(file);
+        if (ObjectUtil.isNull(file)
                 || !Arrays.asList("CSV", "XLS", "XLSX").contains(file.getFileType())
-                || isBlank(path)
-                || isBlank(file.getFileName())) {
-            throw new ServiceException("请上传CSV、XLS或XLSX文件");
+                || StringUtils.isBlank(path)
+                || StringUtils.isBlank(file.getFileName())) {
+            throw new ServiceException("请上传CSV、XLS或XLSX文件", HttpStatus.WARN);
         }
     }
 
     /**
-     * 校验接口地址、请求方法以及配置字段长度。
+     * 校验 API 请求和读取配置，仅在配置操作时将读取器的配置校验失败提示为警告。
      *
-     * @param req 接入任务信息
+     * @param req          接入任务信息
+     * @param forExecution 是否为执行前校验
      */
-    private void validateApi(IngestTaskSaveReqVO req) {
+    private void validateApi(IngestTaskSaveReqVO req, boolean forExecution) {
         IngestTaskApiConfigVO api = req.getApiConfig();
+        // 请求地址、方法、响应路径和分页规则与实际读取共用同一套校验。
         IngestApiReader.validateConfig(api);
-        if (api == null
-                || isBlank(api.getUrl())
-                || !Arrays.asList("GET", "POST").contains(api.getHttpMethod())) {
-            throw new ServiceException("API地址或请求方法不正确");
-        }
         if (api.getUrl().length() > 1000
                 || JSON.toJSONString(api.getHeaderConfig()).length() > 3072
                 || IngestApiConfigCodec.encode(api).length() > 3072) {
-            throw new ServiceException("API地址不能超过1000个字符，请求头或参数配置不能超过3072个字符");
-        }
-        try {
-            URI uri = URI.create(api.getUrl());
-            if (!Arrays.asList("http", "https").contains(uri.getScheme())
-                    || uri.getHost() == null
-                    || uri.getUserInfo() != null) {
-                throw new IllegalArgumentException();
-            }
-        } catch (Exception e) {
-            throw new ServiceException("API地址必须是有效的HTTP或HTTPS地址");
+            throw new ServiceException("API地址不能超过1000个字符，请求头或参数配置不能超过3072个字符", HttpStatus.WARN);
         }
     }
 
@@ -781,23 +751,25 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
      */
     private void validateDb(IngestTaskSaveReqVO req) {
         IngestTaskDbConfigVO config = req.getDbConfig();
-        if (config == null || config.getDatasourceId() == null || isBlank(config.getSourceObject())) {
-            throw new ServiceException("请选择数据库连接和数据对象");
+        if (ObjectUtil.isNull(config) || ObjectUtil.isNull(config.getDatasourceId())
+                || StringUtils.isBlank(config.getSourceObject())) {
+            throw new ServiceException("请选择数据库连接和数据对象", HttpStatus.WARN);
         }
-        if (datasourceMapper.selectById(config.getDatasourceId()) == null) {
-            throw new ServiceException("数据库连接不存在");
+        if (ObjectUtil.isNull(datasourceMapper.selectById(config.getDatasourceId()))) {
+            throw new ServiceException("数据库连接不存在", HttpStatus.WARN);
         }
         List<IngestSourceDatasourceRelDO> relations =
                 sourceDatasourceRelMapper.selectBySourceIds(Collections.singletonList(req.getSourceId()));
         if (relations.stream().noneMatch(r -> config.getDatasourceId().equals(r.getDatasourceId()))) {
-            throw new ServiceException("数据库连接未关联当前来源系统");
+            throw new ServiceException("数据库连接未关联当前来源系统", HttpStatus.WARN);
         }
         if (!Arrays.asList(FULL, INCREMENTAL).contains(req.getIngestMode())) {
-            throw new ServiceException("请选择追加或增量更新");
+            throw new ServiceException("请选择追加或增量更新", HttpStatus.WARN);
         }
         if (INCREMENTAL.equals(req.getIngestMode())
-                && (isBlank(config.getIncrementField()) || isBlank(config.getInitialIncrementValue()))) {
-            throw new ServiceException("增量任务必须配置增量字段及首次起始值");
+                && (StringUtils.isBlank(config.getIncrementField())
+                || StringUtils.isBlank(config.getInitialIncrementValue()))) {
+            throw new ServiceException("增量任务必须配置增量字段及首次起始值", HttpStatus.WARN);
         }
     }
 
@@ -808,12 +780,12 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
      * @return 已锁定的任务
      */
     private IngestTaskDO getTaskForUpdate(Long id) {
-        if (id == null) {
-            throw new ServiceException("任务ID不能为空");
+        if (ObjectUtil.isNull(id)) {
+            throw new ServiceException("任务ID不能为空", HttpStatus.WARN);
         }
         IngestTaskDO task = taskLockMapper.lockTask(id);
-        if (task == null) {
-            throw new ServiceException("接入任务不存在");
+        if (ObjectUtil.isNull(task)) {
+            throw new ServiceException("接入任务不存在", HttpStatus.WARN);
         }
         return task;
     }
@@ -821,11 +793,16 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     /**
      * 按接入类型重建配置，并按输入顺序保存字段映射。
      *
-     * @param id  接入任务编号
-     * @param req 接入任务信息
+     * @param id                    接入任务编号
+     * @param req                   已通过校验的任务配置
+     * @param currentIncrementValue 保留的增量读取位置；重置配置或非增量任务时为空
      */
     private void saveConfig(Long id, IngestTaskSaveReqVO req, String currentIncrementValue) {
-        clearConfig(id);
+        // 与主任务处于同一事务，删除旧配置后仅重建当前类型，避免遗留其他类型配置。
+        taskMapper.deleteDb(id);
+        taskMapper.deleteFile(id);
+        taskMapper.deleteApi(id);
+        taskMapper.deleteMappings(id);
         if (DATABASE.equals(req.getType())) {
             saveDbConfig(id, req, currentIncrementValue);
         } else if (FILE.equals(req.getType())) {
@@ -838,6 +815,10 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
 
     /**
      * 保存数据库配置，追加任务不保留增量字段和首次起始值。
+     *
+     * @param id                    接入任务编号
+     * @param req                   数据库任务配置
+     * @param currentIncrementValue 需要沿用的增量读取位置
      */
     private void saveDbConfig(Long id, IngestTaskSaveReqVO req, String currentIncrementValue) {
         IngestTaskDbConfigDO config =
@@ -856,6 +837,10 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
 
     /**
      * 普通编辑保留位置；切换来源、模型、增量字段或首次起点时重新采集。
+     *
+     * @param previous 修改前已锁定的任务
+     * @param req      已通过校验的新配置
+     * @return 配置未变化时返回原增量位置，否则返回空，由读取器使用首次起始值
      */
     private String retainedIncrementValue(IngestTaskDO previous, IngestTaskSaveReqVO req) {
         if (!DATABASE.equals(previous.getType()) || !DATABASE.equals(req.getType())
@@ -866,7 +851,7 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
         }
         IngestTaskDbConfigDO old = taskMapper.selectDb(previous.getId());
         IngestTaskDbConfigVO config = req.getDbConfig();
-        if (old == null || !Objects.equals(old.getDatasourceId(), config.getDatasourceId())
+        if (ObjectUtil.isNull(old) || !Objects.equals(old.getDatasourceId(), config.getDatasourceId())
                 || !Objects.equals(old.getSourceSchema(), config.getSourceSchema())
                 || !Objects.equals(old.getSourceObject(), config.getSourceObject())
                 || !Objects.equals(old.getIncrementField(), config.getIncrementField())
@@ -878,15 +863,18 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
 
     /**
      * 保存文件配置，兼容旧文件路径字段与上传令牌。
+     *
+     * @param id         接入任务编号
+     * @param fileConfig 文件来源配置
      */
     private void saveFileConfig(Long id, IngestTaskFileConfigVO fileConfig) {
         IngestTaskFileConfigDO config =
                 BeanUtils.toBean(fileConfig, IngestTaskFileConfigDO.class);
         config.setTaskId(id);
-        config.setFilePath(getConfiguredFilePath(fileConfig));
+        config.setFilePath(getConfiguredFileToken(fileConfig));
         config.setValidFlag(VALID_FLAG_YES);
         config.setDelFlag(NOT_DELETED);
-        if (config.getUploadTime() == null) {
+        if (ObjectUtil.isNull(config.getUploadTime())) {
             config.setUploadTime(new Date());
         }
         taskFileConfigMapper.insert(config);
@@ -894,6 +882,9 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
 
     /**
      * 保存接口配置，请求头和参数按 JSON 持久化。
+     *
+     * @param id        接入任务编号
+     * @param apiConfig 接口来源配置
      */
     private void saveApiConfig(Long id, IngestTaskApiConfigVO apiConfig) {
         IngestTaskApiConfigDO config = new IngestTaskApiConfigDO();
@@ -909,10 +900,14 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
 
     /**
      * 按配置顺序保存映射，唯一字段顺序用于后续稳定标识计算。
+     *
+     * @param id  接入任务编号
+     * @param req 已通过校验的任务配置
      */
     private void saveFieldMappings(Long id, IngestTaskSaveReqVO req) {
         int order = 0;
-        List<String> uniqueFields = Optional.ofNullable(req.getUniqueFields()).orElse(Collections.emptyList());
+        List<String> uniqueFields = req.getUniqueFields();
+        List<IngestTaskFieldMappingDO> configs = new ArrayList<>(req.getMappings().size());
         for (IngestTaskMappingVO mapping : req.getMappings()) {
             IngestTaskFieldMappingDO config =
                     BeanUtils.toBean(mapping, IngestTaskFieldMappingDO.class);
@@ -920,29 +915,21 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
             config.setDelFlag(NOT_DELETED);
             config.setSortOrder(order++);
             // 空值是有效的固定值、默认值和值映射目标，持久化时不能省略。
-            config.setTransformConfig(JSON.toJSONString(mapping.getTransformConfig(),
-                    com.alibaba.fastjson2.JSONWriter.Feature.WriteNulls));
+            config.setTransformConfig(JSON.toJSONString(mapping.getTransformConfig(), JSONWriter.Feature.WriteNulls));
             // 兼容现有页面带来源字段的固定值配置；未提供来源字段时按方案存空。
-            if (TRANSFORM_FIXED.equals(mapping.getTransformType()) && isBlank(mapping.getSourceFieldName())) {
+            if (TRANSFORM_FIXED.equals(mapping.getTransformType())
+                    && StringUtils.isBlank(mapping.getSourceFieldName())) {
                 config.setSourceFieldName(null);
             }
             int uniqueOrder = uniqueFields.indexOf(mapping.getSourceFieldName());
             config.setUniqueKeyFlag(uniqueOrder >= 0 ? UNIQUE_KEY_YES : UNIQUE_KEY_NO);
             config.setUniqueKeyOrder(uniqueOrder);
-            taskFieldMappingMapper.insert(config);
+            configs.add(config);
         }
-    }
-
-    /**
-     * 清理任务下所有类型配置和字段映射。
-     *
-     * @param id 接入任务编号
-     */
-    private void clearConfig(Long id) {
-        taskMapper.deleteDb(id);
-        taskMapper.deleteFile(id);
-        taskMapper.deleteApi(id);
-        taskMapper.deleteMappings(id);
+        // 复用 Mapper 的批量实现，保留其针对 SQL Server 主键回填的兼容处理。
+        if (!Boolean.TRUE.equals(taskFieldMappingMapper.insertBatch(configs, 500))) {
+            throw new ServiceException("字段映射保存失败");
+        }
     }
 
     /**
@@ -953,7 +940,7 @@ public class IngestTaskServiceImpl implements IIngestTaskService {
     private void assignGeneratedTaskCode(IngestTaskDO task) {
         String code = TASK_CODE_PREFIX + task.getId();
         if (taskMapper.countCode(code, task.getId()) > 0) {
-            throw new ServiceException("任务编码已存在");
+            throw new ServiceException("任务编码已存在", HttpStatus.WARN);
         }
         task.setCode(code);
         if (taskMapper.updateTaskCode(task.getId(), code) != 1) {

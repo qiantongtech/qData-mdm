@@ -20,6 +20,7 @@ package tech.qiantong.qdata.mdm.merge.support;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.merge.domain.source.MergeSourceRecordBO;
 import tech.qiantong.qdata.mdm.merge.service.source.IMergeSourceTableService;
@@ -159,19 +160,19 @@ public class MergeResultFactory {
                     throw new ServiceException("来源快照不完整，不能生成待提交结果");
                 }
                 if (snapshot.isTarget() && !sourceIds.add(snapshot.getSourceRecordId())) {
-                    throw new ServiceException("同一来源记录不能重复参与结果生成");
+                    throw new ServiceException("同一来源记录不能重复参与结果生成", HttpStatus.WARN);
                 }
             }
         }
         if (sourceIds.isEmpty()) {
-            throw new ServiceException("历史比较数据不能单独生成待提交结果");
+            throw new ServiceException("历史比较数据不能单独生成待提交结果", HttpStatus.WARN);
         }
         // 按来源 ID 顺序加锁，串行化同一来源的结果生成并避免反向加锁。
         List<MergeSourceRecordBO> sources = new ArrayList<>();
         for (Long sourceId : sourceIds) {
             MergeSourceRecordBO source = sourceTableService.lock(modelId, sourceId);
             if (source == null || !Objects.equals(modelId, source.getModelId())) {
-                throw new ServiceException("来源记录不存在、已失效或不属于当前模型");
+                throw new ServiceException("来源记录不存在、已失效或不属于当前模型", HttpStatus.WARN);
             }
             sources.add(source);
         }
@@ -182,13 +183,14 @@ public class MergeResultFactory {
         for (MergeSourceRecordBO source : sources) {
             if (!MergeCodes.GOVERNANCE_PENDING.equals(source.getGovernanceStatus())
                     && !MergeCodes.GOVERNANCE_PROCESSING.equals(source.getGovernanceStatus())) {
-                throw new ServiceException("来源记录 " + source.getId() + " 已完成治理，不能再次作为待处理来源");
+                throw new ServiceException("来源记录 " + source.getId() + " 已完成治理，不能再次作为待处理来源", HttpStatus.WARN);
             }
         }
-        // 撤回、取消、驳回仍保留原治理归属；只有显式失效后才允许重新处理。
-        List<Long> occupied = mergePendingMasterMapper.selectOccupiedSourceIds(groupId, new ArrayList<Long>(sourceIds));
+        // 来源 ID 仅在模型内唯一；撤回、取消、驳回仍保留原治理归属，只有显式失效才允许重新处理。
+        List<Long> occupied = mergePendingMasterMapper.selectOccupiedSourceIds(modelId, groupId,
+                new ArrayList<Long>(sourceIds));
         if (!occupied.isEmpty()) {
-            throw new ServiceException("来源记录 " + occupied.get(0) + " 已参与其他有效治理结果，不能重复生成");
+            throw new ServiceException("来源记录 " + occupied.get(0) + " 已参与其他有效治理结果，不能重复生成", HttpStatus.WARN);
         }
         return null;
     }

@@ -21,6 +21,7 @@ package tech.qiantong.qdata.mdm.ingest.service.ingest.impl;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONWriter;
 import org.springframework.stereotype.Service;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
@@ -345,10 +346,10 @@ public class SourceDataServiceImpl implements SourceDataService {
     }
 
     private ModelPublishedMaterializationRespDTO materialization(Long modelId) {
-        if (modelId == null) throw new ServiceException("请选择主数据模型");
+        if (modelId == null) throw new ServiceException("请选择主数据模型", HttpStatus.WARN);
         ModelPublishedMaterializationRespDTO target = modelPublishedApi.getPublishedModelMaterialization(modelId);
         if (target == null || target.getDatasourceId() == null || target.getTables() == null) {
-            throw new ServiceException("模型未配置已发布的来源表");
+            throw new ServiceException("模型未配置已发布的来源表", HttpStatus.WARN);
         }
         return target;
     }
@@ -357,7 +358,7 @@ public class SourceDataServiceImpl implements SourceDataService {
         return target.getTables().stream().filter(table -> modelId.equals(table.getModelId())
                         && ModelTableRole.SOURCE.name().equals(table.getTableRole())
                         && Boolean.TRUE.equals(table.getEnabledFlag()))
-                .findFirst().orElseThrow(() -> new ServiceException("模型没有已启用的来源表"));
+                .findFirst().orElseThrow(() -> new ServiceException("模型没有已启用的来源表", HttpStatus.WARN));
     }
 
     private SourceDataPageRespVO toPageRow(Map<String, Object> data,

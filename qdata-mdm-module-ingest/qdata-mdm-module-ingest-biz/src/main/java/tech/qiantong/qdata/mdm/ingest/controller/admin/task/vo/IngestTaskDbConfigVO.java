@@ -20,11 +20,36 @@ package tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo;
 
 import lombok.Data;
 
+/**
+ * 接入任务数据库来源配置对象，支持来源对象选择及增量读取配置。
+ *
+ * @author chentangwen
+ */
 @Data
 public class IngestTaskDbConfigVO {
+
+    /**
+     * 来源数据库连接 ID。
+     */
     private Long datasourceId;
+
+    /**
+     * 来源对象所属的数据库模式。
+     */
     private String sourceSchema;
+
+    /**
+     * 待采集的来源表或视图名称。
+     */
     private String sourceObject;
+
+    /**
+     * 增量读取字段，增量模式下用于确定读取位置。
+     */
     private String incrementField;
+
+    /**
+     * 首次增量读取的起始值，后续执行位置由服务端维护。
+     */
     private String initialIncrementValue;
 }

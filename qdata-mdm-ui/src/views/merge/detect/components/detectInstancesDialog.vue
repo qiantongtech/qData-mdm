@@ -295,7 +295,7 @@ async function openLatestRunningRun() {
     if (latestRunning) openLogs(latestRunning)
     else proxy.$modal.msgWarning('没有找到运行中的任务实例')
   } catch {
-    proxy.$modal.msgError('运行实例加载失败，请稍后重试')
+    proxy.$modal.msgWarning('运行实例加载失败，请稍后重试')
   }
 }
 

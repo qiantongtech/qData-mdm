@@ -101,6 +101,10 @@ public interface IngestDatasourceMapper extends BaseMapperX<IngestDatasourceDO> 
 
     public List<IngestDatasourceDO> getDataSourceByAsset();
 
+    long countTaskReferences(@Param("ids") Collection<Long> ids);
+
+    long countSourceReferences(@Param("ids") Collection<Long> ids);
+
     @Select("<script>"
             + "SELECT ID AS \"id\", DATASOURCE_NAME AS \"datasourceName\", DATASOURCE_TYPE AS \"datasourceType\", "
             + "DATASOURCE_CONFIG AS \"datasourceConfig\", IP AS \"ip\", PORT AS \"port\" "

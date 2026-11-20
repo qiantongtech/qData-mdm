@@ -22,59 +22,115 @@ import com.baomidou.mybatisplus.annotation.*;
 import java.util.Date;
 import lombok.Data;
 
+/**
+ * 接入任务数据库来源配置实体，对应表 {@code INGEST_TASK_DB_CONFIG}。
+ *
+ * @author chentangwen
+ */
 @Data
 @TableName(value = "INGEST_TASK_DB_CONFIG")
 public class IngestTaskDbConfigDO {
+
+    /**
+     * 数据库来源配置 ID。
+     */
     @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
+    /**
+     * 所属接入任务 ID。
+     */
     @TableField(value = "TASK_ID")
     private Long taskId;
 
+    /**
+     * 来源数据库连接 ID。
+     */
     @TableField(value = "DATASOURCE_ID")
     private Long datasourceId;
 
+    /**
+     * 来源对象所属的数据库模式。
+     */
     @TableField(value = "SOURCE_SCHEMA")
     private String sourceSchema;
 
+    /**
+     * 待采集的来源表或视图名称。
+     */
     @TableField(value = "SOURCE_OBJECT")
     private String sourceObject;
 
+    /**
+     * 用于确定增量读取位置的来源字段名称。
+     */
     @TableField(value = "INCREMENT_FIELD")
     private String incrementField;
 
+    /**
+     * 首次增量读取的起始值。
+     */
     @TableField(value = "INITIAL_INCREMENT_VALUE")
     private String initialIncrementValue;
 
-    /** 最近一次完整成功采集的增量位置，与首次起始值分开保存。 */
+    /**
+     * 最近一次完整成功采集后保存的增量位置。
+     */
     @TableField(value = "CURRENT_INCREMENT_VALUE")
     private String currentIncrementValue;
 
+    /**
+     * 有效标志，1 表示有效。
+     */
     @TableField(value = "VALID_FLAG")
     private String validFlag;
 
+    /**
+     * 创建人名称。
+     */
     @TableField(value = "CREATE_BY")
     private String createBy;
 
+    /**
+     * 创建人用户 ID。
+     */
     @TableField(value = "CREATOR_ID")
     private Long creatorId;
 
+    /**
+     * 创建时间。
+     */
     @TableField(value = "CREATE_TIME")
     private Date createTime;
 
+    /**
+     * 更新人名称。
+     */
     @TableField(value = "UPDATE_BY")
     private String updateBy;
 
+    /**
+     * 更新人用户 ID。
+     */
     @TableField(value = "UPDATER_ID")
     private Long updaterId;
 
+    /**
+     * 最近更新时间。
+     */
     @TableField(value = "UPDATE_TIME")
     private Date updateTime;
 
+    /**
+     * 逻辑删除标志：0 表示未删除，1 表示已删除。
+     */
     @TableLogic(value = "0", delval = "1")
     @TableField(value = "DEL_FLAG")
     private String delFlag;
 
+    /**
+     * 备注信息。
+     */
     @TableField(value = "REMARK")
     private String remark;
 }

@@ -47,13 +47,15 @@ public interface MergePendingMasterMapper extends BaseMapperX<MergePendingMaster
     MergePendingMasterDO selectByGroupForUpdate(@Param("groupId") Long groupId);
 
     /**
-     * 查询并锁定其他有效治理结果占用的目标来源记录，防止重复生成结果。
+     * 查询并锁定当前模型其他有效治理结果占用的目标来源记录，防止重复生成结果。
      *
+     * @param modelId 当前模型 ID，来源记录 ID 仅在模型内唯一
      * @param groupId 当前候选组 ID，查询时排除该组
      * @param sourceIds 待检查的来源记录 ID，调用方须保证非空
      * @return 已被其他有效结果占用的来源记录 ID
      */
-    List<Long> selectOccupiedSourceIds(@Param("groupId") Long groupId, @Param("sourceIds") List<Long> sourceIds);
+    List<Long> selectOccupiedSourceIds(@Param("modelId") Long modelId, @Param("groupId") Long groupId,
+                                     @Param("sourceIds") List<Long> sourceIds);
 
     /** 按有效结果编号加锁，写操作在同一事务中读取最新状态并完成更新。 */
     @Select("SELECT * FROM MERGE_PENDING_MASTER WHERE ID = #{pendingId} "

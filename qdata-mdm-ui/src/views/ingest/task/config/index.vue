@@ -42,7 +42,7 @@
           <el-form
               :model="form"
               label-width="100px"
-              :disabled="readonly || saving || previewing || uploading"
+              :disabled="readonly || saving || uploading"
               class="column-form"
           >
             <div v-show="activeStep === 0" class="column-form row-full">
@@ -230,7 +230,7 @@
                       :loading="tableLoading"
                       placeholder="请选择数据表"
                       @visible-change="handleTableSelectVisible"
-                      @change="invalidateFields"
+                      @change="handleSourceObjectChange"
                   >
                     <el-option
                         v-for="item in tableOptions"
@@ -241,10 +241,7 @@
                   </el-select>
                 </qt-form-item>
                 <qt-form-item label="接入方式" class="row-full">
-                  <el-radio-group
-                      v-model="form.ingestMode"
-                      @change="invalidateFields"
-                  >
+                  <el-radio-group v-model="form.ingestMode">
                     <el-radio value="FULL">追加</el-radio>
                     <el-radio value="INCREMENTAL">增量更新</el-radio>
                   </el-radio-group>
@@ -254,14 +251,12 @@
                     <el-input
                         v-model="form.dbConfig.incrementField"
                         placeholder="更新时间或递增 ID 字段"
-                        @change="invalidateFields"
                     />
                   </qt-form-item>
                   <qt-form-item label="首次增量起始值" required>
                     <el-input
                         v-model="form.dbConfig.initialIncrementValue"
                         placeholder="请输入首次读取起点"
-                        @change="invalidateFields"
                     />
                   </qt-form-item>
                 </template>
@@ -306,14 +301,10 @@
                       v-model="form.apiConfig.url"
                       maxlength="1000"
                       placeholder="https://example.com/api/records"
-                      @change="invalidateFields"
                   />
                 </qt-form-item>
                 <qt-form-item label="请求方式" required>
-                  <el-radio-group
-                      v-model="form.apiConfig.httpMethod"
-                      @change="invalidateFields"
-                  >
+                  <el-radio-group v-model="form.apiConfig.httpMethod">
                     <el-radio value="GET">GET</el-radio>
                     <el-radio value="POST">POST</el-radio>
                   </el-radio-group>
@@ -323,30 +314,20 @@
                       v-model.trim="form.apiConfig.readConfig.recordsPath"
                       maxlength="512"
                       placeholder="请输入响应数据路径"
-                      @change="invalidateFields"
                   />
                 </qt-form-item>
                 <qt-form-item label="分页方式" required>
-                  <el-radio-group
-                      v-model="form.apiConfig.readConfig.pagingMode"
-                      @change="invalidateFields"
-                  >
+                  <el-radio-group v-model="form.apiConfig.readConfig.pagingMode">
                     <el-radio value="NONE">不分页</el-radio>
                     <el-radio value="PAGE">页码分页</el-radio>
                   </el-radio-group>
                 </qt-form-item>
                 <template v-if="form.apiConfig.readConfig.pagingMode === 'PAGE'">
                   <qt-form-item label="页码参数名" required>
-                    <el-input
-                        v-model.trim="form.apiConfig.readConfig.positionParam"
-                        @change="invalidateFields"
-                    />
+                    <el-input v-model.trim="form.apiConfig.readConfig.positionParam"/>
                   </qt-form-item>
                   <qt-form-item label="每页条数参数名" required>
-                    <el-input
-                        v-model.trim="form.apiConfig.readConfig.pageSizeParam"
-                        @change="invalidateFields"
-                    />
+                    <el-input v-model.trim="form.apiConfig.readConfig.pageSizeParam"/>
                   </qt-form-item>
                   <qt-form-item label="起始页码" required>
                     <el-input
@@ -354,7 +335,6 @@
                         type="number"
                         min="1"
                         step="1"
-                        @change="invalidateFields"
                     />
                   </qt-form-item>
                   <qt-form-item label="每页条数" required>
@@ -364,7 +344,6 @@
                         min="1"
                         max="10000"
                         step="1"
-                        @change="invalidateFields"
                     />
                   </qt-form-item>
                 </template>
@@ -374,7 +353,6 @@
                       type="textarea"
                       :rows="3"
                       placeholder="请输入请求头 JSON（可留空）"
-                      @change="invalidateFields"
                   />
                 </qt-form-item>
                 <qt-form-item :label="form.apiConfig.httpMethod === 'POST' ? '请求体参数' : '查询参数'" required class="row-full">
@@ -383,7 +361,6 @@
                       type="textarea"
                       :rows="3"
                       placeholder="请输入查询参数 JSON（可留空）"
-                      @change="invalidateFields"
                   />
                 </qt-form-item>
               </template>
@@ -418,7 +395,8 @@
               <div class="h2-titles row-full">调度周期
               </div>
               <qt-form-item label="执行方式" label-width="auto"
-                            tip="手动执行：由用户按需手动触发任务执行；Cron 表达式：按配置的周期规则自动执行任务。">
+                            tip="手动执行：由用户按需手动触发任务执行；Cron 表达式：按配置的周期规则自动执行任务。"
+              >
                 <el-radio-group v-model="form.triggerType">
                   <el-radio value="MANUAL">手动执行</el-radio>
                   <el-radio value="SCHEDULED">Cron 表达式</el-radio>
@@ -700,6 +678,7 @@ function handleLayerChange() {
 const modelFields = ref([]);
 const datasources = ref([]);
 const sourceFields = ref([]);
+const sourceFieldsLoaded = ref(false);
 const tableOptions = ref([]);
 const tableLoading = ref(false);
 const headersText = ref('');
@@ -766,6 +745,9 @@ let tableLoadVersion = 0;
 let fieldsLoadVersion = 0;
 let loadedDatasourceId;
 watch(() => [route.path, route.query.id, route.query.sourceSystemId], initialize, {immediate: true});
+watch([() => form.apiConfig, headersText, paramsText], () => {
+  if (form.type === 'API' && !loading.value) invalidateFields();
+}, {deep: true});
 
 /** 按路由初始化选项与任务配置，通过请求版本防止旧数据覆盖当前任务。 */
 async function initialize() {
@@ -778,6 +760,9 @@ async function initialize() {
   }
   const version = ++loadVersion;
   fieldsLoadVersion++;
+  sourceFieldsLoaded.value = false;
+  previewing.value = false;
+  uploading.value = false;
   loading.value = true;
   activeStep.value = 0;
   tableLoadVersion++;
@@ -844,7 +829,7 @@ async function initialize() {
     // 读取外部数据库表可能较慢，不阻塞配置页主体渲染；下拉自身显示加载状态。
     if (form.type === 'DATABASE' && form.dbConfig?.datasourceId) loadTables();
   } catch {
-    /* 请求失败由统一拦截器提示 */
+    proxy.$modal.msgWarning('加载任务配置失败，请稍后重试');
   } finally {
     if (version === loadVersion) loading.value = false;
   }
@@ -874,6 +859,8 @@ async function loadModelFields() {
 /** 数据来源变化时清空已读取字段、唯一标识及映射，要求重新读取。 */
 function invalidateFields() {
   fieldsLoadVersion++;
+  sourceFieldsLoaded.value = false;
+  previewing.value = false;
   sourceFields.value = [];
   form.uniqueFields = [];
   form.mappings = [];
@@ -923,6 +910,12 @@ function handleDatabaseChange() {
   form.dbConfig.sourceObject = '';
   invalidateFields();
   loadTables();
+}
+
+/** 选择新数据对象后立即读取字段。 */
+function handleSourceObjectChange() {
+  invalidateFields();
+  if (form.dbConfig.sourceObject) loadSourceFields();
 }
 
 /**
@@ -1087,24 +1080,16 @@ function validateStage(step) {
     if ((form.remark || '').length > 512)
       throw new Error('描述不能超过256个字符');
   } else if (step === 1) {
-    if (
-        form.type === 'DATABASE' &&
-        (!form.dbConfig.datasourceId || !form.dbConfig.sourceObject)
-    )
-      throw new Error('请选择数据库连接和数据对象');
+    validateSourceConfig();
     if (
         form.type === 'DATABASE' &&
         form.ingestMode === 'INCREMENTAL' &&
         (!form.dbConfig.incrementField || !form.dbConfig.initialIncrementValue)
     )
       throw new Error('请完成增量判断字段和首次起始值配置');
-    if (form.type === 'FILE' && !(form.fileConfig.filePath || form.fileConfig.fileToken))
-      throw new Error('请先上传接入文件');
-    if (form.type === 'API' && !/^https?:\/\//i.test(form.apiConfig.url))
-      throw new Error('请填写有效的 HTTP 或 HTTPS 接口地址');
     buildPayload();
   } else if (step === 2) {
-    if (!sourceFields.value.length) throw new Error('请先读取来源字段');
+    if (!sourceFields.value.length) throw new Error('请展开来源唯一标识下拉框读取来源字段');
     if (!form.uniqueFields?.length) throw new Error('请选择来源记录唯一标识');
   } else if (step === 3) {
     if (!sourceFields.value.length) throw new Error('请先读取来源字段');
@@ -1150,6 +1135,16 @@ function validateStage(step) {
   }
 }
 
+/** 校验读取来源字段所需的配置，不依赖增量运行参数。 */
+function validateSourceConfig() {
+  if (form.type === 'DATABASE' && (!form.dbConfig.datasourceId || !form.dbConfig.sourceObject))
+    throw new Error('请选择数据库连接和数据对象');
+  if (form.type === 'FILE' && !(form.fileConfig.filePath || form.fileConfig.fileToken))
+    throw new Error('请先上传接入文件');
+  if (form.type === 'API' && !/^https?:\/\//i.test(form.apiConfig.url))
+    throw new Error('请填写有效的 HTTP 或 HTTPS 接口地址');
+}
+
 function validateStep(step) {
   if (step === 0) {
     validateStage(0);
@@ -1169,10 +1164,10 @@ function validateStep(step) {
 }
 
 /**
- * 前进时校验已完成步骤，必要时重新读取来源字段；后退保留当前配置。
+ * 前进时校验已完成步骤；进入来源配置时补读已选表或已上传文件的字段。
  * @param {number} step 目标步骤索引。
  */
-async function changeStep(step) {
+function changeStep(step) {
   if (loading.value || saving.value || previewing.value || uploading.value)
     return;
   if (readonly.value || step < activeStep.value) {
@@ -1181,64 +1176,65 @@ async function changeStep(step) {
   }
   try {
     validateStep(0);
-    if (step === 2) {
-      validateStage(1);
-      if (!sourceFields.value.length) {
-        if (!(await preview(false))) return;
-      }
-      validateStep(1);
-    }
+    if (step === 2) validateStep(1);
     activeStep.value = step;
+    if (step === 1 && (
+      (form.type === 'DATABASE' && form.dbConfig.datasourceId && form.dbConfig.sourceObject) ||
+      (form.type === 'FILE' && (form.fileConfig.filePath || form.fileConfig.fileToken))
+    )) loadSourceFields();
   } catch (error) {
     proxy.$modal.msgWarning(error.message);
   }
 }
 
-/** 展开 API 来源唯一标识时补读字段，避免重复请求。 */
-async function handleUniqueFieldsVisible(visible) {
-  if (!visible || form.type !== 'API' || sourceFields.value.length
-      || readonly.value || loading.value || saving.value || uploading.value || previewing.value) return;
-  await preview(false);
+/** 展开来源唯一标识时读取 API 字段，也可重试数据库或文件字段读取。 */
+function handleUniqueFieldsVisible(visible) {
+  if (visible) loadSourceFields();
 }
 
-/**
- * 调用预览接口读取来源字段，清理已失效的唯一标识和映射。
- * @param {boolean} [showSuccess=true] 是否显示读取成功提示。
- * @returns {Promise<boolean>} 是否成功读取字段。
- */
-async function preview(showSuccess = true) {
+/** 读取当前来源字段，忽略切换来源前发出的请求。 */
+async function loadSourceFields() {
+  if (sourceFieldsLoaded.value || readonly.value || loading.value || saving.value
+      || uploading.value || previewing.value) return;
   let data;
   try {
-    validateStage(1);
+    validateSourceConfig();
     data = buildPayload();
+    data.uniqueFields = [];
+    data.mappings = [];
+    if (data.type === 'DATABASE') {
+      // 读取的是表结构，预览不使用增量条件，也不修改任务配置。
+      data.ingestMode = 'FULL';
+      data.dbConfig.incrementField = null;
+      data.dbConfig.initialIncrementValue = null;
+    }
   } catch (error) {
     proxy.$modal.msgWarning(error.message);
-    return false;
+    return;
   }
   previewing.value = true;
   const version = ++fieldsLoadVersion;
   try {
-    let res;
-    try {
-      res = await previewIngestTask(data);
-    } catch {
-      // 请求失败已由统一拦截器提示，停止跳转，避免外层再次弹窗。
-      return false;
-    }
-    if (version !== fieldsLoadVersion) return false;
-    sourceFields.value = res.data.fields;
-    form.uniqueFields = form.uniqueFields.filter((field) =>
-        sourceFields.value.includes(field),
-    );
-    form.mappings = form.mappings.filter((row) =>
-        sourceFields.value.includes(row.sourceFieldName),
-    );
-    if (showSuccess)
-      proxy.$modal.msgSuccess(`已读取 ${sourceFields.value.length} 个来源字段`);
-    return true;
+    const res = await previewIngestTask(data);
+    if (version !== fieldsLoadVersion) return;
+    updateSourceFields(res.data.fields);
+  } catch {
+    proxy.$modal.msgWarning('读取来源字段失败，请检查来源配置后重试');
   } finally {
-    previewing.value = false;
+    if (version === fieldsLoadVersion) previewing.value = false;
   }
+}
+
+/** 更新下拉选项和映射字段，保留仍然有效的配置。 */
+function updateSourceFields(fields) {
+  if (!Array.isArray(fields) || !fields.length) {
+    proxy.$modal.msgWarning('未读取到来源字段，请检查来源数据');
+    return;
+  }
+  sourceFields.value = fields;
+  sourceFieldsLoaded.value = true;
+  form.uniqueFields = form.uniqueFields.filter((field) => fields.includes(field));
+  form.mappings = form.mappings.filter((row) => fields.includes(row.sourceFieldName));
 }
 
 /**
@@ -1248,24 +1244,26 @@ async function preview(showSuccess = true) {
  */
 function validateUploadFile(file) {
   if (!/\.(csv|xls|xlsx)$/i.test(file.name)) {
-    proxy.$modal.msgError('仅支持 CSV、XLS、XLSX 文件');
+    proxy.$modal.msgWarning('仅支持 CSV、XLS、XLSX 文件');
     return false;
   }
   if (file.size > 50 * 1024 * 1024) {
-    proxy.$modal.msgError('文件大小不能超过 50 MB');
+    proxy.$modal.msgWarning('文件大小不能超过 50 MB');
     return false;
   }
   return true;
 }
 
 /**
- * 上传文件后回填文件信息，复用预览流程读取来源字段及同步映射。
+ * 上传文件后直接使用接口已解析的字段，无需再次预览。
  * @param {Object} options 上传组件参数，file 为本次文件。
  */
 async function uploadFile({file}) {
+  const version = loadVersion;
   uploading.value = true;
   try {
     const res = await uploadIngestFile(file);
+    if (version !== loadVersion) return;
     invalidateFields();
     Object.assign(form.fileConfig, {
       fileToken: res.data.fileToken,
@@ -1275,10 +1273,12 @@ async function uploadFile({file}) {
       fileSize: res.data.fileSize,
       uploadTime: res.data.uploadTime,
     });
-    if (!(await preview(false))) return;
-    proxy.$modal.msgSuccess(`文件上传成功，已读取 ${sourceFields.value.length} 个来源字段`);
+    updateSourceFields(res.data.fields);
+    if (sourceFieldsLoaded.value) {
+      proxy.$modal.msgSuccess(`文件上传成功，已读取 ${sourceFields.value.length} 个来源字段`);
+    }
   } finally {
-    uploading.value = false;
+    if (version === loadVersion) uploading.value = false;
   }
 }
 

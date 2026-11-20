@@ -20,6 +20,7 @@ package tech.qiantong.qdata.mdm.ingest.service.task.impl;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestFileUploadRespVO;
 import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestTaskFileConfigVO;
@@ -47,7 +48,7 @@ import javax.annotation.Resource;
 
 
 /**
- * 接入任务读取服务，按接入类型分派读取器并组装预览结果。
+ * 负责接入任务的来源读取、配置预览和文件上传校验。
  *
  * @author chentangwen
  */
@@ -64,48 +65,60 @@ public class IngestTaskReadServiceImpl implements IIngestTaskReadService {
     private IngestFileReader fileReader;
 
     /**
-     * 按接入类型同步读取来源记录，读取器返回字段列表并逐行触发回调。
+     * 同步读取来源记录，逐条将原始字段值交给调用方，不传递来源位置及增量信息。
      *
      * @param task 接入任务配置
-     * @param limit 最大读取行数，小于或等于 0 时不限制
-     * @param consumer 逐行处理回调
-     * @return 来源字段列表
+     * @param limit 最大回调条数，小于或等于 0 时不限制条数
+     * @param consumer 逐条处理来源记录的回调，按来源字段名访问原始字段值
+     * @return 来源字段名称列表
      */
     @Override
     public List<String> read(IngestTaskSaveReqVO task, int limit, Consumer<Map<String, Object>> consumer) {
         return readRows(new IngestReadContext(task, limit), row -> consumer.accept(row.getValues()));
     }
 
+    /**
+     * 按任务的接入类型选择读取器，同步向调用方传递完整来源记录。
+     * 记录除原始字段值外，还保留来源位置和增量字段原值。
+     *
+     * @param context 本次读取的任务配置、条数限制和进度信息
+     * @param consumer 逐条处理来源记录的回调
+     * @return 来源字段名称列表；API 来源返回已回调记录中出现的字段并集
+     * @throws ServiceException 接入类型未注册或来源读取失败
+     */
     @Override
     public List<String> readRows(IngestReadContext context, Consumer<IngestRow> consumer) {
         return readerRegistry.get(context.getTask().getType()).read(context, consumer);
     }
 
     /**
-     * 预览来源字段和前 20 条数据，不写入运行记录或实体来源数据。
+     * 预览来源字段和最多 20 条来源记录，不创建运行实例或写入实体来源表。
      *
-     * @param task 接入任务配置
-     * @return 字段列表及预览数据
+     * @param task 待预览的接入任务配置
+     * @return 来源字段名称和预览数据
      */
     @Override
     public IngestTaskPreviewRespVO preview(IngestTaskSaveReqVO task) {
         List<Map<String, Object>> rows = new ArrayList<>();
         IngestTaskPreviewRespVO result = new IngestTaskPreviewRespVO();
-        result.setFields(read(task, PREVIEW_ROW_LIMIT, rows::add));
+        result.setFields(readRows(new IngestReadContext(task, PREVIEW_ROW_LIMIT, null, true),
+                row -> rows.add(row.getValues())));
         result.setRows(rows);
         return result;
     }
 
     /**
-     * 保存文件并校验表头；解析失败时删除本次上传文件。
+     * 保存接入文件并试读表头及最多一条来源记录，不在上传阶段逐行校验整个文件。
+     * 保存或试读失败时，尝试清理本次上传的文件。
      *
-     * @param file CSV、XLS 或 XLSX 文件
-     * @return 文件配置及来源字段
+     * @param file 非空且不超过 50 MB 的 CSV、XLS 或 XLSX 文件
+     * @return 文件令牌、文件信息及来源字段名称列表
+     * @throws ServiceException 文件不符合上传要求，或保存、解析失败
      */
     @Override
     public IngestFileUploadRespVO upload(MultipartFile file) {
         if (file == null || file.isEmpty() || file.getSize() > MAX_UPLOAD_BYTES) {
-            throw new ServiceException("文件不能为空且不能超过50MB");
+            throw new ServiceException("文件不能为空且不能超过50MB", HttpStatus.WARN);
         }
         String name = file.getOriginalFilename();
         String suffix =
@@ -113,7 +126,7 @@ public class IngestTaskReadServiceImpl implements IIngestTaskReadService {
                         ? ""
                         : name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
         if (!Arrays.asList("csv", "xls", "xlsx").contains(suffix)) {
-            throw new ServiceException("仅支持CSV、XLS、XLSX文件");
+            throw new ServiceException("仅支持CSV、XLS、XLSX文件", HttpStatus.WARN);
         }
         String token = UUID.randomUUID().toString().replace("-", "") + "." + suffix;
         Path path = fileReader.resolveFile(token);
@@ -127,12 +140,13 @@ public class IngestTaskReadServiceImpl implements IIngestTaskReadService {
             config.setFileType(suffix.toUpperCase(Locale.ROOT));
             IngestFileUploadRespVO result = new IngestFileUploadRespVO();
             result.setFileToken(token);
+            // filePath 沿用原字段名，对外仅返回文件令牌，不暴露实际存储路径。
             result.setFilePath(token);
             result.setFileName(name);
             result.setFileType(config.getFileType());
             result.setFileSize(Files.size(path));
             result.setUploadTime(new Date());
-            // 只验证表头和首条数据，不保留上传阶段的预览内容。
+            // 试读时只保留字段名称，不收集样例数据。
             result.setFields(fileReader.read(config, 1, row -> {
             }));
             return result;
@@ -140,6 +154,7 @@ public class IngestTaskReadServiceImpl implements IIngestTaskReadService {
             try {
                 Files.deleteIfExists(path);
             } catch (IOException cleanup) {
+                // 附带清理异常，避免覆盖上传或解析失败的原始原因。
                 ex.addSuppressed(cleanup);
             }
             ServiceException failure = new ServiceException("文件上传或解析失败，请检查文件格式、编码和表头");

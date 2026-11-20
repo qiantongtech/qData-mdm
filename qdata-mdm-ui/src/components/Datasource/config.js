@@ -46,19 +46,8 @@ export const DatasourceConfig = [
                 icon: 'datasource/db/type/sqlserver.svg',
                 canDiagnose: true
             },
-            DB2: { key: 'DB2', label: 'DB2', value: 'DB2', type: 'primary', description: 'IBM DB2 关系型数据库，适用于企业级业务数据接入。', category: 'relational', icon: 'datasource/db/type/db2.svg', tagType: 'info' },
             DM8: { key: 'DM8', label: 'DM8', value: 'DM8', type: 'info', description: '达梦数据库，适用于国产化业务系统数据接入。', category: 'relational', icon: 'datasource/db/type/dm8.svg' },
             Kingbase8: { key: 'Kingbase8', label: 'Kingbase8', value: 'Kingbase8', type: 'info', description: '人大金仓数据库，适用于国产化数据库场景。', category: 'relational', icon: 'datasource/db/type/kingbase8.svg', tagType: 'info' },
-            GBase: { key: 'GBase', label: 'GBase', value: 'GBase', type: 'primary', description: '南大通用数据库，适用于国产数据库数据接入。', category: 'relational', icon: 'datasource/db/type/gbase.svg', tagType: 'info' },
-            OSCAR: { key: 'OSCAR', label: 'OSCAR', value: 'OSCAR', type: 'primary', description: '神通数据库，适用于国产化业务系统接入。', category: 'relational', icon: 'datasource/db/type/oscar.svg', tagType: 'info' },
-            OCEAN_BASE: { key: 'OCEAN_BASE', label: 'OceanBase（MySQL模式）', value: 'OCEANBASE', type: 'primary', description: 'OceanBase MySQL 兼容租户。', category: 'relational', icon: 'datasource/db/type/ocean-base.svg', tagType: 'info' },
-            OCEAN_BASE_ORACLE: { key: 'OCEAN_BASE_ORACLE', label: 'OceanBase（Oracle模式）', value: 'OCEANBASE_ORACLE', type: 'primary', description: 'OceanBase Oracle 兼容租户。', category: 'relational', icon: 'datasource/db/type/ocean-base.svg', tagType: 'info' },
-            TIDB: { key: 'TIDB', label: 'TIDB', value: 'TIDB', type: 'primary', description: '分布式关系型数据库，支撑实时采集、离线计算与数据治理各类任务。', category: 'relational', icon: 'datasource/db/type/tidb.svg', tagType: 'info' },
-            OPEN_GAUSS: { key: 'openGauss', label: 'openGauss', value: 'openGauss', type: 'primary', description: '开源企业级关系型数据库，适用于业务系统与分析场景。', category: 'relational', icon: 'datasource/db/type/open-gauss.svg', canDiagnose: true },
-            GBASE8C: { key: 'GBase8c', label: 'GBase 8c', value: 'GBase 8c', type: 'primary', description: '分布式关系型数据库，适用于企业级业务与数据分析。', category: 'relational', icon: 'datasource/db/type/gbase8c.svg', canDiagnose: true },
-            GAUSS_DB: { key: 'GaussDB', label: 'GaussDB', value: 'GaussDB', type: 'primary', description: '分布式数据仓库，适用于海量数据分析与数仓场景。', category: 'relational', icon: 'datasource/db/type/gauss-db.png', canDiagnose: true },
-            HIGHGO: { key: 'HighGo', label: '瀚高数据库', value: 'HighGo', type: 'primary', description: '瀚高国产关系型数据库，按 PostgreSQL 兼容模式接入。', category: 'relational', icon: 'datasource/db/type/high-go.png', tagType: 'info', canDiagnose: true },
-            // MariaDB: {key: 'MariaDB', label: 'MariaDB', value: 'MariaDB', type: 'primary', description: 'MySQL 分支开源关系型数据库，中小型业务、网站系统广泛部署。', category: 'relational', icon: 'datasource/db/type/MariaDB.svg', tagType: 'info' },
         }
     }
 ];
@@ -223,13 +212,9 @@ export const config = {
         SQL_Server: 3,
         DM8: 3,
         Kingbase8: 3,
-        OSCAR: 3,
-        DB2: 3,
     },
     daDataQuery: {},
     daDiscovery: {
-        OSCAR: 2,
-        DB2: 2,
     },
     // 模型物化：仅允许关系型数据库
     modelMaterialization: {},
@@ -246,11 +231,8 @@ export const config = {
         PostgreSQL: 3,
         SQL_Server: 3,
         SQL_Server2008: 3,
-        DB2: 3,
         DM8: 3,
         Kingbase8: 3,
-        GBase: 3,
-        OSCAR: 3,
     },
     dppIntegratioTaskOdpsOutSPARK: {
         MySql: 3,
@@ -259,21 +241,14 @@ export const config = {
         PostgreSQL: 3,
         SQL_Server: 3,
         SQL_Server2008: 3,
-        DB2: 3,
         DM8: 3,
         Kingbase8: 3,
-        GBase: 3,
-        OSCAR: 3,
     },
     dppIntegratioTaskInFLINK: {
         SQL_Server2008: 2,
-        OSCAR: 2,
-        DB2: 2,
     },
     dppIntegratioTaskOutFLINK: {
         SQL_Server2008: 2,
-        OSCAR: 2,
-        DB2: 2,
     },
     dsApi: {},
     dppIntegratioTaskInTDengine: {
@@ -285,8 +260,6 @@ export const config = {
         SQL_Server: 3,
         SQL_Server2008: 3,
         PostgreSQL: 3,
-        DB2: 3,
-        OSCAR: 3,
     },
     mcStructuredTask: {},
     mcStructuredTaskFile: {
@@ -296,10 +269,7 @@ export const config = {
         PostgreSQL: 3,
         SQL_Server: 3,
         SQL_Server2008: 3,
-        DB2: 3,
         DM8: 3,
         Kingbase8: 3,
-        GBase: 3,
-        OSCAR: 3,
     }
 };

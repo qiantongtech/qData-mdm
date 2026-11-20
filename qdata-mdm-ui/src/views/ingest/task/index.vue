@@ -25,6 +25,7 @@
     <el-container>
       <qt-tree
           ref="sourceTreeRef"
+          v-model:dept-name="sourceKeyword"
           directory-icons
           :dept-options="sources"
           :action-loading="sourcesLoading"
@@ -38,7 +39,7 @@
       <el-main class="main-content">
         <qt-wrap :columns="tableStore.columns" :tableRef="tableRef">
           <template #search>
-            <qt-search-bar v-bind="searchStore" :params="tableStore.params" :tableRef="tableRef"/>
+            <qt-search-bar v-bind="searchStore" :params="tableStore.params" :tableRef="tableRef" @reset="resetSourceFilter"/>
           </template>
           <template #actions-data>
             <el-button v-hasPermi="['ingest:task:add']"
@@ -52,7 +53,7 @@
                 type="danger"
                 plain
                 icon="Delete"
-                :disabled="!store.rows.length"
+                :disabled="!store.rows.length || store.rows.some(row => row.status !== '0')"
                 @click="removeTasks(store.rows)"
             >批量删除
             </el-button>
@@ -228,6 +229,7 @@
                              link
                              type="danger"
                              icon="Delete"
+                             :disabled="row.status !== '0'"
                              @click="removeTasks([row])"
                   >删除任务
                   </el-button>
@@ -343,6 +345,7 @@ const sourceTreeRef = ref();
 const sources = ref([]);
 const sourcesLoading = ref(false);
 const selectedSourceId = ref();
+const sourceKeyword = ref('');
 onMounted(() => {
   loadSources().catch(() => {
   });
@@ -368,6 +371,12 @@ async function loadSources() {
 function selectSource(node) {
   selectedSourceId.value = node.id;
   tableRef.value?.resetQuery();
+}
+
+function resetSourceFilter() {
+  selectedSourceId.value = undefined;
+  sourceKeyword.value = '';
+  sourceTreeRef.value?.resetTree();
 }
 
 const runsVisible = ref(false);
@@ -455,7 +464,7 @@ const tableStore = reactive({
       slot: 'handle',
       fixed: 'right',
       minWidth: 240,
-      align: 'left',
+      align: 'center',
       className: 'is-handle',
       labelClassName: 'is-handle'
     },
@@ -604,6 +613,11 @@ async function changeScheduleStatus(row, status) {
  * @param {Array<Object>} rows 所选任务记录。
  */
 async function removeTasks(rows) {
+  if (!rows.length) return;
+  if (rows.some(row => row.status !== '0')) {
+    proxy.$modal.msgWarning('所选接入任务中有未下线的任务，请先下线后再删除');
+    return;
+  }
   try {
     await proxy.$modal.confirm(
         `确认删除选中的 ${rows.length} 个接入任务？`,

@@ -97,7 +97,7 @@ public interface IMergeDetectService extends IService<MergeDuplicateTaskDO> {
     /** 独立启停已启用且配置为定时执行的任务调度。 */
     Integer changeScheduleStatus(Long taskId, String status, Long operatorId, String operatorName);
 
-    /** 定时执行时在任务锁内再次检查任务和调度开关。 */
+    /** 定时提交时在任务锁内再次检查任务和调度开关，提交后异步检测。 */
     Long executeScheduled(Long taskId, Long operatorId, String operatorName);
 
     /**
@@ -117,22 +117,22 @@ public interface IMergeDetectService extends IService<MergeDuplicateTaskDO> {
     Integer deleteTasks(List<Long> taskIds);
 
     /**
-     * 创建并执行重复检测任务。
+     * 创建任务并提交异步重复检测。
      *
      * @param reqVO 检测配置
      * @param operatorId 操作人编号
      * @param operatorName 操作人名称
-     * @return 运行实例编号
+     * @return 已提交的运行实例编号，不代表检测已完成
      */
     Long start(MergeDetectStartReqVO reqVO, Long operatorId, String operatorName);
 
     /**
-     * 执行已有重复检测任务。
+     * 提交已有任务的异步重复检测。
      *
      * @param taskId 任务编号
      * @param operatorId 操作人编号
      * @param operatorName 操作人名称
-     * @return 运行实例编号
+     * @return 已提交的运行实例编号，不代表检测已完成
      */
     Long execute(Long taskId, Long operatorId, String operatorName);
 
@@ -150,7 +150,7 @@ public interface IMergeDetectService extends IService<MergeDuplicateTaskDO> {
      * @param modelId 模型编号
      * @param operatorId 操作人编号
      * @param operatorName 操作人名称
-     * @return 运行实例编号
+     * @return 已提交的运行实例编号，不代表检测已完成
      */
     Long redetect(Long modelId, Long operatorId, String operatorName);
 

@@ -47,9 +47,4 @@ public class MergeQualityCheckItemBO {
      * 单项执行说明。
      */
     private String message;
-
-    /**
-     * 是否为模型约束；仅模型约束通过不能替代配置质量规则。
-     */
-    private boolean modelConstraint;
 }

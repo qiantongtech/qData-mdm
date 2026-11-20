@@ -82,4 +82,12 @@
         </foreach>
     </delete>
 
+    <delete id="deleteRelationsByIds">
+        DELETE FROM INGEST_SYSTEM_DATASOURCE_REL
+        WHERE ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
 </mapper>

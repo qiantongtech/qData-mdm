@@ -22,6 +22,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="tech.qiantong.qdata.mdm.ingest.dal.mapper.datasource.IngestDatasourceMapper">
 
+    <select id="countTaskReferences" resultType="long">
+        SELECT COUNT(1)
+        FROM INGEST_TASK_DB_CONFIG c
+        INNER JOIN INGEST_TASK t ON t.ID = c.TASK_ID AND t.DEL_FLAG = '0'
+        WHERE c.DEL_FLAG = '0' AND c.DATASOURCE_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="countSourceReferences" resultType="long">
+        SELECT COUNT(1)
+        FROM INGEST_SYSTEM_DATASOURCE_REL r
+        INNER JOIN INGEST_SOURCE_SYSTEM s ON s.ID = r.SOURCE_SYSTEM_ID AND s.DEL_FLAG = '0'
+        WHERE r.DEL_FLAG = '0' AND r.DATASOURCE_ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
     <resultMap type="IngestDatasourceDO" id="IngestDatasourceResult">
         <result property="id"    column="ID"    />
         <result property="datasourceName"    column="DATASOURCE_NAME"    />

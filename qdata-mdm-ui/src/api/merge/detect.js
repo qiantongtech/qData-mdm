@@ -49,25 +49,18 @@ export function listMergeInstance(query) {
 }
 
 /**
- * 通过现有实例列表读取指定实例，兼容已经部署的重复检测接口。
+ * 增量读取检测过程日志及当前进度。
  * @param {*} taskId 检测任务编号。
- * @param {*} instanceId 检测执行实例编号。
- * @returns {Promise<Object>} 后端接口响应。
+ * @param {*} instanceId 执行实例编号。
+ * @param {number} afterSeq 排他日志游标。
+ * @returns {Promise<Object>} 过程日志与后续游标。
  */
-export async function getMergeInstance(taskId, instanceId) {
-  const pageSize = 100
-  let pageNum = 1
-  let readCount = 0
-  while (true) {
-    const response = await listMergeInstance({ taskId, pageNum, pageSize })
-    const rows = response.data?.rows || []
-    const instance = rows.find(row => String(row.id) === String(instanceId))
-    if (instance) return { data: instance }
-    readCount += rows.length
-    if (!rows.length || (Number(response.data?.total) > 0 && readCount >= Number(response.data.total))) break
-    pageNum++
-  }
-  throw new Error('重复检测执行实例不存在')
+export function getMergeDetectRunLogs(taskId, instanceId, afterSeq = 0) {
+  return request({
+    url: `/merge/detect/task/${taskId}/instance/${instanceId}/logs`,
+    method: 'get',
+    params: { afterSeq },
+  })
 }
 
 /**

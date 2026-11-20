@@ -20,13 +20,46 @@ package tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo;
 
 import lombok.Data;
 
+/**
+ * 接入任务字段映射使用的目标模型字段响应对象。
+ *
+ * @author chentangwen
+ */
 @Data
 public class IngestModelFieldRespVO {
+
+    /**
+     * 目标模型字段 ID。
+     */
     private Long id;
+
+    /**
+     * 模型字段显示名称。
+     */
     private String columnName;
+
+    /**
+     * 模型字段编码。
+     */
     private String columnCode;
+
+    /**
+     * 模型字段分类编码，与模型字段定义保持一致。
+     */
     private String columnCategory;
+
+    /**
+     * 字段数据类型。
+     */
     private String dataType;
+
+    /**
+     * 字段数据长度。
+     */
     private Integer dataLength;
+
+    /**
+     * 数值字段的小数位数。
+     */
     private Integer dataScale;
 }

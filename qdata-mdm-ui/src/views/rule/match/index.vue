@@ -92,6 +92,9 @@
             <template #ruleType="{ row }">
               <el-tag effect="plain">{{ getRuleTypeLabel(row.ruleType) }}</el-tag>
             </template>
+            <template #modelFieldId="{ row }">
+              {{ formatRuleFields(row) }}
+            </template>
             <template #ruleConfig="{ row }">
               {{ formatRuleConfig(row) }}
             </template>
@@ -131,6 +134,7 @@
                   link
                   type="danger"
                   icon="Delete"
+                  :disabled="row.validFlag !== false"
                   @click="handleDelete(row)"
                   v-hasPermi="['rule:rulematch:remove']"
               >删除
@@ -472,8 +476,9 @@ async function loadResponsibleUsers() {
 }
 
 const open = ref(false);
-const ids = ref([]);
-const multiple = ref(true);
+const selectedRows = ref([]);
+const ids = computed(() => selectedRows.value.map((row) => row.id));
+const multiple = computed(() => !selectedRows.value.length || selectedRows.value.some(row => row.validFlag !== false));
 const title = ref("");
 const {
   data: modelTreeData,
@@ -506,6 +511,7 @@ const layerOptions = computed(() => {
 
 // 模型选项：详情内使用传入数据，独立入口保留原有模型列表。
 const publishedModelFields = reactive({});
+const loadingModelFields = new Map();
 const publishedModelOptions = computed(() => {
   const models = [];
   const visit = (nodes) => {
@@ -742,7 +748,8 @@ const tableStore = reactive({
     },
     {label: "归属位置", prop: "projectName", slot: "location", minWidth: 180, align: "left"},
     {label: "匹配方式", prop: "ruleType", minWidth: 170, dict: "rule_match_type", align: "left"},
-    {label: "参与字段 / 匹配逻辑", prop: "ruleConfig", slot: "ruleConfig", minWidth: 250, align: "left"},
+    {label: "参与字段", prop: "modelFieldId", slot: "modelFieldId", minWidth: 180, align: "left"},
+    {label: "匹配逻辑", prop: "ruleConfig", slot: "ruleConfig", minWidth: 250, align: "left"},
     {label: "匹配分值", prop: "ruleScore", minWidth: 100, align: "left"},
     {label: "重复检测任务数", prop: "duplicateTaskCount", minWidth: 130, align: "left"},
     {label: "状态", prop: "validFlag", slot: "validFlag", minWidth: 135, align: "left"},
@@ -750,7 +757,7 @@ const tableStore = reactive({
     {label: "创建时间", prop: "createTime", minWidth: 150, date: true, sortable: true, sortableKey: "create_time"},
     {label: "操作", minWidth: 215, fixed: "right", slot: "action"},
   ],
-  func: listRulematch,
+  func: loadRulematchList,
   params: queryParams.value,
   events: {
     // 查询条件：详情内固定模型和版本，与规则管理使用相同筛选口径。
@@ -915,18 +922,40 @@ async function handleModelChange() {
   const modelId = form.value.modelId;
   if (!modelId || props.embedded) return;
   try {
-    const response = await getPublishedModelStructure(modelId);
-    if (String(form.value.modelId) !== String(modelId)) return;
-    publishedModelFields[modelId] = (response.data?.fields || []).map(field => ({
+    await loadModelFields(modelId, true);
+  } catch {
+    proxy.$modal.msgError("主数据模型字段加载失败");
+  }
+}
+
+/** 列表返回前补齐当前页字段名称，同一模型的并发请求只加载一次。 */
+async function loadRulematchList(params) {
+  const response = await listRulematch(params);
+  if (props.embedded) return response;
+  const rows = Array.isArray(response.data) ? response.data : response.data?.rows || [];
+  const modelIds = new Set(rows.map(row => row.modelId).filter(id => id != null));
+  const results = await Promise.allSettled([...modelIds].map(id => loadModelFields(id)));
+  if (results.some(result => result.status === "rejected")) {
+    proxy.$modal.msgWarning("部分主数据模型字段加载失败，请刷新重试");
+  }
+  return response;
+}
+
+function loadModelFields(modelId, refresh = false) {
+  const key = String(modelId);
+  if (loadingModelFields.has(key)) return loadingModelFields.get(key);
+  if (!refresh && publishedModelFields[key]) return Promise.resolve();
+  const request = getPublishedModelStructure(modelId).then(({data}) => {
+    publishedModelFields[key] = (data?.fields || []).map(field => ({
       value: field.id,
       label: field.name || field.code,
       name: field.name || field.code,
       code: field.code,
       type: field.dataType,
     }));
-  } catch {
-    proxy.$modal.msgError("主数据模型字段加载失败");
-  }
+  }).finally(() => loadingModelFields.delete(key));
+  loadingModelFields.set(key, request);
+  return request;
 }
 
 function parseFieldIds(value) {
@@ -1005,7 +1034,9 @@ function getRuleTypeLabel(type) {
 }
 
 function getFieldOption(fieldId, modelId = form.value.modelId) {
-  const fieldOptions = getModelOption(modelId)?.fields || [];
+  const fieldOptions = props.embedded
+      ? getModelOption(modelId)?.fields || []
+      : publishedModelFields[String(modelId)] || [];
   return fieldOptions.find((item) =>
       String(item.value) === String(fieldId)
       || item.label === fieldId
@@ -1016,7 +1047,7 @@ function getFieldOption(fieldId, modelId = form.value.modelId) {
 
 function getFieldName(fieldId, modelId = form.value.modelId) {
   const fieldOption = getFieldOption(fieldId, modelId);
-  return fieldOption?.name || fieldOption?.label || fieldId || "-";
+  return fieldOption?.name || fieldOption?.label || (fieldId ? "字段信息未获取" : "-");
 }
 
 function getRowRuleConfig(row) {
@@ -1031,25 +1062,32 @@ function getRowClassName({row}) {
   return isAbnormalRow(row) ? "abnormal-row" : "";
 }
 
-function formatRuleConfig(row) {
+function getRuleFields(row) {
   const config = getRowRuleConfig(row);
-  const fields = Array.isArray(config.fieldList) && config.fieldList.length
+  return Array.isArray(config.fieldList) && config.fieldList.length
       ? config.fieldList
       : parseFieldIds(row.modelFieldId).map((modelFieldId) => ({modelFieldId}));
-  const fieldText = fields
+}
+
+function formatRuleFields(row) {
+  return getRuleFields(row)
       .filter((item) => item?.modelFieldId)
       .map((item) => getFieldName(item.modelFieldId, row.modelId))
-      .join("、");
-  if (row.ruleType === "FUZZY") return `${fieldText || "参与字段"} 编辑距离相似度 ≥ ${config.similarityThreshold ?? "-"}`;
+      .join("、") || "-";
+}
+
+function formatRuleConfig(row) {
+  const config = getRowRuleConfig(row);
+  if (row.ruleType === "FUZZY") return `编辑距离相似度 ≥ ${config.similarityThreshold ?? "-"}`;
   if (row.ruleType === "WEIGHTED") {
-    const weightedFieldText = fields
+    const weightedFieldText = getRuleFields(row)
         .filter((item) => item?.modelFieldId)
         .map((item) => `${getFieldName(item.modelFieldId, row.modelId)} ${item.weight ?? "-"}%`)
         .join(" · ");
     return `${weightedFieldText || "参与字段"}；最终阈值 ${config.finalThreshold ?? "-"}`;
   }
-  if (row.ruleType === "STD_EXACT") return `${fieldText || "参与字段"} 标准化后完全一致`;
-  return `${fieldText || "参与字段"} 完全一致`;
+  if (row.ruleType === "STD_EXACT") return "标准化后完全一致";
+  return "完全一致";
 }
 
 function serializeRuleConfig() {
@@ -1073,8 +1111,7 @@ function serializeRuleConfig() {
 
 // 多选框选中数据
 function handleSelectionChange(selection) {
-  ids.value = selection.map((item) => item.id);
-  multiple.value = !selection.length;
+  selectedRows.value = selection;
 }
 
 /** 改变启用状态 */
@@ -1176,8 +1213,13 @@ function submitForm() {
 
 /** 删除按钮操作 */
 function handleDelete(row) {
+  const rows = row?.id == null ? selectedRows.value : [row];
+  if (!rows.length) return;
+  if (rows.some((item) => item.validFlag !== false)) {
+    proxy.$modal.msgWarning("请先禁用所选规则再删除");
+    return;
+  }
   const _ids = row?.id ?? ids.value;
-  if (!_ids || (Array.isArray(_ids) && !_ids.length)) return;
   proxy.$modal.confirm('是否确认删除匹配规则编号为"' + _ids + '"的数据项？').then(function () {
     return delRulematch(_ids);
   }).then(() => {

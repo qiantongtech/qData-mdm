@@ -305,7 +305,7 @@ async function loadSourceOptions() {
           .map(item => ({label: item.name, value: item.id}))
     ]
   } catch {
-    proxy.$modal.msgError('加载来源系统失败')
+    proxy.$modal.msgWarning('加载来源系统失败')
   }
 }
 

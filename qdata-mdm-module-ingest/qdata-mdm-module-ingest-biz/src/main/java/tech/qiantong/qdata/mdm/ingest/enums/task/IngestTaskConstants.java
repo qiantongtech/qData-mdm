@@ -18,12 +18,8 @@
 
 package tech.qiantong.qdata.mdm.ingest.enums.task;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
 /**
- * 接入任务配置及运行状态常量，状态码与数据库字段取值保持一致。
+ * 接入任务配置、运行状态及字段转换类型常量。
  *
  * @author chentangwen
  */
@@ -35,62 +31,129 @@ public final class IngestTaskConstants {
     public static final int READ_ALL_ROWS = -1;
 
     /**
-     * 未逻辑删除。
+     * 逻辑删除标志：未删除。
      */
     public static final String NOT_DELETED = "0";
 
     /**
-     * 运行中、失败、成功。
+     * 运行实例状态：运行中，包含排队等待。
      */
     public static final String RUNNING = "1";
+
+    /**
+     * 运行实例状态：失败。
+     */
     public static final String RUN_FAILED = "2";
+
+    /**
+     * 运行实例状态：成功。
+     */
     public static final String RUN_SUCCESS = "4";
 
     /**
-     * 来源记录等待治理。
+     * 来源记录治理状态：待治理。
      */
     public static final String GOVERNANCE_PENDING = "PENDING";
 
     /**
-     * 来源字段是否参与唯一标识。
+     * 来源字段参与记录唯一标识的组合。
      */
     public static final String UNIQUE_KEY_YES = "1";
+
+    /**
+     * 来源字段不参与记录唯一标识的组合。
+     */
     public static final String UNIQUE_KEY_NO = "0";
 
+    /**
+     * 接入任务编码前缀。
+     */
     public static final String TASK_CODE_PREFIX = "task";
 
+    /**
+     * 接入类型：数据库。
+     */
     public static final String DATABASE = "DATABASE";
+
+    /**
+     * 接入类型：文件。
+     */
     public static final String FILE = "FILE";
+
+    /**
+     * 接入类型：API 接口。
+     */
     public static final String API = "API";
+
+    /**
+     * 任务启停状态或调度开关：启用。
+     */
     public static final String ENABLED = "1";
+
+    /**
+     * 任务启停状态或调度开关：停用。
+     */
     public static final String DISABLED = "0";
+
+    /**
+     * 有效标志：有效。
+     */
     public static final String VALID_FLAG_YES = "1";
+
+    /**
+     * 任务触发方式：人工执行。
+     */
     public static final String MANUAL = "MANUAL";
+
+    /**
+     * 任务触发方式：定时执行。
+     */
     public static final String SCHEDULED = "SCHEDULED";
+
+    /**
+     * 数据库接入模式：全量读取。
+     */
     public static final String FULL = "FULL";
+
+    /**
+     * 数据库接入模式：增量读取。
+     */
     public static final String INCREMENTAL = "INCREMENTAL";
 
     /**
-     * 处理类型写入 CHAR(1)：0不处理 1类型转换 2去空格 3空值 4固定值 5值映射 6日期。
+     * 字段转换类型：不处理，保留原值。
      */
     public static final String TRANSFORM_NONE = "0";
-    public static final String TRANSFORM_TYPE = "1";
-    public static final String TRANSFORM_TRIM = "2";
-    public static final String TRANSFORM_NULL = "3";
-    public static final String TRANSFORM_FIXED = "4";
-    public static final String TRANSFORM_VALUE_MAP = "5";
-    public static final String TRANSFORM_DATE = "6";
 
-    public static final List<String> TRANSFORM_TYPES =
-            Collections.unmodifiableList(
-                    Arrays.asList(
-                            TRANSFORM_NONE,
-                            TRANSFORM_TYPE,
-                            TRANSFORM_TRIM,
-                            TRANSFORM_NULL,
-                            TRANSFORM_FIXED,
-                            TRANSFORM_VALUE_MAP,
-                            TRANSFORM_DATE));
+    /**
+     * 字段转换类型：数据类型转换。
+     */
+    public static final String TRANSFORM_TYPE = "1";
+
+    /**
+     * 字段转换类型：去除字符串首尾空白字符。
+     */
+    public static final String TRANSFORM_TRIM = "2";
+
+    /**
+     * 字段转换类型：空值处理。
+     */
+    public static final String TRANSFORM_NULL = "3";
+
+    /**
+     * 字段转换类型：固定值。
+     */
+    public static final String TRANSFORM_FIXED = "4";
+
+    /**
+     * 字段转换类型：值映射。
+     */
+    public static final String TRANSFORM_VALUE_MAP = "5";
+
+    /**
+     * 字段转换类型：日期处理。
+     */
+    public static final String TRANSFORM_DATE = "6";
 
     private IngestTaskConstants() {
     }

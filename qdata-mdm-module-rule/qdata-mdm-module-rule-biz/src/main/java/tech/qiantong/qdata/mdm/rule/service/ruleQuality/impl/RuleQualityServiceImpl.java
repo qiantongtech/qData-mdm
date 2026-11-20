@@ -18,7 +18,9 @@
 
 package tech.qiantong.qdata.mdm.rule.service.ruleQuality.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.system.service.ISysUserService;
 
 import java.util.ArrayList;
@@ -40,7 +42,6 @@ import tech.qiantong.qdata.mdm.rule.dal.mapper.ruleQuality.QualityMergePendingMa
 import tech.qiantong.qdata.mdm.rule.dal.mapper.ruleQuality.QualityMergeLogMapper;
 import tech.qiantong.qdata.mdm.rule.dal.mapper.ruleQuality.QualityTaskCountMapper;
 
-import com.aliyun.oss.ServiceException;
 import lombok.extern.slf4j.Slf4j;
 import javax.annotation.Resource;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
@@ -220,10 +221,25 @@ public class RuleQualityServiceImpl  extends ServiceImpl<RuleQualityMapper,RuleQ
                 .set(updateReqVO.isResponsibleUserSpecified() && updateReqVO.getResponsibleUserId() == null,
                         RuleQualityDO::getResponsibleUserId, null));
     }
+    /** 锁定待删除规则，确认整批均已禁用后才逻辑删除。 */
     @Override
     public int removeRuleQuality(Collection<Long> idList) {
-        // 批量删除质量规则
-        return ruleQualityMapper.deleteBatchIds(idList);
+        if (idList == null || idList.isEmpty()) {
+            return 0;
+        }
+        Set<Long> ids = new HashSet<>(idList);
+        List<RuleQualityDO> rules = ruleQualityMapper.selectList(new LambdaQueryWrapper<RuleQualityDO>()
+                .select(RuleQualityDO::getId, RuleQualityDO::getValidFlag)
+                .in(RuleQualityDO::getId, ids)
+                .orderByAsc(RuleQualityDO::getId)
+                .last("FOR UPDATE"));
+        if (rules.size() != ids.size()) {
+            throw new ServiceException("所选规则已不存在，请刷新列表后重试");
+        }
+        if (rules.stream().anyMatch(rule -> !Boolean.FALSE.equals(rule.getValidFlag()))) {
+            throw new ServiceException("请先禁用所选规则再删除");
+        }
+        return ruleQualityMapper.deleteBatchIds(ids);
     }
 
     @Override

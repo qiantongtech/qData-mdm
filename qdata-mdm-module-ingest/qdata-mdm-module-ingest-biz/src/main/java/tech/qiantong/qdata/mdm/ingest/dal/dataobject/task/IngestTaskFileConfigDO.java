@@ -22,55 +22,109 @@ import com.baomidou.mybatisplus.annotation.*;
 import java.util.Date;
 import lombok.Data;
 
+/**
+ * 接入任务文件来源配置实体，对应表 {@code INGEST_TASK_FILE_CONFIG}。
+ *
+ * @author chentangwen
+ */
 @Data
 @TableName(value = "INGEST_TASK_FILE_CONFIG")
 public class IngestTaskFileConfigDO {
+
+    /**
+     * 文件来源配置 ID。
+     */
     @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
+    /**
+     * 所属接入任务 ID。
+     */
     @TableField(value = "TASK_ID")
     private Long taskId;
 
+    /**
+     * 文件类型：CSV、XLS 或 XLSX。
+     */
     @TableField(value = "FILE_TYPE")
     private String fileType;
 
+    /**
+     * 来源文件名称。
+     */
     @TableField(value = "FILE_NAME")
     private String fileName;
 
+    /**
+     * 用于定位来源文件的路径或文件令牌。
+     */
     @TableField(value = "FILE_PATH")
     private String filePath;
 
+    /**
+     * 文件大小，单位：字节。
+     */
     @TableField(value = "FILE_SIZE")
     private Long fileSize;
 
+    /**
+     * 文件上传时间。
+     */
     @TableField(value = "UPLOAD_TIME")
     private Date uploadTime;
 
+    /**
+     * 有效标志，1 表示有效。
+     */
     @TableField(value = "VALID_FLAG")
     private String validFlag;
 
+    /**
+     * 创建人名称。
+     */
     @TableField(value = "CREATE_BY")
     private String createBy;
 
+    /**
+     * 创建人用户 ID。
+     */
     @TableField(value = "CREATOR_ID")
     private Long creatorId;
 
+    /**
+     * 创建时间。
+     */
     @TableField(value = "CREATE_TIME")
     private Date createTime;
 
+    /**
+     * 更新人名称。
+     */
     @TableField(value = "UPDATE_BY")
     private String updateBy;
 
+    /**
+     * 更新人用户 ID。
+     */
     @TableField(value = "UPDATER_ID")
     private Long updaterId;
 
+    /**
+     * 最近更新时间。
+     */
     @TableField(value = "UPDATE_TIME")
     private Date updateTime;
 
+    /**
+     * 逻辑删除标志：0 表示未删除，1 表示已删除。
+     */
     @TableLogic(value = "0", delval = "1")
     @TableField(value = "DEL_FLAG")
     private String delFlag;
 
+    /**
+     * 备注信息。
+     */
     @TableField(value = "REMARK")
     private String remark;
 }

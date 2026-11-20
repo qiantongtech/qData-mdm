@@ -19,7 +19,13 @@
 package tech.qiantong.qdata.mdm.merge.service.detect.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.merge.service.source.IMergeSourceTableService;
 import tech.qiantong.qdata.mdm.merge.dal.dataobject.MergeCandidateGroupDO;
@@ -41,6 +47,7 @@ import tech.qiantong.qdata.mdm.merge.domain.detect.MergeMatchFieldBO;
 import tech.qiantong.qdata.mdm.merge.enums.MergeCodes;
 import tech.qiantong.qdata.mdm.merge.service.detect.IMergeDetectExecuteService;
 import tech.qiantong.qdata.mdm.merge.service.detect.IMergeDetectScopeService;
+import tech.qiantong.qdata.mdm.merge.service.detect.IMergeDetectRunLogService;
 import tech.qiantong.qdata.mdm.merge.support.MergeAudit;
 import tech.qiantong.qdata.mdm.merge.support.MergeJson;
 import tech.qiantong.qdata.mdm.merge.support.MergeMatchEngine;
@@ -57,13 +64,15 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import javax.annotation.Resource;
 
 /**
- * 重复检测执行服务，负责匹配、候选组写入和运行统计；参与调用方事务。
+ * 重复检测执行服务，先提交运行实例，再异步匹配并保存检测结果。
  *
  * @author chentangwen
  */
+@Slf4j
 @Service
 public class MergeDetectExecuteServiceImpl implements IMergeDetectExecuteService {
 
@@ -94,8 +103,17 @@ public class MergeDetectExecuteServiceImpl implements IMergeDetectExecuteService
     @Resource
     private IMergeDetectScopeService scopeService;
 
+    @Resource(name = "mergeDetectTaskExecutor")
+    private Executor executor;
+
+    @Resource
+    private PlatformTransactionManager transactionManager;
+
+    @Resource
+    private IMergeDetectRunLogService runLogService;
+
     /**
-     * 在调用方持有任务行锁的事务内执行检测，固定快照后生成候选组并占用目标来源。
+     * 在调用方持有任务行锁的事务内创建实例并固定快照，提交后异步检测。
      *
      * @param task 已锁定的有效任务
      * @param operatorId 操作人编号
@@ -109,7 +127,7 @@ public class MergeDetectExecuteServiceImpl implements IMergeDetectExecuteService
     }
 
     /**
-     * 使用同一事务内已校验的检测上下文，避免创建后立即执行时重复查询。
+     * 使用同一事务内已校验的检测上下文创建实例，事务提交后才派发执行。
      *
      * @param task 新创建或已锁定的任务
      * @param context 本次固定数据
@@ -120,29 +138,124 @@ public class MergeDetectExecuteServiceImpl implements IMergeDetectExecuteService
     @Override
     public Long executePrepared(MergeDuplicateTaskDO task, MergeDetectContextBO context,
             Long operatorId, String operatorName) {
-        List<MergeCompiledRuleBO> rules = compile(context.getRules(), context.getColumns());
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("重复检测提交必须在事务内执行");
+        }
         MergeDuplicateTaskInstanceDO instance = createInstance(task, context, operatorId, operatorName);
-        List<Map<String, String>> valueRows = new ArrayList<>();
-        for (SourceSnapshot snapshot : context.getSnapshots()) {
-            valueRows.add(snapshot.getValues());
-        }
-        List<MergeMatchClusterBO> clusters = MergeMatchEngine.cluster(valueRows, rules, matchStrategyRegistry);
-        MergeDetectResultBO result = saveGroups(instance, context, clusters, operatorId, operatorName);
-        instance.setStatus(MergeCodes.TASK_SUCCESS);
-        instance.setEndTime(new Date());
-        instance.setSourceCount((long) result.getSourceIds().size());
-        instance.setGroupCount(result.getGroupCount());
-        instance.setSingleCount(result.getSingleCount());
-        instance.setHistorySourceCount(result.getHistoryCount());
-        mergeDuplicateTaskInstanceMapper.updateById(instance);
-        task.setStatus(MergeCodes.TASK_SUCCESS);
-        task.setLastExecuteTime(instance.getEndTime());
-        mergeDuplicateTaskMapper.updateById(task);
-        if (!result.getSourceIds().isEmpty()) {
-            sourceTableService.transition(task.getModelId(), result.getSourceIds(),
-                    MergeCodes.GOVERNANCE_PENDING, MergeCodes.GOVERNANCE_PROCESSING);
-        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public int getOrder() {
+                // 优先派发已提交的实例，避免调度同步失败使本次运行无人执行。
+                return org.springframework.core.Ordered.HIGHEST_PRECEDENCE;
+            }
+
+            @Override
+            public void afterCommit() {
+                runLogService.publish(instance, "INFO", "QUEUED", "检测任务已提交，等待执行");
+                try {
+                    executor.execute(() -> run(task, instance, context, operatorId, operatorName));
+                } catch (RuntimeException ex) {
+                    fail(task.getId(), instance.getId(), "重复检测线程池暂不可用，请稍后重试", ex);
+                    throw new ServiceException("重复检测线程池暂不可用，请稍后重试");
+                }
+            }
+        });
         return instance.getId();
+    }
+
+    /** 匹配计算在事务外执行，候选组、来源占用和成功终态在同一事务内保存。 */
+    private void run(MergeDuplicateTaskDO task, MergeDuplicateTaskInstanceDO instance,
+            MergeDetectContextBO context, Long operatorId, String operatorName) {
+        try {
+            runLogService.publish(instance, "INFO", "PREPARE", "开始准备本次固定的模型、匹配规则和来源数据");
+            List<MergeCompiledRuleBO> rules = compile(context.getRules(), context.getColumns());
+            runLogService.publish(instance, "INFO", "PREPARE", "准备完成，匹配规则 " + rules.size()
+                    + " 条，待检测数据 " + instance.getSourceCount() + " 条，历史比对数据 "
+                    + instance.getHistorySourceCount() + " 条");
+            if (context.getSkippedCount() > 0) {
+                runLogService.publish(instance, "WARN", "PREPARE", "跳过无法解析的来源数据 "
+                        + context.getSkippedCount() + " 条");
+            }
+            List<Map<String, String>> valueRows = new ArrayList<>();
+            for (SourceSnapshot snapshot : context.getSnapshots()) {
+                valueRows.add(snapshot.getValues());
+            }
+            long totalPairs = (long) valueRows.size() * (valueRows.size() - 1) / 2;
+            runLogService.publish(instance, "INFO", "MATCH", "开始匹配，参与比对数据 " + valueRows.size()
+                    + " 条，共需比较 " + totalPairs + " 对记录");
+            long[] lastProgressTime = {System.nanoTime()};
+            List<MergeMatchClusterBO> clusters = MergeMatchEngine.cluster(valueRows, rules, matchStrategyRegistry,
+                    compared -> {
+                        long now = System.nanoTime();
+                        if (compared == totalPairs || now - lastProgressTime[0] >= 3000000000L) {
+                            runLogService.publish(instance, "INFO", "MATCH_PROGRESS", "已比较 " + compared
+                                    + " / " + totalPairs + " 对记录");
+                            lastProgressTime[0] = now;
+                        }
+                    });
+            long candidates = clusters.stream().filter(cluster -> cluster.getIndexes().size() > 1
+                    && cluster.getIndexes().stream().anyMatch(index -> context.getSnapshots().get(index).isTarget())).count();
+            long singles = clusters.stream().filter(cluster -> cluster.getIndexes().size() == 1
+                    && context.getSnapshots().get(cluster.getIndexes().get(0)).isTarget()).count();
+            runLogService.publish(instance, "INFO", "MATCH_COMPLETE", "匹配完成，识别候选组 " + candidates
+                    + " 组，单条组 " + singles + " 组，开始保存结果");
+            transaction().executeWithoutResult(status -> {
+                mergeDuplicateTaskMapper.selectForUpdate(task.getId());
+                MergeDetectResultBO result = saveGroups(instance, context, clusters, operatorId, operatorName);
+                instance.setStatus(MergeCodes.TASK_SUCCESS);
+                instance.setEndTime(new Date());
+                instance.setSourceCount((long) result.getSourceIds().size());
+                instance.setGroupCount(result.getGroupCount());
+                instance.setSingleCount(result.getSingleCount());
+                instance.setHistorySourceCount(result.getHistoryCount());
+                runLogService.archive(instance, "INFO", "FINISH", "执行结束，检测数据 " + instance.getSourceCount()
+                        + " 条，候选组 " + instance.getGroupCount() + " 组，单条组 " + instance.getSingleCount()
+                        + " 组；耗时 " + (instance.getEndTime().getTime() - instance.getStartTime().getTime()) + " 毫秒");
+                mergeDuplicateTaskInstanceMapper.updateById(instance);
+                task.setStatus(MergeCodes.TASK_SUCCESS);
+                task.setLastExecuteTime(instance.getEndTime());
+                mergeDuplicateTaskMapper.updateById(task);
+                if (!result.getSourceIds().isEmpty()) {
+                    sourceTableService.transition(task.getModelId(), result.getSourceIds(),
+                            MergeCodes.GOVERNANCE_PENDING, MergeCodes.GOVERNANCE_PROCESSING);
+                }
+            });
+            runLogService.clear(instance.getId());
+        } catch (Exception ex) {
+            fail(task.getId(), instance.getId(), ex instanceof ServiceException
+                    ? ex.getMessage() : "重复检测执行异常，请查看服务日志", ex);
+        }
+    }
+
+    /** 检测结果事务回滚后单独保存失败终态，保留本次实例及原始快照。 */
+    private void fail(Long taskId, Long instanceId, String message, Exception cause) {
+        log.error("重复检测执行失败，taskId={}, instanceId={}", taskId, instanceId, cause);
+        MergeDuplicateTaskInstanceDO failed = transaction().execute(status -> {
+            MergeDuplicateTaskDO task = mergeDuplicateTaskMapper.selectForUpdate(taskId);
+            MergeDuplicateTaskInstanceDO stored = mergeDuplicateTaskInstanceMapper.selectById(instanceId);
+            if (stored == null || stored.getEndTime() != null) {
+                return null;
+            }
+            stored.setStatus(MergeCodes.TASK_FAILED);
+            stored.setEndTime(new Date());
+            stored.setErrorMessage(message.substring(0, Math.min(2000, message.length())));
+            runLogService.archive(stored, "ERROR", "FAIL", "执行失败，检测结果已回滚；原因：" + message);
+            mergeDuplicateTaskInstanceMapper.updateById(stored);
+            task.setStatus(MergeCodes.TASK_FAILED);
+            task.setLastExecuteTime(stored.getEndTime());
+            mergeDuplicateTaskMapper.updateById(task);
+            return stored;
+        });
+        if (failed != null) {
+            runLogService.clear(failed.getId());
+        }
+    }
+
+    /** 提交回调也可能仍绑定原事务资源，收尾必须使用独立事务。 */
+    private TransactionTemplate transaction() {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return tx;
     }
 
     /** 创建运行实例并保存模型版本、规则、来源与范围快照，保持本次检测可追溯。 */
@@ -159,10 +272,10 @@ public class MergeDetectExecuteServiceImpl implements IMergeDetectExecuteService
         instance.setModelId(task.getModelId());
         instance.setModelVersionId(context.getModel().getVersionId());
         instance.setStatus(MergeCodes.TASK_RUNNING);
-        instance.setSourceCount(0L);
+        instance.setSourceCount(context.getSnapshots().stream().filter(SourceSnapshot::isTarget).count());
         instance.setGroupCount(0L);
         instance.setSingleCount(0L);
-        instance.setHistorySourceCount(0L);
+        instance.setHistorySourceCount(context.getSnapshots().stream().filter(source -> !source.isTarget()).count());
         instance.setTaskConfigSnapshot(MergeJson.toJson(MergeDetectConfigUtils.taskConfig(task.getModelId(),
                 context.getScope())));
         instance.setMatchRuleSnapshot(MergeJson.toJson(MergeDetectConfigUtils.ruleSnapshot(context.getRules())));
@@ -188,6 +301,8 @@ public class MergeDetectExecuteServiceImpl implements IMergeDetectExecuteService
         long singleCount = 0L;
         long historyCount = 0L;
         List<Long> taken = new ArrayList<>();
+        long lastProgressTime = System.nanoTime();
+        runLogService.publish(instance, "INFO", "SAVE", "开始保存检测结果，单条组进入合并管理，候选组进入匹配复核");
         int seq = 1;
         for (SourceSnapshot snapshot : snapshots) {
             if (!snapshot.isTarget()) {
@@ -229,7 +344,18 @@ public class MergeDetectExecuteServiceImpl implements IMergeDetectExecuteService
             } else {
                 groupCount++;
             }
+            instance.setGroupCount(groupCount);
+            instance.setSingleCount(singleCount);
+            long now = System.nanoTime();
+            if ((groupCount + singleCount) % 100 == 0 || now - lastProgressTime >= 3000000000L) {
+                runLogService.publish(instance, "INFO", "SAVE_PROGRESS", "已处理目标数据 " + taken.size()
+                        + " / " + instance.getSourceCount() + " 条，已保存候选组 " + groupCount
+                        + " 组，单条组 " + singleCount + " 组（等待本次事务提交）");
+                lastProgressTime = now;
+            }
         }
+        runLogService.publish(instance, "INFO", "SAVE_COMPLETE", "结果保存完成，目标数据 " + taken.size()
+                + " 条，候选组 " + groupCount + " 组，单条组 " + singleCount + " 组，等待提交");
         MergeDetectResultBO result = new MergeDetectResultBO();
         result.setGroupCount(groupCount);
         result.setSingleCount(singleCount);
@@ -283,7 +409,7 @@ public class MergeDetectExecuteServiceImpl implements IMergeDetectExecuteService
         }
     }
 
-    /** 按模型字段编码编译规则，兼容字段 ID；非法配置在创建检测实例前直接失败。 */
+    /** 按模型字段编码编译规则，兼容字段 ID；非法配置记录为本次实例的执行失败。 */
     private List<MergeCompiledRuleBO> compile(List<RuleMatchDO> rules, List<ModelColumnDO> columns) {
         Map<String, String> keyMap = new HashMap<>();
         for (ModelColumnDO column : columns) {

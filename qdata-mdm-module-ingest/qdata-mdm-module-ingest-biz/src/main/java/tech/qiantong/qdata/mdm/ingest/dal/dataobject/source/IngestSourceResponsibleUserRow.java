@@ -21,13 +21,25 @@ package tech.qiantong.qdata.mdm.ingest.dal.dataobject.source;
 import lombok.Data;
 
 /**
- * 来源系统责任人
+ * 来源系统责任人基础信息查询结果。
  *
  * @author chentangwen
  */
 @Data
 public class IngestSourceResponsibleUserRow {
+
+    /**
+     * 责任人用户 ID。
+     */
     private Long userId;
+
+    /**
+     * 责任人显示名称，优先使用用户昵称。
+     */
     private String name;
+
+    /**
+     * 责任人联系电话。
+     */
     private String phone;
 }

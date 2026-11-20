@@ -20,7 +20,6 @@ package tech.qiantong.qdata.mdm.ingest.service.task;
 
 import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestModelFieldRespVO;
 import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestTaskRespVO;
-import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestTaskRunRespVO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.ingest.IngestTaskInstanceDO;
 
 import java.util.List;
@@ -37,10 +36,7 @@ public interface IIngestTaskExecuteService {
      *
      * @param task 已通过执行校验的任务配置
      * @param fields 目标模型业务字段
-     * @param operator 执行操作人
      * @param instance 统一提交入口创建并取得占用的实例
-     * @return 执行结束时的实例结果，日志和统计可能仍在等待归档
      */
-    IngestTaskRunRespVO execute(IngestTaskRespVO task, List<IngestModelFieldRespVO> fields, String operator,
-                                IngestTaskInstanceDO instance);
+    void execute(IngestTaskRespVO task, List<IngestModelFieldRespVO> fields, IngestTaskInstanceDO instance);
 }

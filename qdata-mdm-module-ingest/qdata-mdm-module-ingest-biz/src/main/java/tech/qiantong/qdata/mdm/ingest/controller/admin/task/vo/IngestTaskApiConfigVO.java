@@ -22,30 +22,35 @@ import java.util.Map;
 import lombok.Data;
 
 /**
- * API 请求及读取配置，请求参数与响应解析规则分别维护。
+ * 接入任务 API 请求及响应读取配置对象。
  *
  * @author chentangwen
  */
 @Data
 public class IngestTaskApiConfigVO {
+
     /**
      * HTTP 或 HTTPS 地址，可携带接口固定查询参数。
      */
     private String url;
+
     /**
      * 请求方法，支持 GET 和 POST。
      */
     private String httpMethod;
+
     /**
      * 自定义请求头，例如接口鉴权所需的头信息。
      */
     private Map<String, String> headerConfig;
+
     /**
      * GET 时追加为查询参数，POST 时作为 JSON 请求体。
      */
     private Map<String, Object> paramConfig;
+
     /**
-     * 响应路径和分页规则，为空时兼容历史单次根数组读取。
+     * 响应解析路径和分页规则；未配置时按单次请求读取根数组。
      */
     private IngestApiReadConfigVO readConfig;
 }

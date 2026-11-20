@@ -24,6 +24,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
 import tech.qiantong.qdata.mdm.merge.service.detect.IMergeDetectScheduleService;
 
 import javax.annotation.Resource;
@@ -41,6 +43,20 @@ public class MergeDetectScheduleConfig {
 
     @Resource
     private IMergeDetectScheduleService scheduleService;
+
+    /** 重复检测使用有界线程池，提交失败时保留失败实例。 */
+    @Bean("mergeDetectTaskExecutor")
+    public ThreadPoolTaskExecutor mergeDetectTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("merge-detect-run-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        return executor;
+    }
 
     @Bean
     public ThreadPoolTaskScheduler mergeDetectScheduleReconciler() {

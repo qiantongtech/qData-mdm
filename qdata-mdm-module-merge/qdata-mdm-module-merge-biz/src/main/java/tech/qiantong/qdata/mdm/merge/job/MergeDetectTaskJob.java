@@ -43,7 +43,7 @@ public class MergeDetectTaskJob implements Job {
         try {
             log.info("触发重复检测定时任务，taskId={}", taskId);
             Long instanceId = SpringUtils.getBean(IMergeDetectService.class).executeScheduled(taskId, 0L, "系统调度");
-            log.info("重复检测定时任务完成，taskId={}, instanceId={}", taskId, instanceId);
+            log.info("重复检测定时任务已提交，taskId={}, instanceId={}", taskId, instanceId);
         } catch (Exception ex) {
             throw new JobExecutionException("重复检测定时任务执行失败，taskId=" + taskId, ex, false);
         }

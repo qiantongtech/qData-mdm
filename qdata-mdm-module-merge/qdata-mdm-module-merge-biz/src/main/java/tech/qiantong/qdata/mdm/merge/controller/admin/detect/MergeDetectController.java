@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import tech.qiantong.qdata.mdm.common.annotation.Log;
 import tech.qiantong.qdata.mdm.common.core.controller.BaseController;
@@ -50,6 +51,8 @@ import tech.qiantong.qdata.mdm.merge.dal.dataobject.MergeCandidateGroupDO;
 import tech.qiantong.qdata.mdm.merge.dal.dataobject.MergeDuplicateTaskDO;
 import tech.qiantong.qdata.mdm.merge.dal.dataobject.MergeDuplicateTaskInstanceDO;
 import tech.qiantong.qdata.mdm.merge.service.detect.IMergeDetectService;
+import tech.qiantong.qdata.mdm.merge.service.detect.IMergeDetectRunLogService;
+import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeDetectRunLogRespVO;
 import tech.qiantong.qdata.mdm.merge.service.review.IMergeReviewService;
 
 import java.util.Arrays;
@@ -69,6 +72,9 @@ import javax.validation.Valid;
 public class MergeDetectController extends BaseController {
     @Resource
     private IMergeDetectService mergeDetectService;
+
+    @Resource
+    private IMergeDetectRunLogService runLogService;
 
     @Resource
     private IMergeReviewService mergeReviewService;
@@ -91,6 +97,15 @@ public class MergeDetectController extends BaseController {
     public CommonResult<PageResult<MergeInstanceRespVO>> instances(MergeTaskPageReqVO reqVO) {
         PageResult<MergeDuplicateTaskInstanceDO> page = mergeDetectService.pageInstances(reqVO);
         return CommonResult.success(BeanUtils.toBean(page, MergeInstanceRespVO.class));
+    }
+
+    /** 按游标读取执行过程，运行中也能查询已独立提交的阶段日志。 */
+    @Operation(summary = "查询重复检测执行日志")
+    @PreAuthorize("@ss.hasPermi('merge:detect:query')")
+    @GetMapping("/task/{taskId}/instance/{instanceId}/logs")
+    public CommonResult<MergeDetectRunLogRespVO> logs(@PathVariable Long taskId,
+            @PathVariable Long instanceId, @RequestParam(defaultValue = "0") long afterSeq) {
+        return CommonResult.success(runLogService.read(taskId, instanceId, afterSeq));
     }
 
     /** 查询候选组并补充审核摘要。 */
@@ -151,7 +166,7 @@ public class MergeDetectController extends BaseController {
                 reqVO.getId(), reqVO.getStatus(), getUserId(), getNickName()));
     }
 
-    /** 按编号删除非运行中的任务。 */
+    /** 按编号删除已停用且不在执行中的任务。 */
     @Operation(summary = "删除重复检测任务")
     @PreAuthorize("@ss.hasPermi('merge:detect:execute')")
     @Log(title = "重复检测", businessType = BusinessType.DELETE)

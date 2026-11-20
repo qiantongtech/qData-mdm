@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongConsumer;
 
 /**
  * 按匹配规则把来源记录聚成候选组。空白值不参与相等判断，避免空对空被当成重复。
@@ -52,6 +53,12 @@ public final class MergeMatchEngine {
      */
     public static List<MergeMatchClusterBO> cluster(List<Map<String, String>> records,
             List<MergeCompiledRuleBO> rules, MergeMatchStrategyRegistry registry) {
+        return cluster(records, rules, registry, null);
+    }
+
+    /** 提供已完成记录对数回调，调用方自行节流；不改变匹配及分组结果。 */
+    public static List<MergeMatchClusterBO> cluster(List<Map<String, String>> records,
+            List<MergeCompiledRuleBO> rules, MergeMatchStrategyRegistry registry, LongConsumer progress) {
         if (records == null) {
             throw new IllegalArgumentException("匹配记录不能为空");
         }
@@ -70,6 +77,8 @@ public final class MergeMatchEngine {
             parent[i] = i;
         }
         List<MergeMatchEdgeBO> edges = new ArrayList<>();
+        long compared = 0L;
+        long totalPairs = (long) size * (size - 1) / 2;
         for (int i = 0; i < size; i++) {
             for (int j = i + 1; j < size; j++) {
                 List<MergeMatchEdgeBO> pairEdges = new ArrayList<>();
@@ -79,6 +88,10 @@ public final class MergeMatchEngine {
                     if (edge != null) {
                         pairEdges.add(edge);
                     }
+                }
+                compared++;
+                if (progress != null && (compared % 1024 == 0 || compared == totalPairs)) {
+                    progress.accept(compared);
                 }
                 if (pairEdges.isEmpty()) {
                     continue;

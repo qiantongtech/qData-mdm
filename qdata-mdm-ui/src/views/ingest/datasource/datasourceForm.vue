@@ -429,18 +429,6 @@ const standardRelationalConfig = (type, options = {}) => {
   return withDefaults(fields, defaults);
 };
 
-const oceanBaseAuthFields = authFields.map((field) => {
-  if (field.key !== 'username') {
-    return { ...field };
-  }
-
-  return {
-    ...field,
-    placeholder: '用户名@租户名 或 用户名@租户名#集群名',
-    tip: '请填写完整 OceanBase 账号'
-  };
-});
-
 const datasourceFieldsConfig = {
   // 关系型数据库
   MySql: standardRelationalConfig('MySql', {
@@ -474,13 +462,6 @@ const datasourceFieldsConfig = {
     hasDbName: true,
     defaults: { ip: 'localhost', port: '1433', username: 'sa', dbname: 'master', sid: 'dbo' }
   }),
-  DB2: standardRelationalConfig('DB2', {
-    hasSid: true,
-    hasDbName: true,
-    defaults: { ip: 'localhost', port: '50000', username: 'db2inst1' }
-  }),
-  openGauss: standardRelationalConfig('openGauss', { hasSid: true, hasDbName: true }),
-  GaussDB: standardRelationalConfig('GaussDB', { hasSid: true, hasDbName: true }),
 
   // 国产数据库
   DM8: standardRelationalConfig('DM8', {
@@ -493,52 +474,6 @@ const datasourceFieldsConfig = {
     hasDbName: true,
     defaults: { ip: 'localhost', port: '54321', username: 'SYSTEM', dbname: 'TEST', sid: 'public' }
   }),
-  GBase: standardRelationalConfig('GBase', {
-    hasDbName: true,
-    defaults: { ip: 'localhost', port: '5258', username: 'gbase' }
-  }),
-  OSCAR: standardRelationalConfig('OSCAR', {
-    hasSid: true,
-    hasDbName: true,
-    defaults: { ip: 'localhost', port: '2003', username: 'SYSDBA', dbname: 'OSRDB' }
-  }),
-  GBase8c: standardRelationalConfig('GBase8c', { hasSid: true, hasDbName: true }),
-  HighGo: standardRelationalConfig('HighGo', {
-    hasSid: true,
-    hasDbName: true,
-    defaults: { ip: 'localhost', port: '5866', sid: 'public' }
-  }),
-    OCEANBASE: withDefaults([
-    ...baseFields,
-    ...ipPortFields,
-    ...oceanBaseAuthFields,
-    {
-      key: 'dbname',
-      label: '数据库名称',
-      prop: 'dbname',
-      required: true,
-      component: 'input',
-      placeholder: '请输入数据库名称',
-      colSpan: 12
-    },
-    ...commonConfigFields
-  ], { ip: 'localhost', port: '2883', username: 'root@sys' }),
-  OCEANBASE_ORACLE: withDefaults([
-    ...baseFields,
-    ...ipPortFields,
-    ...oceanBaseAuthFields,
-    {
-      key: 'dbname',
-      label: 'Schema',
-      prop: 'dbname',
-      required: true,
-      component: 'input',
-      placeholder: '请输入 Schema',
-      colSpan: 12
-    },
-    ...commonConfigFields
-  ], { ip: 'localhost', port: '2883', username: 'root@sys' }),
-
 };
 
 function getDatasourceFields(type) {

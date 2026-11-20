@@ -84,6 +84,12 @@ public class IngestTaskController extends BaseController {
         return CommonResult.success(runLogService.read(id, runId, afterSeq));
     }
 
+    /**
+     * 按筛选条件分页查询接入任务。
+     *
+     * @param req 筛选及分页参数
+     * @return 接入任务分页结果
+     */
     @Operation(summary = "查询接入任务列表")
     @PreAuthorize("@ss.hasPermi('ingest:task:list')")
     @GetMapping("/list")
@@ -91,6 +97,12 @@ public class IngestTaskController extends BaseController {
         return CommonResult.success(taskService.page(req));
     }
 
+    /**
+     * 查询接入任务详情及其类型配置。
+     *
+     * @param id 接入任务 ID
+     * @return 接入任务详情
+     */
     @Operation(summary = "查询接入任务详情")
     @PreAuthorize("@ss.hasPermi('ingest:task:query')")
     @GetMapping("/{id}")
@@ -125,6 +137,12 @@ public class IngestTaskController extends BaseController {
         return CommonResult.success(taskService.execute(id, getNickName()));
     }
 
+    /**
+     * 保存新建任务及其配置，初始调度开关为关闭。
+     *
+     * @param req 接入任务配置
+     * @return 新建任务 ID
+     */
     @Operation(summary = "创建接入任务")
     @PreAuthorize("@ss.hasPermi('ingest:task:add')")
     @Log(
@@ -138,6 +156,12 @@ public class IngestTaskController extends BaseController {
         return CommonResult.success(taskService.create(req));
     }
 
+    /**
+     * 更新接入任务配置，提交后按最新配置同步调度。
+     *
+     * @param req 待更新的任务配置
+     * @return 更新行数
+     */
     @Operation(summary = "修改接入任务")
     @PreAuthorize("@ss.hasPermi('ingest:task:edit')")
     @Log(
@@ -151,6 +175,12 @@ public class IngestTaskController extends BaseController {
         return CommonResult.success(taskService.update(req));
     }
 
+    /**
+     * 从现有配置创建副本，新任务不自动启用。
+     *
+     * @param id 被复制的任务 ID
+     * @return 新建任务 ID
+     */
     @Operation(summary = "复制接入任务")
     @PreAuthorize("@ss.hasPermi('ingest:task:add')")
     @PostMapping("/{id}/copy")
@@ -158,6 +188,12 @@ public class IngestTaskController extends BaseController {
         return CommonResult.success(taskService.copy(id, getNickName()));
     }
 
+    /**
+     * 切换任务启用状态；停用任务时一并关闭调度。
+     *
+     * @param req 任务 ID 和目标启用状态
+     * @return 更新行数
+     */
     @Operation(summary = "启用或停用接入任务")
     @PreAuthorize("@ss.hasPermi('ingest:task:edit')")
     @PutMapping("/status")
@@ -166,6 +202,12 @@ public class IngestTaskController extends BaseController {
                 taskService.changeStatus(req.getId(), req.getStatus(), getNickName()));
     }
 
+    /**
+     * 独立切换调度开关；启用调度前，任务须已启用且已配置有效的 Cron。
+     *
+     * @param req 任务 ID 和目标调度状态
+     * @return 更新行数
+     */
     @Operation(summary = "启用或暂停接入任务调度")
     @PreAuthorize("@ss.hasPermi('ingest:task:edit')")
     @Log(title = "接入任务调度", businessType = BusinessType.UPDATE)
@@ -175,6 +217,12 @@ public class IngestTaskController extends BaseController {
                 taskService.changeScheduleStatus(req.getId(), req.getStatus(), getNickName()));
     }
 
+    /**
+     * 批量逻辑删除任务，提交后逐条清理关联调度。
+     *
+     * @param ids 待删除的接入任务 ID
+     * @return 删除行数
+     */
     @Operation(summary = "删除接入任务")
     @PreAuthorize("@ss.hasPermi('ingest:task:remove')")
     @Log(title = "接入任务", businessType = BusinessType.DELETE)
@@ -184,6 +232,12 @@ public class IngestTaskController extends BaseController {
     }
 
 
+    /**
+     * 上传接入文件并解析表头，供配置字段映射使用。
+     *
+     * @param file CSV、XLS 或 XLSX 文件
+     * @return 文件令牌及解析得到的字段列表
+     */
     @Operation(summary = "上传并解析任务文件")
     @PreAuthorize("@ss.hasPermi('ingest:task:add') or @ss.hasPermi('ingest:task:edit')")
     @PostMapping("/file")
@@ -191,6 +245,12 @@ public class IngestTaskController extends BaseController {
         return CommonResult.success(taskReadService.upload(file));
     }
 
+    /**
+     * 预览当前接入配置对应的来源字段和样例数据，不保存任务。
+     *
+     * @param req 待预览的接入配置
+     * @return 来源字段和最多 20 条样例数据
+     */
     @Operation(summary = "预览来源字段及前20条数据")
     @PreAuthorize("@ss.hasPermi('ingest:task:query')")
     @PostMapping("/preview")

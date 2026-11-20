@@ -23,9 +23,22 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
+/**
+ * 接入任务启停或调度开关变更请求对象，包含任务 ID 和目标状态。
+ *
+ * @author chentangwen
+ */
 @Data
 public class IngestTaskStatusReqVO {
+
+    /**
+     * 待变更状态的接入任务 ID。
+     */
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
+
+    /**
+     * 目标开关状态：0 表示关闭，1 表示开启，具体含义由状态变更接口确定。
+     */
     private String status;
 }

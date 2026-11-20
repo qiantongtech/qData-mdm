@@ -28,6 +28,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.domain.AjaxResult;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.database.DataSourceFactory;
@@ -46,6 +47,9 @@ import tech.qiantong.qdata.mdm.ingest.dal.dataobject.datasource.IngestDatasource
 import tech.qiantong.qdata.mdm.ingest.dal.mapper.datasource.IngestDatasourceMapper;
 import tech.qiantong.qdata.mdm.ingest.dal.mapper.source.IngestSourceDatasourceRelMapper;
 import tech.qiantong.qdata.mdm.ingest.service.datasource.IIngestDatasourceService;
+import tech.qiantong.qdata.mdm.model.dal.dataobject.base.ModelInstanceDO;
+import tech.qiantong.qdata.mdm.model.dal.mapper.base.ModelInstanceMapper;
+import tech.qiantong.qdata.mdm.model.enums.materialization.ModelPublishStatus;
 import tech.qiantong.qdata.mdm.mybatis.core.query.LambdaQueryWrapperX;
 import tech.qiantong.qdata.mdm.redis.service.IRedisService;
 import tech.qiantong.qdata.mdm.system.service.ISysMessageService;
@@ -71,6 +75,9 @@ public class IngestDatasourceServiceImpl extends ServiceImpl<IngestDatasourceMap
 
     @Resource
     private IngestDatasourceMapper daDatasourceMapper;
+
+    @Resource
+    private ModelInstanceMapper modelInstanceMapper;
 
     @Resource
     private IngestSourceDatasourceRelMapper sourceDatasourceRelMapper;
@@ -204,7 +211,33 @@ public class IngestDatasourceServiceImpl extends ServiceImpl<IngestDatasourceMap
 
     @Override
     public int removeDaDatasource(Collection<Long> idList) {
-        // 批量删除数据源
+        if (CollectionUtils.isEmpty(idList)) {
+            return 0;
+        }
+        for (Long id : new TreeSet<>(idList)) {
+            IngestDatasourceDO datasource = daDatasourceMapper.selectOne(Wrappers.lambdaQuery(IngestDatasourceDO.class)
+                    .select(IngestDatasourceDO::getId, IngestDatasourceDO::getValidFlag)
+                    .eq(IngestDatasourceDO::getId, id)
+                    .last("FOR UPDATE"));
+            if (datasource == null) {
+                throw new ServiceException("数据连接不存在", HttpStatus.WARN);
+            }
+            if (!Boolean.FALSE.equals(datasource.getValidFlag())) {
+                throw new ServiceException("数据连接已启用，请先禁用后再删除", HttpStatus.WARN);
+            }
+        }
+        if (daDatasourceMapper.countTaskReferences(idList) > 0) {
+            throw new ServiceException("数据连接仍被接入任务引用，请先解除引用后再删除", HttpStatus.WARN);
+        }
+        // 已发布和仍需核验或恢复的发布实例均依赖原连接，已确认无残留的失败实例不阻止删除。
+        if (modelInstanceMapper.selectCount(Wrappers.lambdaQuery(ModelInstanceDO.class)
+                .in(ModelInstanceDO::getDatasourceId, idList)
+                .ne(ModelInstanceDO::getStatus, ModelPublishStatus.FAILED.name())) > 0) {
+            throw new ServiceException("数据连接已用于模型发布或存在未完成的发布实例，无法删除", HttpStatus.WARN);
+        }
+        if (daDatasourceMapper.countSourceReferences(idList) > 0) {
+            throw new ServiceException("数据连接仍关联来源系统，请先解除关联后再删除", HttpStatus.WARN);
+        }
         return daDatasourceMapper.deleteBatchIds(idList);
     }
 
@@ -326,16 +359,16 @@ public class IngestDatasourceServiceImpl extends ServiceImpl<IngestDatasourceMap
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<DbTable> getDbTables(Long sourceId, Long id, String tableName, Long limit) {
         if (sourceId == null || id == null) {
-            throw new ServiceException("请选择来源系统和数据库连接");
+            throw new ServiceException("请选择来源系统和数据库连接", HttpStatus.WARN);
         }
         boolean linked = sourceDatasourceRelMapper.selectBySourceIds(Collections.singletonList(sourceId)).stream()
                 .anyMatch(rel -> id.equals(rel.getDatasourceId()));
         if (!linked) {
-            throw new ServiceException("数据库连接未关联当前来源系统");
+            throw new ServiceException("数据库连接未关联当前来源系统", HttpStatus.WARN);
         }
         IngestDatasourceDO datasource = this.getDaDatasourceById(id);
         if (datasource == null) {
-            throw new ServiceException("数据源不存在");
+            throw new ServiceException("数据源不存在", HttpStatus.WARN);
         }
         DbQueryProperty property = new DbQueryProperty(datasource.getDatasourceType(), datasource.getIp(),
                 datasource.getPort(), datasource.getDatasourceConfig());

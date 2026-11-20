@@ -29,7 +29,7 @@ import tech.qiantong.qdata.mdm.merge.domain.detect.MergeDetectContextBO;
 public interface IMergeDetectExecuteService {
 
     /**
-     * 生成检测运行实例与候选组，调用方必须在事务内持有任务行锁。
+     * 保存运行实例并在事务提交后异步检测，调用方必须在事务内持有任务行锁。
      *
      * @param task 已锁定的有效任务
      * @param operatorId 操作人编号
@@ -38,7 +38,7 @@ public interface IMergeDetectExecuteService {
      */
     Long execute(MergeDuplicateTaskDO task, Long operatorId, String operatorName);
 
-    /** 使用当前事务内已校验的固定数据执行，新建任务可复用同一份上下文。 */
+    /** 使用已校验的固定数据创建实例，事务提交后异步执行。 */
     Long executePrepared(MergeDuplicateTaskDO task, MergeDetectContextBO context,
                          Long operatorId, String operatorName);
 }

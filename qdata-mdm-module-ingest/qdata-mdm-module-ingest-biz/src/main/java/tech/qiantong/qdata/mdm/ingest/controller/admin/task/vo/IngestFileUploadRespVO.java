@@ -21,13 +21,46 @@ package tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo;
 import java.util.*;
 import lombok.Data;
 
+/**
+ * 接入文件上传响应对象，包含文件令牌、文件信息及解析出的来源字段。
+ *
+ * @author chentangwen
+ */
 @Data
 public class IngestFileUploadRespVO {
+
+    /**
+     * 上传文件令牌，用于后续预览及任务配置。
+     */
     private String fileToken;
+
+    /**
+     * 上传文件访问标识。
+     */
     private String filePath;
+
+    /**
+     * 上传文件的原始名称。
+     */
     private String fileName;
+
+    /**
+     * 文件类型：CSV、XLS 或 XLSX。
+     */
     private String fileType;
+
+    /**
+     * 文件大小，单位：字节。
+     */
     private Long fileSize;
+
+    /**
+     * 文件上传时间。
+     */
     private Date uploadTime;
+
+    /**
+     * 从上传文件解析出的来源字段名称列表。
+     */
     private List<String> fields;
 }

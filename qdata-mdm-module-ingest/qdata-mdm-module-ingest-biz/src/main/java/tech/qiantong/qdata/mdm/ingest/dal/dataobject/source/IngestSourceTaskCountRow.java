@@ -16,35 +16,20 @@
  * See the LICENSE file in the project root for full license information.
  */
 
-package tech.qiantong.qdata.mdm.ingest.api.datasource.dto;
+package tech.qiantong.qdata.mdm.ingest.dal.dataobject.source;
 
 import lombok.Data;
 
-import java.util.List;
-
+/**
+ * 按来源系统分组的有效接入任务数量，不对应独立数据表。
+ *
+ * @author chentangwen
+ */
 @Data
-public class DatasourceCreaTeTableListReqDTO {
+public class IngestSourceTaskCountRow {
 
-    /**
-     * 数据源类型
-     */
-    private String datasourceType;
-
-    /**
-     * 数据源配置(json字符串)
-     */
-    private String datasourceConfig;
-
-    /**
-     * IP
-     */
-    private String ip;
-
-    /**
-     * 端口号
-     */
-    private Long port;
-
-
-    private List<DatasourceCreaTeTableReqDTO> dtoList;
+    /** 来源系统 ID。 */
+    private Long sourceId;
+    /** 未逻辑删除的接入任务数。 */
+    private Long taskCount;
 }

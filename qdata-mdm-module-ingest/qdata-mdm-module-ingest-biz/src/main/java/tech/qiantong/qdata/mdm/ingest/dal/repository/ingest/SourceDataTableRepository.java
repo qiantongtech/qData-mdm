@@ -21,6 +21,7 @@ package tech.qiantong.qdata.mdm.ingest.dal.repository.ingest;
 import org.springframework.stereotype.Repository;
 import org.springframework.jdbc.core.ColumnMapRowMapper;
 import org.springframework.jdbc.core.SqlParameterValue;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.database.DbDialect;
 import tech.qiantong.qdata.mdm.common.database.core.DbColumn;
 import tech.qiantong.qdata.mdm.common.database.DialectFactory;
@@ -130,7 +131,7 @@ public class SourceDataTableRepository {
                 for (Long id : ids) statement.setLong(index++, id);
                 int changed = statement.executeUpdate();
                 if (GOVERNANCE_PENDING.equals(expected) && changed != ids.size()) {
-                    throw new ServiceException("来源已删除或治理状态已变化，请刷新后重试");
+                    throw new ServiceException("来源已删除或治理状态已变化，请刷新后重试", HttpStatus.WARN);
                 }
                 return null;
             } catch (java.sql.SQLException ex) {
@@ -224,7 +225,7 @@ public class SourceDataTableRepository {
             if (!"id".equals(order)) sql.append(", ").append(column(columns, "id", dialect)).append(" DESC");
             int pageNum = request.getPageNum() == null ? 1 : Math.max(1, request.getPageNum());
             int pageSize = request.getPageSize() == null ? 10 : request.getPageSize();
-            if (pageSize <= 0) throw new ServiceException("每页记录数必须大于0");
+            if (pageSize <= 0) throw new ServiceException("每页记录数必须大于0", HttpStatus.WARN);
             String pageSql = dialect.buildPaginationSql(sql.toString(), (long) (pageNum - 1) * pageSize, pageSize);
              // 使用 JDBC 原始类型，避免通用展示映射将 DECIMAL 主键转为 double 导致精度丢失。
             return new PageResult<>(query.queryList(pageSql, args.toArray(), new ColumnMapRowMapper()), total);
@@ -242,7 +243,7 @@ public class SourceDataTableRepository {
             List<Map<String, Object>> rows = query.queryList("SELECT * FROM " + tableName(target, table, dialect)
                     + " WHERE " + column(columns, "id", dialect) + " = ? AND "
                     + column(columns, "del_flag", dialect) + " = ?", new Object[]{id, flag(columns, false)}, new ColumnMapRowMapper());
-            if (rows.isEmpty()) throw new ServiceException("来源数据不存在或已删除");
+            if (rows.isEmpty()) throw new ServiceException("来源数据不存在或已删除", HttpStatus.WARN);
             return rows.get(0);
         });
     }
@@ -259,7 +260,7 @@ public class SourceDataTableRepository {
                     + " = ? WHERE " + column(columns, "id", dialect) + " = ? AND " + column(columns, "del_flag", dialect) + " = ?"
                     + " AND " + column(columns, "status", dialect) + " = ?";
             if (query.update(sql, new Object[]{flag(columns, true), id, flag(columns, false), GOVERNANCE_PENDING}) != 1) {
-                throw new ServiceException("来源数据不存在、已删除或非待融合状态");
+                throw new ServiceException("来源数据不存在、已删除或非待融合状态", HttpStatus.WARN);
             }
             return null;
         });
