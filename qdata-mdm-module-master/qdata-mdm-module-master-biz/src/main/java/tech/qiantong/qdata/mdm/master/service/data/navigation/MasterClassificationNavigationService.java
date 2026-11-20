@@ -21,6 +21,7 @@ package tech.qiantong.qdata.mdm.master.service.data.navigation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.master.api.instance.dto.MasterFieldRespDTO;
 import tech.qiantong.qdata.mdm.master.api.instance.dto.MasterModelRespDTO;
@@ -132,7 +133,7 @@ public class MasterClassificationNavigationService {
     public MasterClassificationTreeRespVO options(Long instanceId, MasterClassificationOptionsReqVO request) {
         MasterModelRespDTO target = metadataService.getPublishedDefinition(instanceId, request.getModelId(), true);
         if (!Objects.equals(request.getModelVersionId(), target.getModelVersionId()))
-            throw new ServiceException("分类目标版本已变化，请重新展开选择器");
+            throw new ServiceException("分类目标版本已变化，请重新展开选择器", HttpStatus.WARN);
         MasterFieldRespDTO field = new MasterFieldRespDTO();
         field.setRelatedCode(request.getRelatedCode());
         field.setDisplayCode(request.getDisplayCode());
@@ -151,18 +152,20 @@ public class MasterClassificationNavigationService {
                 || request.getClassificationFieldId() == null || request.getClassificationNodeId() == null
                 || request.getClassificationNodeId().isEmpty() || request.getClassificationTargetVersionId() == null
                 || request.getClassificationRevision() == null)
-            throw new ServiceException("分类筛选上下文不完整，请重新选择分类");
+            throw new ServiceException("分类筛选上下文不完整，请重新选择分类", HttpStatus.WARN);
         if (!"NORMAL".equals(source.getModelType())) throw new ServiceException("分类导航只支持普通模型");
         MasterFieldRespDTO field = classificationField(source, request.getClassificationFieldId());
         permissions.requireView(source, field);
-        MasterModelRespDTO target = target(field);
+        if (field.getRelatedModelId() == null) throw new ServiceException("分类字段缺少目标模型");
+        MasterModelRespDTO target = metadataService.getPublishedDefinition(null, field.getRelatedModelId(), true);
         if (!Objects.equals(request.getClassificationTargetVersionId(), target.getModelVersionId()))
-            throw new ServiceException("分类目标版本已变化，请刷新分类树");
+            throw new ServiceException("分类目标版本已变化，请刷新分类树", HttpStatus.WARN);
+        validateTarget(target, field);
         MasterClassificationTreeRespVO tree = loadTree(target, field);
         if (!tree.getRevision().equals(request.getClassificationRevision()))
-            throw new ServiceException("分类数据已变化，请刷新分类树后重新查询");
+            throw new ServiceException("分类数据已变化，请刷新分类树后重新查询", HttpStatus.WARN);
         Node selected = find(tree.getNodes(), request.getClassificationNodeId());
-        if (selected == null) throw new ServiceException("分类节点不存在，请刷新分类树");
+        if (selected == null) throw new ServiceException("分类节点不存在，请刷新分类树", HttpStatus.WARN);
         MasterFieldRespDTO key = field(target, field.getRelatedCode());
         Set<Object> values = new LinkedHashSet<>();
         collectValues(selected, values, field, key);
@@ -174,7 +177,7 @@ public class MasterClassificationNavigationService {
         if (instanceId == null || instanceId <= 0) throw new ServiceException("模型实例ID格式无效");
         MasterModelRespDTO source = metadataService.getPublishedDefinition(instanceId, modelId, false);
         if (versionId == null || !versionId.equals(source.getModelVersionId()))
-            throw new ServiceException("分类导航与成功发布版本不一致，请重新进入模型");
+            throw new ServiceException("分类导航与成功发布版本不一致，请重新进入模型", HttpStatus.WARN);
         if (!"NORMAL".equals(source.getModelType())) throw new ServiceException("分类导航只支持普通模型");
         return source;
     }
@@ -182,13 +185,6 @@ public class MasterClassificationNavigationService {
     private MasterFieldRespDTO classificationField(MasterModelRespDTO model, Long id) {
         return model.getFields().stream().filter(f -> id != null && id.equals(f.getId()) && "CLASS".equals(f.getCategory()))
                 .findFirst().orElseThrow(() -> new ServiceException("分类字段不属于当前已发布模型"));
-    }
-
-    private MasterModelRespDTO target(MasterFieldRespDTO field) {
-        if (field.getRelatedModelId() == null) throw new ServiceException("分类字段缺少目标模型");
-        MasterModelRespDTO target = metadataService.getPublishedDefinition(null, field.getRelatedModelId(), true);
-        validateTarget(target, field);
-        return target;
     }
 
     private void validateTarget(MasterModelRespDTO target, MasterFieldRespDTO config) {
@@ -275,7 +271,7 @@ public class MasterClassificationNavigationService {
     private void requireCurrent(MasterModelRespDTO target) {
         // 读取期间重新发布不能混用旧字段与新目标表。
         if (!publishedApi.isPublishedInstance(target.getModelId(), target.getInstanceId(), target.getModelVersionId()))
-            throw new ServiceException("分类目标版本已变化，请刷新分类树");
+            throw new ServiceException("分类目标版本已变化，请刷新分类树", HttpStatus.WARN);
     }
 
     private void decorate(Node node, String parentPath, MasterFieldRespDTO config, Set<String> visited, int depth) {
@@ -303,7 +299,8 @@ public class MasterClassificationNavigationService {
                 || (!stringType(source.getDataType()) && !numberType(source.getDataType())))
             throw new ServiceException("普通模型分类字段与分类关联键类型不兼容");
         values.add(typedKey(node.getValue(), source.getDataType()));
-        if (values.size() > MAX_FILTER_VALUES) throw new ServiceException("分类筛选范围超过500个节点，请选择更小范围");
+        if (values.size() > MAX_FILTER_VALUES)
+            throw new ServiceException("分类筛选范围超过500个节点，请选择更小范围", HttpStatus.WARN);
         for (Node child : node.getChildren()) collectValues(child, values, source, targetKey);
     }
 

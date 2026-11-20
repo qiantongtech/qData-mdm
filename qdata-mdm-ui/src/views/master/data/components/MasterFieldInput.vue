@@ -131,15 +131,30 @@ function buildClassificationOptions(nodes) {
   }))
 }
 
+function findOptionLabel(options, value) {
+  for (const option of options) {
+    if (String(option.value) === value) return option.label
+    const childLabel = option.children?.length ? findOptionLabel(option.children, value) : undefined
+    if (childLabel !== undefined) return childLabel
+  }
+}
+
 const props = defineProps({
   modelValue: { type: [String, Number, Boolean], default: '' },
   column: { type: Object, required: true },
   placeholder: { type: String, default: '' },
   disabled: Boolean
 })
-const emit = defineEmits(['update:modelValue', 'loadError'])
+const emit = defineEmits(['update:modelValue', 'loadError', 'referenceLabel'])
 const value = computed({ get: () => props.modelValue == null ? '' : String(props.modelValue),
-  set: next => emit('update:modelValue', next == null ? '' : String(next)) })
+  set: next => {
+    const storedValue = next == null ? '' : String(next)
+    emit('update:modelValue', storedValue)
+    const referenceOptions = control.value === 'dictionary' ? props.column.referenceOptions || [] : options.value
+    const label = storedValue === '' ? undefined : findOptionLabel(referenceOptions, storedValue)
+    emit('referenceLabel', label)
+  }
+})
 const control = computed(() => getFieldControl(props.column))
 const options = ref([])
 const loading = ref(false)

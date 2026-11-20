@@ -46,6 +46,7 @@ import tech.qiantong.qdata.mdm.common.database.core.DbIndex;
 import tech.qiantong.qdata.mdm.common.database.datasource.DefaultDataSourceFactoryBean;
 import tech.qiantong.qdata.mdm.common.database.dialect.MySqlDialect;
 import tech.qiantong.qdata.mdm.common.database.dialect.SQLServer2008Dialect;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.StringUtils;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
@@ -322,7 +323,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
     public Long getPublishedModelId(Long instanceId) {
         if (instanceId == null || instanceId <= 0) throw new ServiceException("模型实例ID格式无效");
         Long modelId = instanceMapper.selectPublishedModelId(instanceId);
-        if (modelId == null) throw new ServiceException("当前实例不可用");
+        if (modelId == null) throw new ServiceException("当前实例不可用，请返回卡片列表后重新进入", HttpStatus.WARN);
         return modelId;
     }
 

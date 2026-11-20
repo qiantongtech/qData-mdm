@@ -55,23 +55,20 @@
             当前模型没有可批量修改的字段
           </el-text>
         </qt-form-item>
-        <qt-form-item v-for="field in checkedFields" :key="field" :label="columnLabel(field)"
-                      :prop="`values.${field}`" class="row-full"
+        <qt-form-item v-for="column in selectedUpdateColumns" :key="column.prop" :label="column.label || column.prop"
+                      :prop="`values.${column.prop}`" :error="fieldLoadErrors[column.prop]" class="row-full"
         >
-          <el-date-picker v-if="isDateField(field)" v-model="form.values[field]" type="date"
-                          value-format="YYYY-MM-DD" placeholder="请选择日期" clearable class="number-input"
-          />
-          <el-date-picker v-else-if="isDateTimeField(field)" v-model="form.values[field]" type="datetime"
-                          value-format="YYYY-MM-DD HH:mm:ss" placeholder="请选择日期时间" clearable class="number-input"
-          />
-          <el-input v-else v-model="form.values[field]" clearable
-                    :placeholder="fieldPlaceholder(field)"
+          <MasterFieldInput v-model="form.values[column.prop]"
+                            :column="column" :placeholder="fieldPlaceholder(column.prop)"
+                            :disabled="validating || submitting"
+                            @load-error="fieldLoadErrors[column.prop] = $event"
+                            @reference-label="fieldReferenceLabels[column.prop] = $event"
           />
         </qt-form-item>
       </template>
 
-      <qt-form-item v-else-if="isBatchStatus" label="目标状态操作" prop="action">
-        <el-select v-model="form.action" placeholder="请选择状态操作">
+      <qt-form-item v-else-if="isBatchStatus" label="目标状态操作" prop="action" class="row-full">
+        <el-select v-model="form.action" class="batch-status-select" placeholder="请选择状态操作">
           <el-option v-for="item in statusActions" :key="item.value" :label="item.label"
                      :value="item.value" :disabled="item.disabled"
           />
@@ -170,7 +167,7 @@
         <template #title>{{ validationBatchErrors.join('；') || '校验未通过，请核对所选数据的状态和操作权限。' }}</template>
       </el-alert>
       <qt-table v-if="validation?.rows?.length" ref="validationTableRef" v-bind="validationTableStore">
-        <template #rowNumber="{ row }">{{ row.rowNo }}</template>
+        <template #rowNumber="{ row }">{{ displayRowNumber(row) }}</template>
         <template #recordId="{ row }">{{ row.recordId ?? '-' }}</template>
         <template #recordName="{ row }">{{ validationRecordName(row) }}</template>
         <template #businessKey="{ row }">{{ validationBusinessKey(row) }}</template>
@@ -204,7 +201,7 @@
         <template #updateSummary>
           <el-space wrap>
             <el-tag v-for="item in updateSummary" :key="item.field" type="info">
-              {{ item.label }}：{{ displayValue(item.value, item.field) }}
+              {{ item.label }}：{{ item.value }}
             </el-tag>
           </el-space>
         </template>
@@ -239,6 +236,7 @@ import { saveAs } from 'file-saver'
 import Steps from '@/components/Steps/index.vue'
 import DescriptionsInfo from '@/components/DescriptionsInfo/index.vue'
 import GuideTipPanel from '@/components/GuideTip/GuideTipPanel.vue'
+import MasterFieldInput from '../../../data/components/MasterFieldInput.vue'
 import { parseTime } from '@/utils/anivia.js'
 import { trimText, validateAlphaNumUnderscore, validatePattern, validateTrimmedRequired } from '@/utils/validate.js'
 import { downloadMasterChangeImportTemplate, parseMasterChangeImport, submitMasterChangeBatch,
@@ -302,6 +300,8 @@ const importOperationOptions = computed(() => [
 })))
 const step = ref(0)
 const checkedFields = ref([])
+const fieldLoadErrors = ref({})
+const fieldReferenceLabels = ref({})
 const maintenanceDefinition = ref(null)
 const definitionLoading = ref(false)
 const definitionError = ref('')
@@ -381,6 +381,9 @@ const editableColumns = computed(() => (maintenanceDefinition.value?.columns || 
   column.businessField === true && column.prop && column.prop !== 'ID'
     && !isAutomaticColumn(column)
     && String(column.columnCategory || column.category || '').toUpperCase() !== 'SYSTEM'))
+const selectedUpdateColumns = computed(() => checkedFields.value
+  .map(field => editableColumns.value.find(column => column.prop === field))
+  .filter(Boolean))
 const definitionUnavailable = computed(() => definitionLoading.value || !maintenanceDefinition.value
   || Boolean(definitionError.value))
 const updateUnavailable = computed(() => definitionUnavailable.value || !editableColumns.value.length)
@@ -417,11 +420,14 @@ const title = computed(() => props.mode === 'BATCH_UPDATE'
       ? '批量状态'
     : `${modeLabel(props.mode)}${props.modelName ? ` · ${props.modelName}` : ''}`)
 const itemCount = computed(() => props.mode === 'BATCH_IMPORT' ? form.rows.length : form.recordIds.length)
-const updateSummary = computed(() => checkedFields.value.map(field => ({
-  field,
-  label: columnLabel(field),
-  value: form.values[field]
-})))
+const updateSummary = computed(() => selectedUpdateColumns.value.map(column => {
+  const value = normalizeUpdateValue(form.values[column.prop])
+  return {
+    field: column.prop,
+    label: column.label || column.prop,
+    value: value === null ? '（清空）' : fieldReferenceLabels.value[column.prop] ?? displayUpdateValue(value, column)
+  }
+}))
 const applyReasonRules = [
   { required: true, whitespace: true, message: '请输入申请原因', trigger: 'blur' },
   { max: 500, message: '申请原因不能超过500字', trigger: 'blur' }
@@ -439,32 +445,36 @@ const batchRules = computed(() => {
     }
     return rules
   }
-  for (const field of checkedFields.value) {
-    const label = columnLabel(field)
-    if (['客户名称', '产品名称'].includes(label)) {
-      rules[`values.${field}`] = [
-        { required: true, validator: validateTrimmedRequired(`${label}不能为空`, 64), trigger: 'blur' },
-        { validator: validatePattern(/^[\u4e00-\u9fffA-Za-z0-9_-]+$/, `${label}只允许中文、英文字母、数字、下划线和短横线`), trigger: 'blur', transform: trimText }
-      ]
-      continue
-    }
-    if (['供应商编码', '产品编码'].includes(label)) {
-      rules[`values.${field}`] = [
-        { required: true, validator: validateTrimmedRequired(`${label}不能为空`, 64), trigger: 'blur' },
-        { validator: validateAlphaNumUnderscore(`${label}只允许英文字母、数字和下划线`), trigger: 'blur', transform: trimText }
-      ]
-      continue
-    }
-    rules[`values.${field}`] = [{
-      required: true,
-      validator: (_rule, value, callback) => {
-        if (value === null || value === undefined || (typeof value === 'string' && !value.trim())) {
-          return callback(new Error(`${columnLabel(field)}不能为空`))
-        }
-        callback()
+  for (const column of selectedUpdateColumns.value) {
+    const label = column.label || column.prop
+    const required = Boolean(column.required || column.nameField)
+    const isRestrictedName = ['客户名称', '产品名称'].includes(label)
+    const isRestrictedCode = ['供应商编码', '产品编码'].includes(label)
+    const maxLength = isRestrictedName || isRestrictedCode ? 64 : undefined
+    if (!required && !maxLength) continue
+
+    const validateValue = validateTrimmedRequired(`${label}不能为空`, maxLength)
+    const fieldRules = [{
+      required,
+      validator: (rule, value, callback) => {
+        if (!required && normalizeUpdateValue(value) === null) return callback()
+        validateValue(rule, value, callback)
       },
       trigger: ['blur', 'change']
     }]
+    if (isRestrictedName) {
+      fieldRules.push({
+        validator: validatePattern(/^[\u4e00-\u9fffA-Za-z0-9_-]+$/, `${label}只允许中文、英文字母、数字、下划线和短横线`),
+        trigger: 'blur', transform: trimText
+      })
+    }
+    if (isRestrictedCode) {
+      fieldRules.push({
+        validator: validateAlphaNumUnderscore(`${label}只允许英文字母、数字和下划线`),
+        trigger: 'blur', transform: trimText
+      })
+    }
+    rules[`values.${column.prop}`] = fieldRules
   }
   return rules
 })
@@ -506,6 +516,8 @@ function reset() {
     .filter(row => row?.ID !== null && row?.ID !== undefined)
     .map(row => [String(row.ID), businessKeyProp ? row[businessKeyProp] : row.ID]))
   form.values = {}
+  fieldLoadErrors.value = {}
+  fieldReferenceLabels.value = {}
   form.action = ''
   form.rows = []
   form.importMode = 'CREATE_ONLY'
@@ -523,6 +535,8 @@ async function loadMaintenanceDefinition() {
   definitionLoading.value = true
   checkedFields.value = []
   form.values = {}
+  fieldLoadErrors.value = {}
+  fieldReferenceLabels.value = {}
   validation.value = null
   try {
     if (!props.modelId || !props.modelVersionId) throw new Error('模型发布配置不可用，请刷新页面后重试')
@@ -566,6 +580,12 @@ function importSourceRow(row) {
   return form.rows.find((item, index) => Number(item.rowNo ?? index + 2) === Number(row.rowNo))
 }
 
+function displayRowNumber(row) {
+  if (props.mode !== 'BATCH_IMPORT') return row.rowNo
+  const index = form.rows.indexOf(importSourceRow(row))
+  return index >= 0 ? index + 1 : row.rowNo
+}
+
 function validationBusinessKey(row) {
   const prop = businessKeyColumn.value?.prop
   if (props.mode === 'BATCH_IMPORT') {
@@ -604,21 +624,19 @@ function validationFailureReason(row) {
   return row.message || (row.operation === 'SKIP' ? '根据导入方式跳过' : '-')
 }
 
-function columnDataType(prop) {
-  return String(businessColumns.value.find(column => column.prop === prop)?.dataType || '').toUpperCase()
+function displayUpdateValue(value, column) {
+  const label = getReferenceDisplayValue(value, column)
+  if (label !== value) return label
+  const type = String(column.dataType || '').trim().toUpperCase().replace(/\(.*\)$/, '')
+  if (/^(BOOL|BOOLEAN)$/.test(type)) {
+    if (value === 'true') return '是'
+    if (value === 'false') return '否'
+  }
+  return displayValue(value, column)
 }
 
-function isDateField(prop) {
-  return columnDataType(prop) === 'DATE'
-}
-
-function isDateTimeField(prop) {
-  return columnDataType(prop) === 'DATETIME'
-}
-
-function displayValue(value, field) {
+function displayValue(value, column) {
   if (value === null || value === undefined || value === '') return '（清空）'
-  const column = businessColumns.value.find(item => item.prop === field)
   return /TIME/i.test(column?.dataType || '') ? parseTime(value) || value : value
 }
 
@@ -626,16 +644,19 @@ function displayImportValue(row, field) {
   const value = importSourceRow(row)?.values?.[field]
   const column = businessColumns.value.find(item => item.prop === field) || { prop: field }
   const label = getReferenceDisplayValue(value, column)
-  return label === value ? displayValue(value, field) : label
+  return label === value ? displayValue(value, column) : label
+}
+
+function normalizeUpdateValue(value) {
+  return value == null || (typeof value === 'string' && !value.trim()) ? null : value
 }
 
 function payload() {
   const data = { mode: props.mode, applyReason: form.applyReason }
   if (props.mode === 'BATCH_UPDATE') {
     data.recordIds = [...form.recordIds]
-    data.values = Object.fromEntries(checkedFields.value
-      .filter(field => editableColumns.value.some(column => column.prop === field))
-      .map(field => [field, form.values[field] ?? '']))
+    data.values = Object.fromEntries(selectedUpdateColumns.value
+      .map(({ prop }) => [prop, normalizeUpdateValue(form.values[prop])]))
   } else if (props.mode === 'BATCH_STATUS') {
     data.recordIds = [...form.recordIds]
     data.action = form.action || null
@@ -666,6 +687,8 @@ function checkBeforeValidate() {
     if (checkedFields.value.some(field => !editableColumns.value.some(column => column.prop === field))) {
       throw new Error('修改字段已不可编辑，请重新选择')
     }
+    const failedColumn = selectedUpdateColumns.value.find(column => fieldLoadErrors.value[column.prop])
+    if (failedColumn) throw new Error(`${failedColumn.label || failedColumn.prop}：${fieldLoadErrors.value[failedColumn.prop]}`)
   }
   if (props.mode === 'BATCH_STATUS' && !form.action) throw new Error('请选择目标状态操作')
   if (props.mode === 'BATCH_IMPORT' && importUnavailable.value) {
@@ -791,6 +814,10 @@ watch(checkedFields, async () => {
 </script>
 
 <style scoped lang="scss">
+.batch-status-select {
+  width: 100%;
+}
+
 .batch-steps :deep(.zl-step.is-dialog) {
   // 步骤条与步骤项等高，避免步骤项向上溢出，侵占弹窗顶部的 15px 留白。
   height: 40px;

@@ -30,17 +30,8 @@
         time-format="{y}-{m}-{d} {h}:{i}:{s}"
         class="request-header"
       >
-        <template #modelInfo>
-          <div class="request-model-info">
-            <div class="request-model-main">
-              <img :src="getModelIcon(modelInfo)" alt="" class="request-info-icon" />
-              <span class="request-model-title" :title="modelTitle">{{ modelTitle }}</span>
-              <dict-tag v-if="modelInfo.type" :options="model_type" :value="modelInfo.type" size="small" type="primary" />
-              <dict-tag v-if="modelInfo.releaseVersion?.versionNo" :options="model_status"
-                :value="modelInfo.version?.status" :label="modelInfo.releaseVersion.versionNo" size="small"
-              />
-            </div>
-          </div>
+        <template #model="{ data }">
+          <RuleModelDisplay :model="modelInfo" :fallback="data" />
         </template>
         <template #location>
           <div v-if="modelLocation" class="request-model-location">
@@ -92,6 +83,12 @@
               </template>
               <template #approvalStatus="{ row }">
                 <dict-tag :value="row.approvalStatus" :options="approvalStatusOptions" />
+              </template>
+              <template #executeStatus="{ row }">
+                <template v-if="String(row.approvalStatus) === '1'">
+                  {{ selectDictLabel(master_change_item_execute_status || [], row.executeStatus) || '-' }}{{ row.executeMessage ? `：${row.executeMessage}` : '' }}
+                </template>
+                <template v-else>-</template>
               </template>
               <template #businessValue="{ row, column_data }">
                 {{ displayRequestFieldValue(detail, column_data.fieldCode, row.businessValues[column_data.fieldCode]) }}
@@ -152,8 +149,10 @@ import DescriptionsInfo from '@/components/DescriptionsInfo/index.vue'
 import { getMasterChangeRequestDetail } from '@/api/master/change/request'
 import { getBase } from '@/api/model/base/base'
 import { checkPermi } from '@/utils/permission'
-import { getModelIcon, getProjectIcon } from '@/utils/imageUrl'
+import { getProjectIcon } from '@/utils/imageUrl'
 import { useDict } from '@/utils/dict'
+import { selectDictLabel } from '@/utils/anivia'
+import RuleModelDisplay from '@/views/rule/components/RuleModelDisplay.vue'
 import RequestSnapshotContent from './components/RequestSnapshotContent.vue'
 
 const requestNumberCollator = new Intl.Collator('zh-CN', { numeric: true })
@@ -316,8 +315,12 @@ function requestApprovalRows(detail) {
 
 const route = useRoute()
 const router = useRouter()
-const { master_change_type, master_change_request_status, master_data_status, model_type, model_status } = useDict(
-  'master_change_type', 'master_change_request_status', 'master_data_status', 'model_type', 'model_status'
+const {
+  master_change_type, master_change_request_status,
+  master_change_item_execute_status, master_data_status
+} = useDict(
+  'master_change_type', 'master_change_request_status',
+  'master_change_item_execute_status', 'master_data_status'
 )
 const detail = ref(null)
 const modelInfo = ref({})
@@ -351,11 +354,6 @@ const headerData = computed(() => ({
   // 从申请明细汇总稳定主数据 ID，保留数字字符串以免 BIGINT 精度丢失。
   masterDataIds: [...new Set(itemRows.value.map(item => item.recordId).filter(Boolean))].join('、')
 }))
-const modelTitle = computed(() => {
-  const name = modelInfo.value.name || detail.value?.modelName
-  const code = modelInfo.value.code
-  return name ? (code ? `${name} (${code})` : name) : code || '-'
-})
 const modelLocation = computed(() => [
   modelInfo.value.projectName,
   modelInfo.value.layers?.at(-1)?.name
@@ -364,10 +362,9 @@ const headerConfig = computed(() => ({
   className: 'clearfixs', idKey: 'requestId', nameKey: 'title', statusKey: 'approvalStatus',
   statusOptions: approvalStatusOptions.value
 }))
-// 顶部信息分三行展示，申请原因独占中间一行。
 const headerItems = computed(() => [
   { label: '主数据ID', key: 'masterDataIds' },
-  { label: '模型信息', slot: 'modelInfo' },
+  { label: '主数据模型', key: 'modelId', slot: 'model' },
   { label: '归属位置', slot: 'location' },
   { label: '申请原因', key: 'applyReason', span: 24 },
   { label: '申请类型', key: 'changeType', dictOptions: changeTypeOptions.value },
@@ -400,7 +397,8 @@ watch(businessFields, fields => {
       minWidth: 150, align: 'left', slot: 'businessValue', showOverflowTooltip: { effect: 'light' }
     })),
     { prop: 'changeType', label: '操作类型', width: 120, slot: 'changeType' },
-    { prop: 'approvalStatus', label: '当前状态', width: 110, slot: 'approvalStatus' },
+    { prop: 'approvalStatus', label: '审批状态', width: 110, slot: 'approvalStatus' },
+    { prop: 'executeStatus', label: '执行结果', minWidth: 210, slot: 'executeStatus', showOverflowTooltip: { effect: 'light' } },
     { label: '操作', width: 90, fixed: 'right', slot: 'action' }
   ]
 }, { immediate: true })
@@ -546,22 +544,6 @@ onUnmounted(() => { latestRequest++ })
   }
 }
 
-.request-model-info {
-  width: 100%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.request-model-main {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
-}
-
 .request-info-icon {
   width: 16px;
   height: 16px;
@@ -569,21 +551,12 @@ onUnmounted(() => { latestRequest++ })
   object-fit: contain;
 }
 
-.request-model-title,
-.request-model-description {
+.request-model-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.request-model-title {
   max-width: 100%;
-}
-
-.request-model-description {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
 }
 
 .request-model-location {

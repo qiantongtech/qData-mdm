@@ -19,6 +19,7 @@
 package tech.qiantong.qdata.mdm.master.dal.repository.data;
 
 import org.springframework.stereotype.Repository;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.DateUtils;
 import tech.qiantong.qdata.mdm.master.controller.admin.data.vo.MasterDataPageReqVO;
@@ -330,6 +331,19 @@ public class MasterDataQueryRepository {
         }
     }
 
+    /** Reads bounded active records for relation-field dropdowns without loading list-only extensions. */
+    public List<Map<String, Object>> selectReferenceOptions(Long datasourceId, String table,
+            Map<String, String> mappings, String valueColumn, String labelColumn, int limit) {
+        try (RequestContext context = connections.openRequest()) {
+            TableAccess access = context.forTable(datasourceId, table, mappings);
+            SqlParts parts = normal(access);
+            parts.eq(access.column("STATUS"), "status", "1");
+            List<String> columns = Arrays.asList(valueColumn, labelColumn);
+            return access.page(access.select(columns) + parts.sql + " ORDER BY " + access.column(valueColumn),
+                    parts.parameters, 0, limit + 1);
+        }
+    }
+
     private SqlParts where(TableAccess access, MasterDataQueryDTO condition) {
         if (condition == null) throw new ServiceException("主数据查询条件不能为空");
         SqlParts parts = normal(access);
@@ -346,7 +360,8 @@ public class MasterDataQueryRepository {
         parts.in(access.column("ID"), "categoryIds", condition.getCategoryIds());
         if (condition.getClassificationColumn() != null) {
             if (condition.getClassificationValues() == null) throw new ServiceException("分类筛选值缺失");
-            if (condition.getClassificationValues().size() > 500) throw new ServiceException("分类筛选范围超过500个节点，请选择更小范围");
+            if (condition.getClassificationValues().size() > 500)
+                throw new ServiceException("分类筛选范围超过500个节点，请选择更小范围", HttpStatus.WARN);
             parts.in(access.column(condition.getClassificationColumn()), "classificationValues", condition.getClassificationValues());
         }
         return parts;
