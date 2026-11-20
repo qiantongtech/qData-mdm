@@ -46,6 +46,14 @@
             <img src="@/assets/common/images/empty-state/empty-nodata.png" alt="" />
             <p>当前模型没有可维护的业务字段</p>
           </div>
+          <template v-if="isCreate">
+            <div class="h2-titles row-full">申请信息</div>
+            <qt-form-item label="申请原因" prop="$applyReason" class="row-full" :error="serverErrors.applyReason">
+              <el-input v-model="form.$applyReason" type="textarea" :rows="3" :maxlength="applyReasonMaxLength"
+                        show-word-limit :placeholder="`请输入本次新增${subject}的原因`"
+              />
+            </qt-form-item>
+          </template>
         </el-form>
 
         <div v-if="submodelsReady && hasSubmodels" class="h2-title row-full">子模型数据</div>
@@ -246,10 +254,12 @@ let submissionSnapshot = null
 let requestSerial = 0
 let validationSerial = 0
 
+const isCreate = computed(() => props.mode === 'create')
+const applyReasonMaxLength = 256
+const subject = computed(() => props.modelType === 'CATEGORY' ? '分类' : '主数据')
 const dialogTitle = computed(() => {
-  const subject = props.modelType === 'CATEGORY' ? '分类' : '主数据'
   const action = { update: '修改', copy: '新增', create: '新增' }[props.mode] || ''
-  return `${action}${subject}申请`
+  return `${action}${subject.value}申请`
 })
 const businessColumns = computed(() => {
   const columns = (definition.value?.columns || []).filter(column =>
@@ -308,6 +318,12 @@ const categoryIds = computed(() => {
 })
 const rules = computed(() => ({
   ...Object.fromEntries(businessColumns.value.map(column => [column.prop, getFieldRules(column)])),
+  ...(isCreate.value ? {
+    $applyReason: [
+      { required: true, whitespace: true, message: '请输入申请原因', trigger: 'blur' },
+      { max: applyReasonMaxLength, message: `申请原因不能超过 ${applyReasonMaxLength} 个字符`, trigger: 'blur' }
+    ]
+  } : {}),
   parentId: [{ validator: (_rule, value, callback) => {
     if (!value) return callback()
     const id = String(value)
@@ -356,6 +372,7 @@ function payload(changes, values) {
     mode: props.mode === 'update' ? 'UPDATE' : 'CREATE',
     recordId: props.mode === 'update' ? effectiveRecordId.value : null,
     parentId: props.modelType === 'CATEGORY' ? form.parentId : null,
+    ...(isCreate.value ? { applyReason: form.$applyReason.trim() } : {}),
     values,
     submodelChanges: changes
   }
@@ -423,6 +440,7 @@ async function initializeForm() {
   effectiveRecordId.value = props.recordId ? String(props.recordId) : ''
   Object.keys(form).forEach(key => delete form[key])
   form.parentId = props.parentId ? String(props.parentId) : ''
+  form.$applyReason = ''
   try {
     const response = await getMaintenanceFormConfig(props.instanceId, {
       modelId: props.modelId, modelVersionId: props.modelVersionId

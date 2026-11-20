@@ -24,7 +24,7 @@ public final class MasterStatusLabels {
     }
 
     public static String lifecycle(String status) {
-        if ("1".equals(status)) return "生效";
+        if ("1".equals(status)) return "有效";
         if ("2".equals(status)) return "冻结";
         if ("3".equals(status)) return "失效";
         if ("4".equals(status)) return "归档";
