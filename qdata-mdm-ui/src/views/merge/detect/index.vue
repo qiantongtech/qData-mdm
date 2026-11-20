@@ -199,7 +199,7 @@
                 link
                 type="primary"
                 icon="Edit"
-                :disabled="String(row.status) === '1'"
+                :disabled="row.enableStatus === 'ENABLED' || String(row.status) === '1'"
                 @click="openEdit(row)"
               >修改</el-button>
               <el-popover

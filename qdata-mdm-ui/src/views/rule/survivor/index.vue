@@ -164,6 +164,7 @@
                     link
                     type="primary"
                     icon="Edit"
+                    :disabled="row.validFlag === true"
                     @click="handleUpdate(row)"
                     v-hasPermi="['rule:rulesurvivor:edit']"
                 >修改</el-button>

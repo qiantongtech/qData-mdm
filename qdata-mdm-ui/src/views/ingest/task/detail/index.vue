@@ -289,7 +289,7 @@ const detailItems = computed(() => [
   {label: '描述', key: 'remark', span: 24, className: 'mt2 mb2'},
   {label: '调度周期', slot: 'schedule'},
   {
-    label: '责任人',
+    label: '负责人',
     value: [task.value.responsiblePersonName, task.value.responsiblePersonPhone].filter(Boolean).join(' / ') || '-',
   },
   {label: '创建时间', value: task.value.createTime, formatter: formatTaskTime},

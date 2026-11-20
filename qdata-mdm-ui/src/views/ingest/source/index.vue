@@ -118,6 +118,7 @@
               link
               type="primary"
               icon="Edit"
+              :disabled="String(row.validFlag ?? '1') === '1'"
               @click="handleUpdate(row)"
               v-hasPermi="['ingest:source:edit']"
           >

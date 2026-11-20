@@ -159,6 +159,7 @@
                   link
                   type="primary"
                   icon="Edit"
+                  :disabled="row.validFlag === true"
                   @click="handleUpdate(row)"
                   v-hasPermi="['rule:rulequality:edit']"
               >修改
