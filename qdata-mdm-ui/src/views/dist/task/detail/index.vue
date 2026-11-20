@@ -231,7 +231,7 @@
                                @click="rerunTask" v-hasPermi="['dist:task:edit']"
                     >
                       <template #icon>
-                        <span class="redistribute-icon" :style="{ maskImage: `url(${redistributeIcon})`, WebkitMaskImage: `url(${redistributeIcon})` }" />
+                        <svg-icon icon-class="redistribute"/>
                       </template>
                       重新分发
                     </el-button>
