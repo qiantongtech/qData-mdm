@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tech.qiantong.qdata.mdm.common.core.page.PageParam;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.domain.entity.SysUser;
 import tech.qiantong.qdata.mdm.system.service.ISysUserService;
 import tech.qiantong.qdata.mdm.quality.controller.admin.qualityIssueTaskLog.vo.QualityIssueTaskLogPageReqVO;
@@ -56,7 +57,7 @@ public class QualityIssueTaskLogServiceImpl extends ServiceImpl<QualityIssueTask
     @Override
     public PageResult<QualityIssueTaskLogDO> getQualityIssueTaskLogPage(QualityIssueTaskLogPageReqVO request) {
         if (request.getQualityIssueTaskId() == null) {
-            throw new ServiceException("请指定整改任务后查看处理记录");
+            throw new ServiceException("请指定整改任务后查看处理记录", HttpStatus.WARN);
         }
         qualityIssueTaskService.getQualityIssueTaskById(request.getQualityIssueTaskId());
         int pageNum = request.getPageNum() == null ? 1 : Math.max(1, request.getPageNum());
@@ -72,7 +73,7 @@ public class QualityIssueTaskLogServiceImpl extends ServiceImpl<QualityIssueTask
     public QualityIssueTaskLogDO getQualityIssueTaskLogById(Long id) {
         QualityIssueTaskLogDO entry = qualityIssueTaskLogMapper.selectById(id);
         if (entry == null) {
-            throw new ServiceException("处理记录不存在");
+            throw new ServiceException("处理记录不存在", HttpStatus.WARN);
         }
         qualityIssueTaskService.getQualityIssueTaskById(entry.getQualityIssueTaskId());
         fillHandlerPhones(Collections.singletonList(entry));

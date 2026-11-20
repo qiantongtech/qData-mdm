@@ -62,7 +62,7 @@ public class QualityTaskController extends BaseController {
     private IQualityTaskService qualityTaskService;
 
     @Operation(summary = "查询主数据质量任务列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytask:list')")
+    @PreAuthorize("@ss.hasPermi('quality:task:list')")
     @GetMapping("/list")
     public CommonResult<PageResult<QualityTaskRespVO>> list(@Valid QualityTaskPageReqVO qualityTask) {
         PageResult<QualityTaskDO> page = qualityTaskService.getQualityTaskPage(qualityTask);
@@ -70,7 +70,7 @@ public class QualityTaskController extends BaseController {
     }
 
     @Operation(summary = "导出主数据质量任务列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytask:export')")
+    @PreAuthorize("@ss.hasPermi('quality:task:export')")
     @Log(title = "主数据质量任务", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, QualityTaskPageReqVO exportReqVO) {
@@ -81,7 +81,7 @@ public class QualityTaskController extends BaseController {
     }
 
     @Operation(summary = "导入主数据质量任务列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytask:import')")
+    @PreAuthorize("@ss.hasPermi('quality:task:import')")
     @Log(title = "主数据质量任务", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
@@ -93,7 +93,7 @@ public class QualityTaskController extends BaseController {
     }
 
     @Operation(summary = "获取主数据质量任务详细信息")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytask:query')")
+    @PreAuthorize("@ss.hasPermi('quality:task:query')")
     @GetMapping(value = "/{id}")
     public CommonResult<QualityTaskRespVO> getInfo(@PathVariable("id") Long id) {
         QualityTaskDO qualityTaskDO = qualityTaskService.getQualityTaskById(id);
@@ -101,7 +101,7 @@ public class QualityTaskController extends BaseController {
     }
 
     @Operation(summary = "新增主数据质量任务")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytask:add')")
+    @PreAuthorize("@ss.hasPermi('quality:task:add')")
     @Log(title = "主数据质量任务", businessType = BusinessType.INSERT)
     @PostMapping
     public CommonResult<Long> add(@Valid @RequestBody QualityTaskSaveReqVO qualityTask) {
@@ -112,7 +112,7 @@ public class QualityTaskController extends BaseController {
     }
 
     @Operation(summary = "修改主数据质量任务")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytask:edit')")
+    @PreAuthorize("@ss.hasPermi('quality:task:edit')")
     @Log(title = "主数据质量任务", businessType = BusinessType.UPDATE)
     @PutMapping
     public CommonResult<Integer> edit(@Valid @RequestBody QualityTaskSaveReqVO qualityTask) {
@@ -123,7 +123,7 @@ public class QualityTaskController extends BaseController {
     }
 
     @Operation(summary = "删除主数据质量任务")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytask:remove')")
+    @PreAuthorize("@ss.hasPermi('quality:task:remove')")
     @Log(title = "主数据质量任务", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public CommonResult<Integer> remove(@PathVariable Long[] ids) {
