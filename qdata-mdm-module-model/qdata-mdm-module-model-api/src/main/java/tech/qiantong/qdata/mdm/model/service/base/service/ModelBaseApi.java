@@ -23,9 +23,13 @@ import tech.qiantong.qdata.mdm.model.base.dto.ModelBaseRespDTO;
 import java.util.Collection;
 import java.util.List;
 
-/** 向其他模块提供当前模型定义的展示信息，不加载字段、子模型或物化配置。 */
+/**
+ * 向其他模块提供当前模型定义的展示信息，不加载字段、子模型或物化配置。
+ */
 public interface ModelBaseApi {
 
-    /** 按 ID 批量查询模型、版本和归属位置；不存在或已删除的模型不返回。 */
+    /**
+     * 按 ID 批量查询模型、版本和归属位置；不存在或已删除的模型不返回。
+     */
     List<ModelBaseRespDTO> getModelBaseList(Collection<Long> modelIds);
 }

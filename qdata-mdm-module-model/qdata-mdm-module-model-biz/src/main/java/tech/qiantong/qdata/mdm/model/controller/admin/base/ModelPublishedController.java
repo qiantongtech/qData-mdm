@@ -28,7 +28,7 @@ import tech.qiantong.qdata.mdm.common.core.domain.CommonResult;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.model.controller.admin.base.vo.*;
-import tech.qiantong.qdata.mdm.model.service.base.IModelPublishService;
+import tech.qiantong.qdata.mdm.model.service.base.impl.ModelPublishedQueryService;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -44,7 +44,7 @@ public class ModelPublishedController extends BaseController {
 
     /** 读取成功发布的模型、字段、规则和物化信息。 */
     @Resource
-    private IModelPublishService modelPublishService;
+    private ModelPublishedQueryService publishedQueryService;
 
     /**
      * 按成功模型内容筛选，返回基本信息和发布版本，不附带字段或物化信息。
@@ -53,14 +53,14 @@ public class ModelPublishedController extends BaseController {
     @PreAuthorize("@ss.hasPermi('model:base:list')")
     @GetMapping("/list")
     public CommonResult<PageResult<ModelPublishedRespVO>> list(ModelPublishedPageReqVO request) {
-        return CommonResult.success(BeanUtils.toBean(modelPublishService.getPublishedModelPage(request), ModelPublishedRespVO.class));
+        return CommonResult.success(BeanUtils.toBean(publishedQueryService.getPublishedModelPage(request), ModelPublishedRespVO.class));
     }
 
     @Operation(summary = "查询已发布模型树")
     @PreAuthorize("@ss.hasPermi('model:base:list')")
     @GetMapping("/tree")
     public CommonResult<List<ModelTreeRespVO>> tree() {
-        return CommonResult.success(modelPublishService.getPublishedModelTree());
+        return CommonResult.success(publishedQueryService.getPublishedModelTree());
     }
 
     /**
@@ -70,7 +70,7 @@ public class ModelPublishedController extends BaseController {
     @PreAuthorize("@ss.hasPermi('model:base:query')")
     @GetMapping("/{id}")
     public CommonResult<ModelPublishedRespVO> getInfo(@PathVariable("id") Long id) {
-        return CommonResult.success(BeanUtils.toBean(modelPublishService.getPublishedModel(id), ModelPublishedRespVO.class));
+        return CommonResult.success(BeanUtils.toBean(publishedQueryService.getPublishedModel(id), ModelPublishedRespVO.class));
     }
 
     /**
@@ -80,7 +80,7 @@ public class ModelPublishedController extends BaseController {
     @PreAuthorize("@ss.hasPermi('model:base:query')")
     @GetMapping("/{id}/structure")
     public CommonResult<ModelPublishedStructureRespVO> getStructure(@PathVariable("id") Long id) {
-        return CommonResult.success(BeanUtils.toBean(modelPublishService.getPublishedModelStructure(id), ModelPublishedStructureRespVO.class));
+        return CommonResult.success(BeanUtils.toBean(publishedQueryService.getPublishedModelStructure(id), ModelPublishedStructureRespVO.class));
     }
 
     /**
@@ -90,7 +90,7 @@ public class ModelPublishedController extends BaseController {
     @PreAuthorize("@ss.hasPermi('model:base:query')")
     @GetMapping("/{id}/materialization")
     public CommonResult<ModelPublishedMaterializationRespVO> getMaterialization(@PathVariable("id") Long id) {
-        return CommonResult.success(BeanUtils.toBean(modelPublishService.getPublishedModelMaterialization(id), ModelPublishedMaterializationRespVO.class));
+        return CommonResult.success(BeanUtils.toBean(publishedQueryService.getPublishedModelMaterialization(id), ModelPublishedMaterializationRespVO.class));
     }
 
     /**
@@ -101,6 +101,6 @@ public class ModelPublishedController extends BaseController {
     @GetMapping("/{id}/rules")
     public CommonResult<ModelPublishedRulesRespVO> getRules(@PathVariable("id") Long id,
                                                             @RequestParam("ruleCategory") String ruleCategory) {
-        return CommonResult.success(BeanUtils.toBean(modelPublishService.getPublishedModelRules(id, ruleCategory), ModelPublishedRulesRespVO.class));
+        return CommonResult.success(BeanUtils.toBean(publishedQueryService.getPublishedModelRules(id, ruleCategory), ModelPublishedRulesRespVO.class));
     }
 }

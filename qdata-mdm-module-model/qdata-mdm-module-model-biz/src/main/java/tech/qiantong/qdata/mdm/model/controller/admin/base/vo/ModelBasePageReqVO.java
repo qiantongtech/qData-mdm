@@ -61,7 +61,7 @@ public class ModelBasePageReqVO extends PageParam {
     @Schema(hidden = true)
     private List<Long> scopeLayerIds;
 
-    @Schema(description = "模型类型；0：普通模型，1：分类模型", example = "")
+    @Schema(description = "模型类型", example = "")
     private String type;
 
     @Schema(description = "版本id", example = "")

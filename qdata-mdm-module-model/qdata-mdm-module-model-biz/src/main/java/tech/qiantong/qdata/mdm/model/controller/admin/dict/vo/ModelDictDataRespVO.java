@@ -37,13 +37,16 @@ public class ModelDictDataRespVO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ID")
+    @Excel(name = "编号")
     @Schema(description = "ID")
     private Long id;
 
-    @Excel(name = "参考数据类型ID")
     @Schema(description = "参考数据类型ID", example = "")
     private Long typeId;
+
+    @Excel(name = "参考数据类型编码")
+    @Schema(description = "参考数据类型编码")
+    private String typeCode;
 
     @Excel(name = "项编码")
     @Schema(description = "项编码", example = "")
@@ -57,25 +60,20 @@ public class ModelDictDataRespVO implements Serializable {
     @Schema(description = "排序号", example = "")
     private Long sortOrder;
 
-    @Excel(name = "创建人")
     @Schema(description = "创建人", example = "")
     private String createBy;
 
-    @Excel(name = "创建时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间", example = "")
     private Date createTime;
 
-    @Excel(name = "更新人")
     @Schema(description = "更新人", example = "")
     private String updateBy;
 
-    @Excel(name = "更新时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "更新时间", example = "")
     private Date updateTime;
 
-    @Excel(name = "逻辑删除标志：0未删除，1已删除")
     @Schema(description = "逻辑删除标志：0未删除，1已删除", example = "")
     private Boolean delFlag;
 
@@ -83,15 +81,12 @@ public class ModelDictDataRespVO implements Serializable {
     @Schema(description = "描述", example = "")
     private String description;
 
-    @Excel(name = "是否有效；0：无效，1：有效")
     @Schema(description = "是否有效；0：无效，1：有效", example = "")
     private Boolean validFlag;
 
-    @Excel(name = "创建人ID")
     @Schema(description = "创建人ID", example = "")
     private Long creatorId;
 
-    @Excel(name = "更新人ID")
     @Schema(description = "更新人ID", example = "")
     private Long updaterId;
 

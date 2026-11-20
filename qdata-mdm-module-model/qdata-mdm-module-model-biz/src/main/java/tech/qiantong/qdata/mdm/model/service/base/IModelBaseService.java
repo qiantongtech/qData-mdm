@@ -42,7 +42,9 @@ import java.util.List;
  */
 public interface IModelBaseService extends IService<ModelBaseDO> {
 
-    /** 按 ID 批量读取模型展示信息，包含当前版本、正式版本和归属位置。 */
+    /**
+     * 按 ID 批量读取模型展示信息，包含当前版本、正式版本和归属位置。
+     */
     List<ModelBaseDO> getModelBaseListByIds(Collection<Long> modelIds);
 
     /**
@@ -68,10 +70,6 @@ public interface IModelBaseService extends IService<ModelBaseDO> {
      */
     int updateModelBase(ModelBaseSaveReqVO updateReqVO);
 
-    /**
-     * 校验主数据模型编码是否唯一
-     */
-    boolean checkCodeUnique(String code, Long id);
 
     /**
      * 发布模型当前版本，只有物化和正式保存全部成功才返回成功结果。

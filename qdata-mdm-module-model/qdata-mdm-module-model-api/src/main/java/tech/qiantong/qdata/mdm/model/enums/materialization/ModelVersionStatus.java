@@ -66,6 +66,6 @@ public enum ModelVersionStatus {
                 return value;
             }
         }
-        throw new IllegalArgumentException("未识别的模型版本状态：" + status);
+        throw new IllegalArgumentException();
     }
 }

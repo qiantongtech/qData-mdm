@@ -43,10 +43,14 @@ public interface ModelPublishedApi {
      */
     ModelPublishedRespDTO getPublishedModel(Long modelId);
 
-    /** 按当前成功实例定位主模型ID，不读取快照或物化信息。 */
+    /**
+     * 按当前成功实例定位主模型ID，不读取快照或物化信息。
+     */
     Long getPublishedModelId(Long instanceId);
 
-    /** 仅核对当前可用的成功实例和版本，不读取快照、执行计划或域名称。 */
+    /**
+     * 仅核对当前可用的成功实例和版本，不读取快照、执行计划或域名称。
+     */
     boolean isPublishedInstance(Long modelId, Long instanceId, Long versionId);
 
     /**
@@ -57,7 +61,9 @@ public interface ModelPublishedApi {
      */
     ModelPublishedStructureRespDTO getPublishedModelStructure(Long modelId);
 
-    /** 在同一次结构查询中按需附带权威主表及列绑定，不加载完整执行计划。 */
+    /**
+     * 在同一次结构查询中按需附带权威主表及列绑定，不加载完整执行计划。
+     */
     ModelPublishedStructureRespDTO getPublishedModelStructure(Long modelId, boolean includeAuthorityTable);
 
     /**

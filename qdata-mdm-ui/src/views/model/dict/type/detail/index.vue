@@ -45,6 +45,7 @@
           <dict-data-index
               v-if="currentTypeId != null"
               :type-id="currentTypeId"
+              :type-code="dataDetail.code"
               @items-change="usageRef?.refreshList()"
           />
         </qt-tab-pane>

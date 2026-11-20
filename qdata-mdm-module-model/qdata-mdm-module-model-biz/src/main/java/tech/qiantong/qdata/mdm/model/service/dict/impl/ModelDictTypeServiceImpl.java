@@ -23,9 +23,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
-import tech.qiantong.qdata.mdm.common.utils.StringUtils;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.model.controller.admin.dict.vo.ModelDictTypePageReqVO;
 import tech.qiantong.qdata.mdm.model.controller.admin.dict.vo.ModelDictTypeRespVO;
@@ -38,7 +38,11 @@ import tech.qiantong.qdata.mdm.model.service.base.IModelColumnService;
 import tech.qiantong.qdata.mdm.model.service.dict.IModelDictDataService;
 import tech.qiantong.qdata.mdm.model.service.dict.IModelDictTypeService;
 
+import tech.qiantong.qdata.mdm.model.util.ModelCodeGuard;
+
 import javax.annotation.Resource;
+import javax.validation.ConstraintViolation;
+import javax.validation.Validator;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,6 +58,9 @@ import java.util.stream.Collectors;
 public class ModelDictTypeServiceImpl extends ServiceImpl<ModelDictTypeMapper, ModelDictTypeDO> implements IModelDictTypeService {
     @Resource
     private ModelDictTypeMapper modelDictTypeMapper;
+
+    @Resource
+    private Validator validator;
 
     @Resource
     private IModelColumnService iModelColumnService;
@@ -74,27 +81,39 @@ public class ModelDictTypeServiceImpl extends ServiceImpl<ModelDictTypeMapper, M
     }
 
     @Override
-    public Long createModelDictType(ModelDictTypeSaveReqVO createReqVO) {
-        ModelDictTypeDO dictType = BeanUtils.toBean(createReqVO, ModelDictTypeDO.class);
-        modelDictTypeMapper.insert(dictType);
-        return dictType.getId();
+    public Long createModelDictType(ModelDictTypeSaveReqVO request) {
+        ModelCodeGuard.DICT_TYPE.lockTransaction();
+        validateCode(request);
+        ModelDictTypeDO type = BeanUtils.toBean(request, ModelDictTypeDO.class);
+        ModelCodeGuard.DICT_TYPE.write(type.getCode(), () -> modelDictTypeMapper.insert(type));
+        return type.getId();
     }
 
     @Override
-    public int updateModelDictType(ModelDictTypeSaveReqVO updateReqVO) {
-        // 相关校验
-
-        // 更新参考数据
-        ModelDictTypeDO updateObj = BeanUtils.toBean(updateReqVO, ModelDictTypeDO.class);
-        return modelDictTypeMapper.updateById(updateObj);
+    public int updateModelDictType(ModelDictTypeSaveReqVO request) {
+        ModelCodeGuard.DICT_TYPE.lockTransaction();
+        validateCode(request);
+        ModelDictTypeDO type = BeanUtils.toBean(request, ModelDictTypeDO.class);
+        return ModelCodeGuard.DICT_TYPE.write(type.getCode(), () -> modelDictTypeMapper.updateById(type));
     }
 
-    @Override
-    public boolean checkCodeUnique(String code, Long id) {
-        QueryWrapper<ModelDictTypeDO> wrapper = new QueryWrapper<>();
-        wrapper.eq("code", code);
-        if (id != null) wrapper.ne("id", id);
-        return modelDictTypeMapper.selectCount(wrapper) == 0;
+    private void validateCode(ModelDictTypeSaveReqVO request) {
+        String code = normalizeCode(request.getCode());
+        request.setCode(code);
+        if (modelDictTypeMapper.selectCount(codeQuery(code).ne(request.getId() != null, "id", request.getId())) > 0) {
+            throw ModelCodeGuard.DICT_TYPE.duplicateCode(code);
+        }
+    }
+
+    private String normalizeCode(String value) {
+        String code = value == null ? "" : value.trim();
+        if (code.isEmpty()) throw new ServiceException("参考数据编码不能为空", HttpStatus.WARN);
+        if (code.length() > 64) throw new ServiceException("参考数据编码不能超过64个字符", HttpStatus.WARN);
+        return code;
+    }
+
+    private QueryWrapper<ModelDictTypeDO> codeQuery(String code) {
+        return new QueryWrapper<ModelDictTypeDO>().apply("LOWER(TRIM(code)) = {0}", code.toLowerCase(Locale.ROOT));
     }
 
     @Override
@@ -148,72 +167,56 @@ public class ModelDictTypeServiceImpl extends ServiceImpl<ModelDictTypeMapper, M
     }
 
 
-    /**
-     * 导入参考数据数据
-     *
-     * @param importExcelList 参考数据数据列表
-     * @param isUpdateSupport 是否更新支持，如果已存在，则进行更新数据
-     * @param operName        操作用户
-     * @return 结果
-     */
     @Override
-    public String importModelDictType(List<ModelDictTypeRespVO> importExcelList, boolean isUpdateSupport, String operName) {
-        if (StringUtils.isNull(importExcelList) || importExcelList.isEmpty()) {
-            throw new ServiceException("导入数据不能为空！");
-        }
+    public String importModelDictType(List<ModelDictTypeRespVO> rows, boolean updateSupport, String operName) {
+        ModelCodeGuard.DICT_TYPE.lockTransaction();
+        if (rows == null || rows.isEmpty()) throw new ServiceException("导入数据不能为空", HttpStatus.WARN);
 
-        int successNum = 0;
-        int failureNum = 0;
-        List<String> successMessages = new ArrayList<>();
-        List<String> failureMessages = new ArrayList<>();
-
-        for (ModelDictTypeRespVO respVO : importExcelList) {
+        Set<String> codes = new HashSet<>();
+        Set<Long> updatedIds = new HashSet<>();
+        int updated = 0;
+        Date now = new Date();
+        for (int index = 0; index < rows.size(); index++) {
             try {
-                ModelDictTypeDO modelDictTypeDO = BeanUtils.toBean(respVO, ModelDictTypeDO.class);
-                Long modelDictTypeId = respVO.getId();
-                if (isUpdateSupport) {
-                    if (modelDictTypeId != null) {
-                        ModelDictTypeDO existingModelDictType = modelDictTypeMapper.selectById(modelDictTypeId);
-                        if (existingModelDictType != null) {
-                            modelDictTypeMapper.updateById(modelDictTypeDO);
-                            successNum++;
-                            successMessages.add("数据更新成功，ID为 " + modelDictTypeId + " 的参考数据记录。");
-                        } else {
-                            failureNum++;
-                            failureMessages.add("数据更新失败，ID为 " + modelDictTypeId + " 的参考数据记录不存在。");
-                        }
-                    } else {
-                        failureNum++;
-                        failureMessages.add("数据更新失败，某条记录的ID不存在。");
-                    }
+                ModelDictTypeRespVO row = rows.get(index);
+                String code = normalizeCode(row.getCode());
+                if (!codes.add(code.toLowerCase(Locale.ROOT))) throw new ServiceException("文件中参考数据编码重复", HttpStatus.WARN);
+
+                ModelDictTypeSaveReqVO request = new ModelDictTypeSaveReqVO();
+                request.setCode(code);
+                request.setName(row.getName());
+                request.setDescription(row.getDescription());
+                request.setValidFlag(row.getValidFlag());
+                Set<ConstraintViolation<ModelDictTypeSaveReqVO>> violations = validator.validate(request);
+                if (!violations.isEmpty()) throw new ServiceException(violations.iterator().next().getMessage());
+                if (updateSupport) request.setId(resolveImportId(row.getId(), code));
+                if (request.getId() == null) {
+                    if (request.getValidFlag() == null) request.setValidFlag(Boolean.TRUE);
+                    request.setCreateBy(operName);
+                    request.setCreateTime(now);
+                    createModelDictType(request);
                 } else {
-                    QueryWrapper<ModelDictTypeDO> queryWrapper = new QueryWrapper<>();
-                    queryWrapper.eq("id", modelDictTypeId);
-                    ModelDictTypeDO existingModelDictType = modelDictTypeMapper.selectOne(queryWrapper);
-                    if (existingModelDictType == null) {
-                        modelDictTypeMapper.insert(modelDictTypeDO);
-                        successNum++;
-                        successMessages.add("数据插入成功，ID为 " + modelDictTypeId + " 的参考数据记录。");
-                    } else {
-                        failureNum++;
-                        failureMessages.add("数据插入失败，ID为 " + modelDictTypeId + " 的参考数据记录已存在。");
-                    }
+                    if (!updatedIds.add(request.getId())) throw new ServiceException("文件中同一参考数据记录重复", HttpStatus.WARN);
+                    request.setUpdateBy(operName);
+                    request.setUpdateTime(now);
+                    if (updateModelDictType(request) != 1) throw new ServiceException("参考数据记录不存在", HttpStatus.WARN);
+                    updated++;
                 }
-            } catch (Exception e) {
-                failureNum++;
-                String errorMsg = "数据导入失败，错误信息：" + e.getMessage();
-                failureMessages.add(errorMsg);
-                log.error(errorMsg, e);
+            } catch (ServiceException ex) {
+                throw new ServiceException("导入第" + (index + 1) + "条数据失败，" + ex.getMessage());
             }
         }
-        StringBuilder resultMsg = new StringBuilder();
-        if (failureNum > 0) {
-            resultMsg.append("很抱歉，导入失败！共 ").append(failureNum).append(" 条数据格式不正确，错误如下：");
-            resultMsg.append("<br/>").append(String.join("<br/>", failureMessages));
-            throw new ServiceException(resultMsg.toString());
-        } else {
-            resultMsg.append("恭喜您，数据已全部导入成功！共 ").append(successNum).append(" 条。");
+        return "导入成功，新增" + (rows.size() - updated) + "条，更新" + updated + "条";
+    }
+
+    private Long resolveImportId(Long id, String code) {
+        if (id != null) {
+            if (modelDictTypeMapper.selectById(id) == null) throw new ServiceException("参考数据记录不存在", HttpStatus.WARN);
+            return id;
         }
-        return resultMsg.toString();
+        // 旧版导出没有 ID，使用唯一编码定位原记录。
+        List<ModelDictTypeDO> matches = modelDictTypeMapper.selectList(codeQuery(code).select("id"));
+        if (matches.size() > 1) throw new ServiceException("参考数据编码对应多条记录，请使用编号更新");
+        return matches.isEmpty() ? null : matches.get(0).getId();
     }
 }

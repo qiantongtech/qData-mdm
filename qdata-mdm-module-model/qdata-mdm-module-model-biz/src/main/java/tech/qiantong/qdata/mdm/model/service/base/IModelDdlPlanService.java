@@ -46,7 +46,8 @@ public interface IModelDdlPlanService {
      *
      * <p>
      * 统一发布入口发现未完成实例时调用；先查旧效果，满足恢复条件才发送下一次尝试，不重复发送已生效SQL。
-     * @param modelId 主模型ID，用于核对实例归属
+     *
+     * @param modelId    主模型ID，用于核对实例归属
      * @param instanceId 要恢复的发布实例ID
      * @return 从平台记录重新读取的发布上下文，调用方应检查其中的执行状态
      */

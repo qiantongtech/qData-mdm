@@ -22,6 +22,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.model.domain.ModelMaterializedColumnDefinition;
 import tech.qiantong.qdata.mdm.model.domain.ModelMaterializedIndexDefinition;
@@ -131,7 +132,7 @@ public class ModelSchemaServiceImpl implements IModelSchemaService {
             Set<String> tableNames = new HashSet<>();
             for (ModelMaterializedTableDefinition table : result.getTables()) {
                 if (!tableNames.add(table.getTableName())) {
-                    throw new ServiceException("来源、权威或主子模型计算出的物理表名重复：" + table.getTableName());
+                    throw new ServiceException("来源、权威或主子模型计算出的物理表名重复：" + table.getTableName(), HttpStatus.WARN);
                 }
             }
             // 主子模型和两套表全部构建完成后再放入上下文，后续比较始终拿到完整的一组表。
@@ -407,7 +408,7 @@ public class ModelSchemaServiceImpl implements IModelSchemaService {
         table.setColumns(new ArrayList<>(current.values()));
         for (ModelMaterializedColumnDefinition column : table.getColumns()) {
             if (!names.add(column.getColumnName())) {
-                throw new ServiceException("业务字段不能复用仍在数据库中的旧列名：" + column.getColumnName());
+                throw new ServiceException("业务字段不能复用仍在数据库中的旧列名：" + column.getColumnName(), HttpStatus.WARN);
             }
             if (column.getColumnPosition() == null) {
                 column.setColumnPosition(++position);

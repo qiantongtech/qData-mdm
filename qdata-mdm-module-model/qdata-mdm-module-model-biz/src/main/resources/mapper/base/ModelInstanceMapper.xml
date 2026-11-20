@@ -53,14 +53,25 @@
         <include refid="publishedInstanceWhere"/>
     </sql>
 
+    <sql id="publishedCollectionAvailability">
+        AND I.DATASOURCE_ID &gt; 0
+        AND EXISTS (
+            SELECT 1 FROM INGEST_DATASOURCE D
+            WHERE D.ID = I.DATASOURCE_ID AND D.DEL_FLAG = '0'
+        )
+        AND I.PUBLISHED_TIME IS NOT NULL
+        AND JSON_VALUE(I.MODEL_SNAPSHOT, '$.formatVersion' RETURNING DECIMAL(20, 0) NULL ON ERROR) = 1
+    </sql>
+
     <!-- 显式指定字符串长度，避免快照说明被默认返回长度截断。 -->
     <sql id="publishedSnapshotString">
-        JSON_VALUE(I.MODEL_SNAPSHOT, '$.model.${property}' RETURNING VARCHAR(4000))
+        JSON_VALUE(I.MODEL_SNAPSHOT, '$.model.${property}' RETURNING VARCHAR(4000) NULL ON ERROR)
     </sql>
 
     <!-- property仅来自下方固定include属性；所有用户输入均通过绑定参数传入。 -->
     <sql id="publishedPageSource">
         <include refid="publishedInstanceWhere"/>
+        <include refid="publishedCollectionAvailability"/>
         <if test="req.id != null">AND M.ID = #{req.id}</if>
         <if test="req.versionId != null">AND I.MODEL_VERSION_ID = #{req.versionId}</if>
         <if test="req.code != null and req.code.trim().length() > 0">
@@ -80,10 +91,10 @@
             AND <include refid="publishedSnapshotString"><property name="property" value="type"/></include> = #{typeFilter}
         </if>
         <if test="req.projectId != null">
-            AND CAST(JSON_VALUE(I.MODEL_SNAPSHOT, '$.model.projectId') AS DECIMAL(20, 0)) = #{req.projectId}
+            AND JSON_VALUE(I.MODEL_SNAPSHOT, '$.model.projectId' RETURNING DECIMAL(20, 0) NULL ON ERROR) = #{req.projectId}
         </if>
         <if test="req.layerId != null">
-            AND CAST(JSON_VALUE(I.MODEL_SNAPSHOT, '$.model.layerId') AS DECIMAL(20, 0)) = #{req.layerId}
+            AND JSON_VALUE(I.MODEL_SNAPSHOT, '$.model.layerId' RETURNING DECIMAL(20, 0) NULL ON ERROR) = #{req.layerId}
         </if>
     </sql>
 
@@ -148,14 +159,19 @@
         <include refid="publishedInstanceQuery"/>
     </select>
 
-    <!-- 当前版本只判断可用性；实际返回内容始终来自成功指针对应的配置，不读取草稿名称等属性。 -->
-    <select id="selectPublishedInstances" resultMap="ModelInstanceResult" fetchSize="100">
+    <select id="selectPublishedInstance" resultMap="ModelInstanceResult">
         SELECT I.ID, I.MODEL_ID, I.MODEL_VERSION_ID, I.PUBLISHED_TIME, I.MODEL_SNAPSHOT, I.DATASOURCE_ID
         <if test="includeMaterialization">
             , I.STRUCTURE_FORMAT_VERSION
         </if>
         <include refid="publishedInstanceSource"/>
-        <if test="modelId != null">AND M.ID = #{modelId}</if>
+        AND M.ID = #{modelId}
+    </select>
+
+    <select id="scanPublishedInstances" resultMap="ModelInstanceResult" fetchSize="100">
+        SELECT I.ID, I.MODEL_ID, I.MODEL_VERSION_ID, I.PUBLISHED_TIME, I.MODEL_SNAPSHOT, I.DATASOURCE_ID
+        <include refid="publishedInstanceSource"/>
+        <include refid="publishedCollectionAvailability"/>
         ORDER BY M.ID ASC
     </select>
 

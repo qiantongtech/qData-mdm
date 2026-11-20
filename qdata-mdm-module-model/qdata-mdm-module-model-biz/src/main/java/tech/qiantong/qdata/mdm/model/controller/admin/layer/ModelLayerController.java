@@ -108,8 +108,6 @@ public class ModelLayerController extends BaseController {
     @Log(title = "模型目录层级", businessType = BusinessType.INSERT)
     @PostMapping
     public CommonResult<Long> add(@Valid @RequestBody ModelLayerSaveReqVO modelLayer) {
-        if (!modelLayerService.checkCodeUnique(modelLayer.getCode(), null))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "新增模型目录层级'" + modelLayer.getCode() + "'失败，编码已存在");
         modelLayer.setCreatorId(getUserId());
         modelLayer.setCreateBy(getNickName());
         modelLayer.setCreateTime(DateUtil.date());
@@ -121,8 +119,6 @@ public class ModelLayerController extends BaseController {
     @Log(title = "模型目录层级", businessType = BusinessType.UPDATE)
     @PutMapping
     public CommonResult<Integer> edit(@Valid @RequestBody ModelLayerSaveReqVO modelLayer) {
-        if (!modelLayerService.checkCodeUnique(modelLayer.getCode(), modelLayer.getId()))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "修改模型目录层级'" + modelLayer.getCode() + "'失败，编码已存在");
         modelLayer.setUpdatorId(getUserId());
         modelLayer.setUpdateBy(getNickName());
         modelLayer.setUpdateTime(DateUtil.date());

@@ -164,6 +164,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     private MasterChangeImportMapper importMapper;
 
     // 当前登录人的申请查询。
+
     /**
      * 分页查询当前登录人的已提交申请。
      *
@@ -211,8 +212,8 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
             models = myPublishedModels(changeRequestMapper.selectMyRequestModelIds(applicantId));
             final String keyword = search.toLowerCase(Locale.ROOT);
             List<Long> matchedIds = models.values().stream().filter(model ->
-                    (model.getName() != null && model.getName().toLowerCase(Locale.ROOT).contains(keyword))
-                    || (model.getCode() != null && model.getCode().toLowerCase(Locale.ROOT).contains(keyword)))
+                            (model.getName() != null && model.getName().toLowerCase(Locale.ROOT).contains(keyword))
+                                    || (model.getCode() != null && model.getCode().toLowerCase(Locale.ROOT).contains(keyword)))
                     .map(ModelPublishedRespDTO::getId).collect(java.util.stream.Collectors.toList());
             List<List<Long>> groups = new ArrayList<>();
             for (int offset = 0; offset < matchedIds.size(); offset += 500) {
@@ -286,7 +287,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         String search = submissionTrim(value);
         if (search.length() > 100) throw new ServiceException(label + "不能超过100字");
         return search.isEmpty() ? null : "%" + search.toLowerCase(Locale.ROOT)
-                .replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+                                               .replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
     }
 
     /**
@@ -454,7 +455,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         SysUser user = sysUserService.selectUserById(applicantId);
         String applicantName = user == null ? source.getApplicantName()
                 : (user.getNickName() == null || user.getNickName().trim().isEmpty()
-                    ? user.getUserName() : user.getNickName());
+                   ? user.getUserName() : user.getNickName());
         String requestNo = submissionRequestNo();
         MasterChangeRequestDO request = new MasterChangeRequestDO();
         request.setRequestNo(requestNo);
@@ -522,10 +523,12 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     private static final Set<String> APPROVAL_CHANGE_TYPES = new HashSet<>(Arrays.asList(
             "CREATE", "UPDATE", "BATCH_UPDATE", "BATCH_IMPORT", "STATUS_CHANGE", "VERSION_RESTORE"));
 
-    /** 仅返回当前记录实际关联的直接维护申请，批量申请用 EXISTS 去重。 */
+    /**
+     * 仅返回当前记录实际关联的直接维护申请，批量申请用 EXISTS 去重。
+     */
     @Override
     public MasterRecordRequestPageRespVO getRecordApprovalPage(Long instanceId, Long masterDataId,
-                                                                  MasterChangePageReqVO reqVO) {
+                                                               MasterChangePageReqVO reqVO) {
         Long modelId = approvalCheckedRecordModelId(instanceId, masterDataId);
         int page = reqVO == null || reqVO.getPageNum() == null ? 1 : Math.max(1, reqVO.getPageNum());
         int size = reqVO == null || reqVO.getPageSize() == null ? 10
@@ -559,7 +562,9 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         }
     }
 
-    /** 返回申请头信息，但申请明细严格限定为当前主数据，避免批量申请泄露其他记录。 */
+    /**
+     * 返回申请头信息，但申请明细严格限定为当前主数据，避免批量申请泄露其他记录。
+     */
     @Override
     public MasterChangeRequestDetailRespVO getRecordApprovalDetail(Long instanceId, Long masterDataId, Long requestId) {
         if (requestId == null || requestId <= 0) throw new ServiceException("审批申请ID格式无效");
@@ -598,7 +603,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
      * 分页查询当前模型的维护审批申请。
      *
      * @param instanceId 模型物化实例 ID
-     * @param req 查询参数
+     * @param req        查询参数
      * @return 当前模型的审批申请分页列表及统计信息
      */
     @Override
@@ -667,7 +672,9 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         }
     }
 
-    /** 分类分支记录 ID 每 500 个一批，避免单个 IN 参数过多。 */
+    /**
+     * 分类分支记录 ID 每 500 个一批，避免单个 IN 参数过多。
+     */
     private List<List<Long>> approvalBatches(Set<Long> recordIds) {
         List<Long> ids = new ArrayList<>(recordIds);
         List<List<Long>> result = new ArrayList<>();
@@ -682,7 +689,9 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         return result;
     }
 
-    /** 只查询当前页申请的有效明细，避免逐行读取详情造成 N+1 查询。 */
+    /**
+     * 只查询当前页申请的有效明细，避免逐行读取详情造成 N+1 查询。
+     */
     Map<Long, String> pageTargetSummaries(List<MasterChangeRequestApprovalDTO> requests) {
         if (requests.isEmpty()) return Collections.emptyMap();
         List<Long> ids = new ArrayList<>();
@@ -705,7 +714,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
      * 查询当前模型中的指定申请详情。
      *
      * @param instanceId 模型物化实例 ID
-     * @param requestId 变更申请 ID
+     * @param requestId  变更申请 ID
      * @return 申请详情及有效申请明细
      */
     @Override
@@ -815,21 +824,22 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     // 单条维护申请预校验
+
     /**
      * 只读校验单条维护申请。
      *
      * @param instanceId 模型物化实例 ID
-     * @param request 业务请求参数
+     * @param request    业务请求参数
      * @return 校验结果及问题明细
      */
     @Override
     public MasterChangeValidateRespVO validateMaintenance(Long instanceId,
-            MasterChangeRequestSaveReqVO request) {
+                                                          MasterChangeRequestSaveReqVO request) {
         return validateMaintenance(instanceId, request, true);
     }
 
     private MasterChangeValidateRespVO validateMaintenance(Long instanceId,
-            MasterChangeRequestSaveReqVO request, boolean allowUnassignedAutomatic) {
+                                                           MasterChangeRequestSaveReqVO request, boolean allowUnassignedAutomatic) {
         if (request == null) throw new ServiceException("申请内容不能为空");
         MasterModelRespDTO model = metadataService.getModel(instanceId);
         MasterChangeValidateRespVO response = new MasterChangeValidateRespVO();
@@ -909,7 +919,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private void maintenanceValidateLifecycle(MasterModelRespDTO model, Long instanceId,
-            MasterChangeRequestSaveReqVO request, Map<String, String> errors) {
+                                              MasterChangeRequestSaveReqVO request, Map<String, String> errors) {
         Long recordId = maintenanceParseId(request.getRecordId());
         if (recordId == null) {
             errors.put("recordId", "主数据ID格式无效");
@@ -920,7 +930,8 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
             }
             Long pending = changeRequestItemService.getPendingCountForRecord(
                     model.getModelId(), recordId);
-            if (pending != null && pending > 0) errors.put("recordId", pendingMaintenanceMessage(model.getModelId(), recordId));
+            if (pending != null && pending > 0)
+                errors.put("recordId", pendingMaintenanceMessage(model.getModelId(), recordId));
         }
         if (request.getValues() != null && !request.getValues().isEmpty()) {
             errors.put("values", "状态申请不能修改业务字段");
@@ -937,7 +948,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private void maintenanceValidateParent(MasterModelRespDTO model, Long instanceId, String parent,
-            Long recordId, Map<String, String> errors) {
+                                           Long recordId, Map<String, String> errors) {
         if (!"CATEGORY".equals(model.getModelType())) {
             if (!maintenanceTrim(parent).isEmpty()) errors.put("parentId", "普通模型不能设置父级节点");
             return;
@@ -1016,7 +1027,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private MasterChangeBatchValidateRespVO validateBatch(Long instanceId,
-            MasterChangeRequestBatchSaveReqVO request, Long applicantId) {
+                                                          MasterChangeRequestBatchSaveReqVO request, Long applicantId) {
         if (request == null) throw new ServiceException("批量申请内容不能为空");
         maintenanceValidator.validateApplicant(applicantId, request.getMode());
         MasterModelRespDTO model = metadataService.getModel(instanceId);
@@ -1043,7 +1054,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private void batchValidateSelected(Long instanceId, MasterModelRespDTO model,
-            MasterChangeRequestBatchSaveReqVO request, String reason, MasterChangeBatchValidateRespVO result) {
+                                       MasterChangeRequestBatchSaveReqVO request, String reason, MasterChangeBatchValidateRespVO result) {
         List<String> ids = request.getRecordIds();
         if (ids == null || ids.isEmpty()) {
             result.getErrors().put("recordIds", "请选择至少一条主数据");
@@ -1110,8 +1121,8 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private void batchValidateImport(Long instanceId, MasterModelRespDTO model,
-            MasterChangeRequestBatchSaveReqVO request, String reason, Long applicantId,
-            MasterChangeBatchValidateRespVO result) {
+                                     MasterChangeRequestBatchSaveReqVO request, String reason, Long applicantId,
+                                     MasterChangeBatchValidateRespVO result) {
         List<MasterChangeRequestBatchSaveReqVO.ImportRow> rows = request.getRows();
         if (rows == null || rows.isEmpty()) {
             result.getErrors().put("rows", "导入数据不能为空");
@@ -1154,7 +1165,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         for (int i = 0; i < rows.size(); i++) {
             MasterChangeRequestBatchSaveReqVO.ImportRow source = rows.get(i);
             MasterChangeBatchValidateRespVO.RowResult row = batchNewRow(source != null && source.getRowNo() != null
-                    ? source.getRowNo() : i + 2, null,
+                            ? source.getRowNo() : i + 2, null,
                     updateOnly ? "SKIP" : "CREATE");
             result.getRows().add(row);
             MasterChangeBatchValidateRespVO.RowResult firstSource = sourceRows.putIfAbsent(row.getRowNo(), row);
@@ -1163,7 +1174,8 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
                 firstSource.getErrors().put("row", "文件行号重复，请重新上传文件");
                 row.getErrors().put("row", "文件行号重复，请重新上传文件");
             }
-            if (result.getErrors().containsKey("permission")) row.getErrors().put("permission", result.getErrors().get("permission"));
+            if (result.getErrors().containsKey("permission"))
+                row.getErrors().put("permission", result.getErrors().get("permission"));
             if (source == null) {
                 row.getErrors().put("values", "导入行不能为空");
                 continue;
@@ -1252,7 +1264,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
                     if (row.getErrors().isEmpty() && "UPDATE".equals(row.getOperation())
                             && !batchHasActualChange(model, original, values)
                             && (source.getParentId() == null || batchTrim(source.getParentId())
-                                    .equals(batchTrim(submissionValue(original.get("CATEGORY_ID")))))) {
+                            .equals(batchTrim(submissionValue(original.get("CATEGORY_ID")))))) {
                         row.setOperation("SKIP");
                         row.setMessage("导入值与现有数据一致，不处理");
                     }
@@ -1267,7 +1279,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private boolean batchHasActualChange(MasterModelRespDTO model, Map<String, Object> original,
-            Map<String, String> changes) {
+                                         Map<String, String> changes) {
         if (changes == null || changes.isEmpty()) return false;
         for (Map.Entry<String, String> change : changes.entrySet()) {
             String dataType = model.getFields().stream()
@@ -1291,7 +1303,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private Map<String, String> batchValidateOne(Long instanceId, String mode, String recordId,
-            String parentId, Map<String, String> values, String reason) {
+                                                 String parentId, Map<String, String> values, String reason) {
         MasterChangeRequestSaveReqVO single = new MasterChangeRequestSaveReqVO();
         single.setMode(mode);
         single.setRecordId(recordId);
@@ -1370,21 +1382,21 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     /**
      * 先校验并固定申请内容，再在同一事务内保存申请、明细及执行任务。
      *
-     * @param instanceId 模型物化实例 ID
-     * @param request 业务请求参数
-     * @param applicantId 申请人 ID
+     * @param instanceId    模型物化实例 ID
+     * @param request       业务请求参数
+     * @param applicantId   申请人 ID
      * @param applicantName 申请人姓名
      * @return 申请提交结果
      */
     @Override
     public MasterChangeRequestSubmitRespVO submitSingle(Long instanceId,
-            MasterChangeRequestSaveReqVO request, Long applicantId, String applicantName) {
+                                                        MasterChangeRequestSaveReqVO request, Long applicantId, String applicantName) {
         return submitSingle(instanceId, request, applicantId, applicantName, "MANUAL");
     }
 
     @Override
     public MasterChangeRequestSubmitRespVO submitSingle(Long instanceId,
-            MasterChangeRequestSaveReqVO request, Long applicantId, String applicantName, String changeSource) {
+                                                        MasterChangeRequestSaveReqVO request, Long applicantId, String applicantName, String changeSource) {
         submissionPositiveId(instanceId, "模型实例ID无效");
         submissionPositiveId(applicantId, "请先登录再提交申请");
         String source = changeSource == null ? "" : changeSource.trim().toUpperCase(Locale.ROOT);
@@ -1469,7 +1481,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
      */
     @Override
     public MasterChangeRequestSubmitRespVO submitBatch(Long instanceId,
-            MasterChangeRequestBatchSaveReqVO request, Long applicantId, String applicantName) {
+                                                       MasterChangeRequestBatchSaveReqVO request, Long applicantId, String applicantName) {
         submissionPositiveId(instanceId, "模型实例ID无效");
         submissionPositiveId(applicantId, "请先登录再提交申请");
         MasterChangeBatchValidateRespVO validation = validateBatch(instanceId, request, applicantId);
@@ -1479,7 +1491,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
 
         if ("BATCH_IMPORT".equals(request.getMode())
                 && (request.getFileName() == null || request.getFileName().trim().isEmpty()
-                    || request.getFileName().length() > 256)) {
+                || request.getFileName().length() > 256)) {
             throw new ServiceException("上传文件名不能为空且不能超过256字");
         }
 
@@ -1582,7 +1594,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private List<SubmissionItem> submissionBatchItems(Long instanceId, MasterModelRespDTO model,
-            MasterChangeRequestBatchSaveReqVO request, MasterChangeBatchValidateRespVO validation) {
+                                                      MasterChangeRequestBatchSaveReqVO request, MasterChangeBatchValidateRespVO validation) {
         List<SubmissionItem> items = new ArrayList<>();
         List<Long> recordIds = new ArrayList<>();
         if ("BATCH_IMPORT".equals(request.getMode())) {
@@ -1624,7 +1636,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
                         ? "UPDATE" : "CREATE", submissionSerialize(before),
                         submissionSerializePayload(proposed, null, "CREATE".equals(checked.getOperation()), model, recordId),
                         beforeStatus, "UPDATE".equals(checked.getOperation())
-                                ? beforeStatus : "1",
+                        ? beforeStatus : "1",
                         currentVersions.get(recordId)));
             }
             if (items.isEmpty()) throw new ServiceException("没有可处理的数据行，请检查导入方式和匹配键");
@@ -1650,7 +1662,9 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         return items;
     }
 
-    /** 保留原详情查询的版本异常语义：重复当前版本报错，其他查询失败时版本号为空。 */
+    /**
+     * 保留原详情查询的版本异常语义：重复当前版本报错，其他查询失败时版本号为空。
+     */
     private Map<Long, String> submissionCurrentVersions(Long modelId, List<Long> recordIds) {
         if (recordIds.isEmpty()) return Collections.emptyMap();
         try {
@@ -1664,7 +1678,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private Map<String, String> submissionProposedSingle(MasterModelRespDTO model,
-            MasterChangeRequestSaveReqVO request, Map<String, String> before) {
+                                                         MasterChangeRequestSaveReqVO request, Map<String, String> before) {
         String mode = request.getMode();
         boolean create = "CREATE".equals(mode);
         boolean lifecycle = MasterLifecycleRules.isAction(mode);
@@ -1689,8 +1703,8 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private long submissionInsertRequest(Long instanceId, MasterModelRespDTO model, Long modelVersionId, String mode,
-            String reason, String submissionRequestNo, String requestName, Long applicantId,
-            String applicantName, int itemCount, String changeSource) {
+                                         String reason, String submissionRequestNo, String requestName, Long applicantId,
+                                         String applicantName, int itemCount, String changeSource) {
         MasterChangeRequestDO request = new MasterChangeRequestDO();
         request.setRequestNo(submissionRequestNo);
         request.setModelId(model.getModelId());
@@ -1726,7 +1740,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private MasterChangeRequestSubmitRespVO submissionResponse(long requestId, String submissionRequestNo,
-            String requestName, int itemCount) {
+                                                               String requestName, int itemCount) {
         MasterChangeRequestSubmitRespVO submissionResponse = new MasterChangeRequestSubmitRespVO();
         submissionResponse.setRequestId(String.valueOf(requestId));
         submissionResponse.setRequestNo(submissionRequestNo);
@@ -1752,8 +1766,8 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private String submissionSerializePayload(Map<String, String> values,
-            List<MasterChangeSubmodelSaveReqVO> submodelChanges, boolean create,
-            MasterModelRespDTO model, Long recordId) {
+                                              List<MasterChangeSubmodelSaveReqVO> submodelChanges, boolean create,
+                                              MasterModelRespDTO model, Long recordId) {
         if (!create && CollectionUtils.isEmpty(submodelChanges)) return submissionSerialize(values);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("values", values);
@@ -1803,7 +1817,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     private String submissionSingleLabel(MasterChangeRequestSaveReqVO request) {
         return MasterLifecycleRules.isAction(request.getMode()) ? "状态变更申请"
                 : ("CREATE".equals(request.getMode()) ? "新增"
-                : "UPDATE".equals(request.getMode()) ? "修改" : request.getMode()) + "主数据申请";
+                   : "UPDATE".equals(request.getMode()) ? "修改" : request.getMode()) + "主数据申请";
     }
 
     private String submissionBatchLabel(MasterChangeRequestBatchSaveReqVO request) {
@@ -1851,7 +1865,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         private final String currentVersionNo;
 
         private SubmissionItem(Long recordId, String changeType, String beforeData,
-                String proposedData, String beforeStatus, String targetStatus, String currentVersionNo) {
+                               String proposedData, String beforeStatus, String targetStatus, String currentVersionNo) {
             this.recordId = recordId;
             this.changeType = changeType;
             this.beforeData = beforeData;
@@ -1871,7 +1885,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
      * 解析导入文件，不写入业务表。
      *
      * @param instanceId 模型物化实例 ID
-     * @param file 待解析的 CSV 或 XLSX 文件
+     * @param file       待解析的 CSV 或 XLSX 文件
      * @return 解析后的表头、数据行及文件格式问题
      */
     @Override
@@ -1899,7 +1913,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
      * 按当前模型字段生成导入模板。
      *
      * @param instanceId 模型物化实例 ID
-     * @param response 用于写入导出文件的 HTTP 响应
+     * @param response   用于写入导出文件的 HTTP 响应
      */
     @Override
     public void writeImportTemplate(Long instanceId, HttpServletResponse response) throws IOException {
@@ -1966,15 +1980,17 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
 
     private String importFieldGuide(MasterFieldRespDTO field) {
         List<String> rules = new ArrayList<>();
-        if (Boolean.TRUE.equals(field.getUnique())) rules.add("唯一业务键，可选择用于匹配现有数据；选为匹配业务键时必填，非空值不可重复");
+        if (Boolean.TRUE.equals(field.getUnique()))
+            rules.add("唯一业务键，可选择用于匹配现有数据；选为匹配业务键时必填，非空值不可重复");
         String type = field.getDataType() == null ? "" : field.getDataType().toUpperCase(Locale.ROOT);
         if ("DATE".equals(type)) rules.add("格式：yyyy-MM-dd；支持年月日以 / 或 . 分隔，上传后自动转换");
         else if ("DATETIME".equals(type) || "TIMESTAMP".equals(type)) {
             rules.add("格式：yyyy-MM-dd HH:mm:ss；支持年月日以 / 或 . 分隔；只填日期时补为当天00:00:00，省略秒时补00秒");
-        }
-        else if ("BOOLEAN".equals(type)) rules.add("填写 true 或 false");
-        else if (Arrays.asList("INTEGER", "INT", "BIGINT", "LONG").contains(type)) rules.add("填写整数；超过15位时必须使用文本单元格");
-        else if (Arrays.asList("DECIMAL", "NUMBER", "DOUBLE", "FLOAT").contains(type)) rules.add("填写数字，不含千位分隔符");
+        } else if ("BOOLEAN".equals(type)) rules.add("填写 true 或 false");
+        else if (Arrays.asList("INTEGER", "INT", "BIGINT", "LONG").contains(type))
+            rules.add("填写整数；超过15位时必须使用文本单元格");
+        else if (Arrays.asList("DECIMAL", "NUMBER", "DOUBLE", "FLOAT").contains(type))
+            rules.add("填写数字，不含千位分隔符");
         rules.add("表头字段为空表示清空；更新时未包含在表头的字段保持原值；禁止公式");
         if (field.getComment() != null && !field.getComment().isEmpty()) rules.add(field.getComment());
         return String.join("；", rules);
@@ -1985,7 +2001,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         try (Reader reader = new InputStreamReader(input, StandardCharsets.UTF_8.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT));
-                CSVParser parser = new CSVParser(reader, CSVFormat.DEFAULT.builder().setIgnoreEmptyLines(false).build())) {
+             CSVParser parser = new CSVParser(reader, CSVFormat.DEFAULT.builder().setIgnoreEmptyLines(false).build())) {
             Iterator<CSVRecord> records = parser.iterator();
             if (!records.hasNext()) throw new ServiceException("导入文件缺少表头");
             CSVRecord header = records.next();
@@ -2087,8 +2103,8 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private void appendRow(MasterChangeImportParseRespVO result, MasterModelRespDTO model,
-            List<String> names, List<String> values, int rowNo, Map<String, ReferenceValues> choices,
-            MasterEditableWorkbook.Binding binding) {
+                           List<String> names, List<String> values, int rowNo, Map<String, ReferenceValues> choices,
+                           MasterEditableWorkbook.Binding binding) {
         if (values.stream().allMatch(value -> value == null || value.trim().isEmpty())) return;
         if (result.getRows().size() >= IMPORT_MAX_ROWS) throw new ServiceException("单批最多导入500行数据");
         MasterChangeRequestBatchSaveReqVO.ImportRow row = new MasterChangeRequestBatchSaveReqVO.ImportRow();
@@ -2109,7 +2125,8 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
                 String value = values.get(i);
                 ReferenceValues fieldChoices = choices.get(code);
                 try {
-                    if (fieldChoices != null) value = fieldChoices.resolve(value, binding == null ? null : binding.options(code));
+                    if (fieldChoices != null)
+                        value = fieldChoices.resolve(value, binding == null ? null : binding.options(code));
                 } catch (ServiceException ex) {
                     throw new ServiceException("第" + rowNo + "行 " + code + "：" + ex.getMessage());
                 }
@@ -2143,7 +2160,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private String resolveHeader(MasterModelRespDTO model, Set<String> allowed,
-            Map<String, List<String>> nameAliases, String originalName) {
+                                 Map<String, List<String>> nameAliases, String originalName) {
         if (allowed.contains(originalName)) return originalName;
         if ("CATEGORY".equals(model.getModelType())
                 && ("上级类目ID".equalsIgnoreCase(originalName)
@@ -2171,7 +2188,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     private List<MasterFieldRespDTO> importableFields(MasterModelRespDTO model) {
         List<MasterFieldRespDTO> fields = new ArrayList<>(model.getFields());
         fields.sort(Comparator.comparing((MasterFieldRespDTO field) ->
-                field.getSortOrder() == null ? 0 : field.getSortOrder())
+                        field.getSortOrder() == null ? 0 : field.getSortOrder())
                 .thenComparing(field -> field.getId() == null ? Long.MAX_VALUE : field.getId()));
         List<MasterFieldRespDTO> importable = new ArrayList<>();
         Set<String> automaticFields = maintenanceValidator.automaticFieldCodes(model);
