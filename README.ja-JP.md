@@ -23,7 +23,7 @@
 
 ✨✨✨**オープンソース版デモ**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a>（ユーザー名 `qData`、パスワード `qData123`）
 
-✨✨✨**プロフェッショナル版デモ**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>。デモアカウントの取得は[カスタマーサービスにお問い合わせ](https://qdata.qiantong.tech/business/policy.html)ください。
+✨✨✨**プロフェッショナル版デモ**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>。デモアカウントの取得は[カスタマーサービスにお問い合わせ](https://docs.qdata.tech/business/policy.html)ください。
 
 > qData-mdm が役に立ったら、開発を応援するために **Star ⭐️** をお願いします。
 
@@ -95,7 +95,7 @@ qData-mdm は、Spring Boot のバックエンドと Vue 3 のフロントエン
 
 qData-mdm は**プロフェッショナル版**と**オープンソース版**の2つの形態を提供し、さまざまな規模やシナリオのニーズに対応します。両者にはそれぞれ特長があり、相互に補完し合います。オープンソース版は低コストでの導入を支援し、プロフェッショナル版はより高度な機能と手厚いサポートを提供します。どちらを選択しても、qData-mdm は企業のデータ価値の創出とデジタル化の推進を支える信頼できるパートナーとなります。
 
-> 👉 **オープンソース版のブランド利用許諾**または**プロフェッショナル版に関するご相談**は、[💼 ライセンスの詳細](https://qdata.qiantong.tech/business/policy.html)をご覧ください。
+> 👉 **オープンソース版のブランド利用許諾**または**プロフェッショナル版に関するご相談**は、[💼 ライセンスの詳細](https://docs.qdata.tech/business/policy.html)をご覧ください。
 
 ## クイックスタート
 
@@ -151,7 +151,7 @@ qData-mdm をデプロイする前に、次の実行環境とツールを用意�
 
 qData 公式 QQ コミュニティでは、最新情報の確認、技術的な相談、情報交換ができます。
 
-👉 <a href="https://qdata.qiantong.tech/discuss.html">QQ コミュニティに参加</a>
+👉 <a href="https://docs.qdata.tech/discuss.html">QQ コミュニティに参加</a>
 
 ## システム画面
 

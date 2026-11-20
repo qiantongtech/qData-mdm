@@ -23,7 +23,7 @@
 
 ✨✨✨**Open-Source Edition Demo**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a> (username `qData`, password `qData123`).
 
-✨✨✨**Professional Edition Demo**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>. Please [contact customer service](https://qdata.qiantong.tech/business/policy.html) to obtain a demo account.
+✨✨✨**Professional Edition Demo**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>. Please [contact customer service](https://docs.qdata.tech/business/policy.html) to obtain a demo account.
 
 > If qData-mdm helps you, give the project a **star ⭐️** to support its development.
 
@@ -95,7 +95,7 @@ qData-mdm separates the Spring Boot backend from the Vue 3 frontend and integrat
 
 qData-mdm provides two editions: **Professional Edition** and **Open-Source Edition**, meeting user needs across different scales and scenarios. Each has its own focus while complementing the other: the Open-Source Edition helps users get started at low cost, while the Professional Edition provides greater depth and support. Whichever edition you choose, qData-mdm aims to be a reliable partner that helps enterprises unlock data value and accelerate digital transformation.
 
-> 👉 For **Open-Source Edition brand authorization** or **Professional Edition consultation**, see [💼 Licensing Details](https://qdata.qiantong.tech/business/policy.html).
+> 👉 For **Open-Source Edition brand authorization** or **Professional Edition consultation**, see [💼 Licensing Details](https://docs.qdata.tech/business/policy.html).
 
 ## Quick Start
 
@@ -151,7 +151,7 @@ Install the following prerequisites before deploying qData-mdm.
 
 Join the official qData QQ community for updates, technical support, and discussions.
 
-👉 <a href="https://qdata.qiantong.tech/discuss.html">Join the QQ community</a>
+👉 <a href="https://docs.qdata.tech/discuss.html">Join the QQ community</a>
 
 ## System Screenshots
 

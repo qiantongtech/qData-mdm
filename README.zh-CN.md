@@ -22,7 +22,7 @@
 
 ✨✨✨**开源版演示地址**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a>（账号 `qData`，密码 `qData123`）
 
-✨✨✨**专业版演示地址**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>，演示账号请 [联系客服获取](https://qdata.qiantong.tech/business/policy.html)。
+✨✨✨**专业版演示地址**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>，演示账号请 [联系客服获取](https://docs.qdata.tech/business/policy.html)。
 
 > 如果 qData-mdm 对您有帮助，请点个 **Star ⭐️**，这是我们持续更新的动力！ 🚀
 
@@ -98,7 +98,7 @@ qData-mdm 平台采用前后端分离架构，后端基于 Spring Boot，前端�
 
 qData-mdm 提供 **专业版** 与 **开源版** 两种形态，满足不同规模与场景下的用户需求。两者既各具特色，又形成互补：开源版更像启蒙老师，帮助低成本起步；专业版更像专家顾问，提供深度与保障。无论选择哪种版本，qData-mdm 都将成为可靠的伙伴，帮助企业释放数据价值，加速数字化进程。
 
-> 👉 如需 **开源版品牌授权** 或 **咨询专业版**，请点击按钮查看详情：[💼 了解授权详情](https://qdata.qiantong.tech/business/policy.html)
+> 👉 如需 **开源版品牌授权** 或 **咨询专业版**，请点击按钮查看详情：[💼 了解授权详情](https://docs.qdata.tech/business/policy.html)
 
 ## 快速开始
 
@@ -153,7 +153,7 @@ qData-mdm 提供 **专业版** 与 **开源版** 两种形态，满足不同规�
 ## QQ交流群
 欢迎加入 qData 官方 QQ 交流群，获取最新动态、技术支持与使用交流。
 
-👉 <a href="https://qdata.qiantong.tech/discuss.html">点击加入 QQ 交流群</a>
+👉 <a href="https://docs.qdata.tech/discuss.html">点击加入 QQ 交流群</a>
 
 <!-- [![加入QQ群](https://img.shields.io/badge/QQ群-814145903（已满）-blue.svg)](https://qm.qq.com/q/Qz5NJut20y)
 [![加入QQ群](https://img.shields.io/badge/QQ群-236734346-blue.svg)](https://qm.qq.com/q/Bpml33lTWK)
