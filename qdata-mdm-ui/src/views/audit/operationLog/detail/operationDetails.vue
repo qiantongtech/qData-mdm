@@ -131,7 +131,7 @@ const queryParams = data.queryParams;
 function getList(params) {
   const source = props.logList;
   const rows = source.filter(item =>
-      (!params.operatorName || (item.operatorName || '').includes(params.operatorName)) &&
+    (!params.operatorName || (item.operatorName || '').includes(params.operatorName)) &&
       (!params.operateId || (item.operateId || '').includes(params.operateId)) &&
       (!params.type || item.type === params.type) &&
       (!params.operateResult || item.operateResult === params.operateResult),

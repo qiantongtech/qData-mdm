@@ -29,7 +29,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/** 与模型定义列表复用相同的版本映射和归属位置装配。 */
+/**
+ * 与模型定义列表复用相同的版本映射和归属位置装配。
+ */
 @Service
 public class ModelBaseApiImpl implements ModelBaseApi {
 

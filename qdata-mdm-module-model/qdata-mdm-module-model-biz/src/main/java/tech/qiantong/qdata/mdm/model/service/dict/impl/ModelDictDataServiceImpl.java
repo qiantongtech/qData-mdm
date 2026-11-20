@@ -24,6 +24,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
+import tech.qiantong.qdata.mdm.common.core.page.PageParam;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.StringUtils;
@@ -39,7 +41,9 @@ import tech.qiantong.qdata.mdm.model.controller.admin.dict.vo.ModelDictDataUsage
 import tech.qiantong.qdata.mdm.model.dal.dataobject.base.ModelBaseDO;
 import tech.qiantong.qdata.mdm.model.dal.dataobject.base.ModelColumnDO;
 import tech.qiantong.qdata.mdm.model.dal.dataobject.dict.ModelDictDataDO;
+import tech.qiantong.qdata.mdm.model.dal.dataobject.dict.ModelDictTypeDO;
 import tech.qiantong.qdata.mdm.model.dal.mapper.dict.ModelDictDataMapper;
+import tech.qiantong.qdata.mdm.model.dal.mapper.dict.ModelDictTypeMapper;
 import tech.qiantong.qdata.mdm.model.dal.mapper.base.ModelBaseMapper;
 import tech.qiantong.qdata.mdm.model.service.base.IModelColumnService;
 import tech.qiantong.qdata.mdm.model.service.dict.IModelDictDataService;
@@ -47,9 +51,15 @@ import tech.qiantong.qdata.mdm.model.service.dict.IModelDictDataService;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -70,6 +80,9 @@ public class ModelDictDataServiceImpl extends ServiceImpl<ModelDictDataMapper, M
     private ModelDictDataMapper modelDictDataMapper;
 
     @Resource
+    private ModelDictTypeMapper modelDictTypeMapper;
+
+    @Resource
     private IModelColumnService iModelColumnService;
 
     @Resource
@@ -84,7 +97,7 @@ public class ModelDictDataServiceImpl extends ServiceImpl<ModelDictDataMapper, M
     @Override
     public List<ModelDictDataUsageRespVO> getModelDictDataUsage(Long typeId) {
         if (typeId == null) {
-            throw new ServiceException("参考数据类型ID不能为空");
+            throw new ServiceException("参考数据类型ID不能为空", HttpStatus.WARN);
         }
         List<ModelColumnDO> columns = iModelColumnService.list(
                 new QueryWrapper<ModelColumnDO>().eq("dict_type_id", typeId)
@@ -169,27 +182,52 @@ public class ModelDictDataServiceImpl extends ServiceImpl<ModelDictDataMapper, M
     }
 
     @Override
-    public Long createModelDictData(ModelDictDataSaveReqVO createReqVO) {
-        ModelDictDataDO dictType = BeanUtils.toBean(createReqVO, ModelDictDataDO.class);
-        modelDictDataMapper.insert(dictType);
-        return dictType.getId();
+    public List<ModelDictDataRespVO> getModelDictDataExportRows(ModelDictDataPageReqVO exportReqVO, String typeCode) {
+        ModelDictTypeDO type = resolveTypeByCode(typeCode);
+        exportReqVO.setTypeId(type.getId());
+        exportReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
+        List<ModelDictDataRespVO> rows = BeanUtils.toBean(getModelDictDataPage(exportReqVO).getRows(), ModelDictDataRespVO.class);
+        rows.forEach(row -> row.setTypeCode(type.getCode()));
+        return rows;
     }
 
     @Override
-    public int updateModelDictData(ModelDictDataSaveReqVO updateReqVO) {
-        // 相关校验
-
-        // 更新参考数据项
-        ModelDictDataDO updateObj = BeanUtils.toBean(updateReqVO, ModelDictDataDO.class);
-        return modelDictDataMapper.updateById(updateObj);
+    public Long createModelDictData(ModelDictDataSaveReqVO request) {
+        validateCode(request);
+        ModelDictDataDO item = BeanUtils.toBean(request, ModelDictDataDO.class);
+        modelDictDataMapper.insert(item);
+        return item.getId();
     }
 
     @Override
-    public boolean checkCodeUnique(String code, Long id) {
-        QueryWrapper<ModelDictDataDO> wrapper = new QueryWrapper<>();
-        wrapper.eq("code", code);
-        if (id != null) wrapper.ne("id", id);
-        return modelDictDataMapper.selectCount(wrapper) == 0;
+    public int updateModelDictData(ModelDictDataSaveReqVO request) {
+        validateCode(request);
+        return modelDictDataMapper.updateById(BeanUtils.toBean(request, ModelDictDataDO.class));
+    }
+
+    private void validateCode(ModelDictDataSaveReqVO request) {
+        String code = normalizeCode(request.getCode());
+        ModelDictTypeDO type = request.getTypeId() == null ? null : modelDictTypeMapper.selectById(request.getTypeId());
+        if (type == null) {
+            throw new ServiceException("所属参考数据集合不存在", HttpStatus.WARN);
+        }
+        request.setCode(code);
+        if (modelDictDataMapper.selectCount(codeQuery(request.getTypeId(), code)
+                .ne(request.getId() != null, "id", request.getId())) > 0) {
+            throw new ServiceException("参考数据集合“" + type.getCode() + "”中的项编码“" + code + "”已存在", HttpStatus.WARN);
+        }
+    }
+
+    private String normalizeCode(String value) {
+        String code = value == null ? "" : value.trim();
+        if (code.isEmpty()) throw new ServiceException("项编码不能为空", HttpStatus.WARN);
+        if (code.length() > 64) throw new ServiceException("项编码不能超过64个字符", HttpStatus.WARN);
+        return code;
+    }
+
+    private QueryWrapper<ModelDictDataDO> codeQuery(Long typeId, String code) {
+        return new QueryWrapper<ModelDictDataDO>().eq("type_id", typeId)
+                .apply("LOWER(TRIM(code)) = {0}", code.toLowerCase(Locale.ROOT));
     }
 
     @Override
@@ -202,7 +240,24 @@ public class ModelDictDataServiceImpl extends ServiceImpl<ModelDictDataMapper, M
 
     @Override
     public int removeModelDictData(Collection<Long> idList) {
-        // 批量删除参考数据项
+        if (idList == null || idList.isEmpty()) return 0;
+        // 字段通过所属参考数据集合引用数据项，与详情页的引用关系统一。
+        List<ModelDictDataDO> referencedItems = modelDictDataMapper.selectList(new LambdaQueryWrapper<ModelDictDataDO>()
+                .select(ModelDictDataDO::getId, ModelDictDataDO::getCode, ModelDictDataDO::getName)
+                .in(ModelDictDataDO::getId, idList)
+                .exists("SELECT 1 FROM MODEL_COLUMN mc JOIN MODEL_BASE mb ON mb.ID = mc.MODEL_ID "
+                        + "WHERE mc.DICT_TYPE_ID = MODEL_DICT_DATA.TYPE_ID AND mc.DEL_FLAG = '0' AND mb.DEL_FLAG = '0'")
+                .orderByAsc(ModelDictDataDO::getId));
+        if (!referencedItems.isEmpty()) {
+            ModelDictDataDO item = referencedItems.get(0);
+            String name = StringUtils.defaultIfEmpty(item.getName(),
+                    StringUtils.defaultIfEmpty(item.getCode(), String.valueOf(item.getId())));
+            throw new ServiceException(name + "数据项存在引用", HttpStatus.WARN);
+        }
+        if (modelDictDataMapper.selectCount(new LambdaQueryWrapper<ModelDictDataDO>()
+                .in(ModelDictDataDO::getId, idList).eq(ModelDictDataDO::getValidFlag, Boolean.TRUE)) > 0) {
+            throw new ServiceException("删除参考数据失败,请先停用!", HttpStatus.WARN);
+        }
         return modelDictDataMapper.deleteByIds(idList);
     }
 
@@ -211,72 +266,81 @@ public class ModelDictDataServiceImpl extends ServiceImpl<ModelDictDataMapper, M
         return modelDictDataMapper.selectById(id);
     }
 
-    /**
-     * 导入参考数据项数据
-     *
-     * @param importExcelList 参考数据项数据列表
-     * @param isUpdateSupport 是否更新支持，如果已存在，则进行更新数据
-     * @param operName        操作用户
-     * @return 结果
-     */
     @Override
-    public String importModelDictData(List<ModelDictDataRespVO> importExcelList, boolean isUpdateSupport, String operName) {
-        if (StringUtils.isNull(importExcelList) || importExcelList.size() == 0) {
-            throw new ServiceException("导入数据不能为空！");
-        }
+    public String importModelDictData(List<ModelDictDataRespVO> rows, String typeCode, boolean updateSupport, String operName) {
+        if (rows == null || rows.isEmpty()) throw new ServiceException("导入数据不能为空", HttpStatus.WARN);
 
-        int successNum = 0;
-        int failureNum = 0;
-        List<String> successMessages = new ArrayList<>();
-        List<String> failureMessages = new ArrayList<>();
-
-        for (ModelDictDataRespVO respVO : importExcelList) {
+        ModelDictTypeDO selectedType = StringUtils.isBlank(typeCode) ? null : resolveTypeByCode(typeCode);
+        Map<String, ModelDictTypeDO> typesByCode = new HashMap<>();
+        Set<String> codes = new HashSet<>();
+        Set<Long> updatedIds = new HashSet<>();
+        int updated = 0;
+        Date now = new Date();
+        for (int index = 0; index < rows.size(); index++) {
             try {
-                ModelDictDataDO modelDictDataDO = BeanUtils.toBean(respVO, ModelDictDataDO.class);
-                Long modelDictTypeId = respVO.getId();
-                if (isUpdateSupport) {
-                    if (modelDictTypeId != null) {
-                        ModelDictDataDO existingModelDictData = modelDictDataMapper.selectById(modelDictTypeId);
-                        if (existingModelDictData != null) {
-                            modelDictDataMapper.updateById(modelDictDataDO);
-                            successNum++;
-                            successMessages.add("数据更新成功，ID为 " + modelDictTypeId + " 的参考数据项记录。");
-                        } else {
-                            failureNum++;
-                            failureMessages.add("数据更新失败，ID为 " + modelDictTypeId + " 的参考数据项记录不存在。");
-                        }
-                    } else {
-                        failureNum++;
-                        failureMessages.add("数据更新失败，某条记录的ID不存在。");
-                    }
-                } else {
-                    QueryWrapper<ModelDictDataDO> queryWrapper = new QueryWrapper<>();
-                    queryWrapper.eq("id", modelDictTypeId);
-                    ModelDictDataDO existingModelDictData = modelDictDataMapper.selectOne(queryWrapper);
-                    if (existingModelDictData == null) {
-                        modelDictDataMapper.insert(modelDictDataDO);
-                        successNum++;
-                        successMessages.add("数据插入成功，ID为 " + modelDictTypeId + " 的参考数据项记录。");
-                    } else {
-                        failureNum++;
-                        failureMessages.add("数据插入失败，ID为 " + modelDictTypeId + " 的参考数据项记录已存在。");
-                    }
+                ModelDictDataRespVO row = rows.get(index);
+                String rowTypeCode = StringUtils.trimToEmpty(row.getTypeCode());
+                if (selectedType != null && !rowTypeCode.isEmpty() && !selectedType.getCode().trim().equalsIgnoreCase(rowTypeCode)) {
+                    throw new ServiceException("文件中的参考数据类型编码与当前集合不一致", HttpStatus.WARN);
                 }
-            } catch (Exception e) {
-                failureNum++;
-                String errorMsg = "数据导入失败，错误信息：" + e.getMessage();
-                failureMessages.add(errorMsg);
-                log.error(errorMsg, e);
+                Long itemTypeId = selectedType == null
+                        ? typesByCode.computeIfAbsent(rowTypeCode.toLowerCase(Locale.ROOT), key -> resolveTypeByCode(rowTypeCode)).getId()
+                        : selectedType.getId();
+                String code = normalizeCode(row.getCode());
+                if (StringUtils.isBlank(row.getName())) throw new ServiceException("项名称不能为空", HttpStatus.WARN);
+                if (!codes.add(itemTypeId + ":" + code.toLowerCase(Locale.ROOT))) {
+                    throw new ServiceException("文件中同一参考数据集合的项编码重复", HttpStatus.WARN);
+                }
+
+                ModelDictDataSaveReqVO request = new ModelDictDataSaveReqVO();
+                request.setTypeId(itemTypeId);
+                request.setCode(code);
+                request.setName(row.getName());
+                request.setSortOrder(row.getSortOrder());
+                request.setDescription(row.getDescription());
+                request.setValidFlag(row.getValidFlag());
+                if (updateSupport) request.setId(resolveImportId(row.getId(), itemTypeId, code));
+                if (request.getId() == null) {
+                    if (request.getValidFlag() == null) request.setValidFlag(Boolean.TRUE);
+                    request.setCreateBy(operName);
+                    request.setCreateTime(now);
+                    createModelDictData(request);
+                } else {
+                    if (!updatedIds.add(request.getId())) throw new ServiceException("文件中同一数据项记录重复", HttpStatus.WARN);
+                    request.setUpdateBy(operName);
+                    request.setUpdateTime(now);
+                    if (updateModelDictData(request) != 1) throw new ServiceException("参考数据项记录不存在", HttpStatus.WARN);
+                    updated++;
+                }
+            } catch (ServiceException ex) {
+                throw new ServiceException("导入第" + (index + 1) + "条数据失败，" + ex.getMessage(), ex.getCode());
             }
         }
-        StringBuilder resultMsg = new StringBuilder();
-        if (failureNum > 0) {
-            resultMsg.append("很抱歉，导入失败！共 ").append(failureNum).append(" 条数据格式不正确，错误如下：");
-            resultMsg.append("<br/>").append(String.join("<br/>", failureMessages));
-            throw new ServiceException(resultMsg.toString());
-        } else {
-            resultMsg.append("恭喜您，数据已全部导入成功！共 ").append(successNum).append(" 条。");
+        return "导入成功，新增" + (rows.size() - updated) + "条，更新" + updated + "条";
+    }
+
+    private ModelDictTypeDO resolveTypeByCode(String code) {
+        if (StringUtils.isBlank(code)) throw new ServiceException("参考数据类型编码不能为空", HttpStatus.WARN);
+        List<ModelDictTypeDO> matches = modelDictTypeMapper.selectList(new LambdaQueryWrapper<ModelDictTypeDO>()
+                .select(ModelDictTypeDO::getId, ModelDictTypeDO::getCode)
+                .apply("LOWER(TRIM(code)) = {0}", code.trim().toLowerCase(Locale.ROOT)));
+        if (matches.isEmpty()) throw new ServiceException("参考数据类型编码不存在", HttpStatus.WARN);
+        if (matches.size() > 1) {
+            throw new ServiceException("参考数据集合编码“" + code.trim() + "”对应多条集合", HttpStatus.WARN);
         }
-        return resultMsg.toString();
+        return matches.get(0);
+    }
+
+    private Long resolveImportId(Long id, Long typeId, String code) {
+        if (id != null) {
+            ModelDictDataDO existing = modelDictDataMapper.selectById(id);
+            if (existing == null || !Objects.equals(existing.getTypeId(), typeId)) {
+                throw new ServiceException("当前参考数据集合中不存在该数据项编号", HttpStatus.WARN);
+            }
+            return id;
+        }
+        List<ModelDictDataDO> matches = modelDictDataMapper.selectList(codeQuery(typeId, code).select("id"));
+        if (matches.size() > 1) throw new ServiceException("项编码对应多条记录，请使用编号更新");
+        return matches.isEmpty() ? null : matches.get(0).getId();
     }
 }

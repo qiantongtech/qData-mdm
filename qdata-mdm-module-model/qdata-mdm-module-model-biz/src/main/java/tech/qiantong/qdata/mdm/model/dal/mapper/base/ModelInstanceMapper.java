@@ -113,12 +113,12 @@ public interface ModelInstanceMapper extends BaseMapperX<ModelInstanceDO> {
     /** 按相同筛选条件查询全部成功快照，不分页。 */
     List<ModelInstanceDO> selectPublishedInstanceList(@Param("req") ModelPublishedPageReqDTO request);
 
-    /**
-     * 按成功指针逐条读取可用主模型；回调处理配置，不在应用中积攒全部完整JSON。
-     */
-    void selectPublishedInstances(@Param("modelId") Long modelId,
-                                  @Param("includeMaterialization") boolean includeMaterialization,
-                                  ResultHandler<ModelInstanceDO> handler);
+    /** 按主模型 ID 读取成功指针及快照，物化详情额外读取结构格式版本。 */
+    ModelInstanceDO selectPublishedInstance(@Param("modelId") Long modelId,
+                                            @Param("includeMaterialization") boolean includeMaterialization);
+
+    /** 逐条读取树所需的成功快照。 */
+    void scanPublishedInstances(ResultHandler<ModelInstanceDO> handler);
 
     /**
      * 按模型、版本、发布状态及补偿状态等条件分页查询发布记录，保留成功和失败历史。

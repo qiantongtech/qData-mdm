@@ -61,7 +61,7 @@ public class QualityIssueTaskLogController extends BaseController {
     private IQualityIssueTaskLogService qualityIssueTaskLogService;
 
     @Operation(summary = "查询问题整改记录日志列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:query')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:query')")
     @GetMapping("/list")
     public CommonResult<PageResult<QualityIssueTaskLogRespVO>> list(@Valid QualityIssueTaskLogPageReqVO qualityIssueTaskLog) {
         PageResult<QualityIssueTaskLogDO> page = qualityIssueTaskLogService.getQualityIssueTaskLogPage(qualityIssueTaskLog);
@@ -69,7 +69,7 @@ public class QualityIssueTaskLogController extends BaseController {
     }
 
     @Operation(summary = "导出问题整改记录日志列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetasklog:export')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTaskLog:export')")
     @Log(title = "问题整改记录日志", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, QualityIssueTaskLogPageReqVO exportReqVO) {
@@ -80,7 +80,7 @@ public class QualityIssueTaskLogController extends BaseController {
     }
 
     @Operation(summary = "获取问题整改记录日志详细信息")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:query')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:query')")
     @GetMapping(value = "/{id}")
     public CommonResult<QualityIssueTaskLogRespVO> getInfo(@PathVariable("id") Long id) {
         QualityIssueTaskLogDO qualityIssueTaskLogDO = qualityIssueTaskLogService.getQualityIssueTaskLogById(id);

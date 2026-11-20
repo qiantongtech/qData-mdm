@@ -18,9 +18,6 @@
 
 package tech.qiantong.qdata.mdm.model.service.base;
 
-import tech.qiantong.qdata.mdm.common.core.page.PageResult;
-import tech.qiantong.qdata.mdm.model.base.dto.*;
-import tech.qiantong.qdata.mdm.model.controller.admin.base.vo.ModelTreeRespVO;
 import tech.qiantong.qdata.mdm.model.dal.dataobject.base.ModelInstanceDO;
 import tech.qiantong.qdata.mdm.model.dal.dataobject.base.ModelVersionDO;
 import tech.qiantong.qdata.mdm.model.domain.*;
@@ -33,58 +30,9 @@ import tech.qiantong.qdata.mdm.model.util.ModelPublishDatabaseSession;
 import java.util.List;
 
 /**
- * 统一处理模型发布、分阶段校验、过程记录及成功版本查询。
+ * 统一处理模型发布、分阶段校验及过程记录。
  */
 public interface IModelPublishService {
-
-    /**
-     * 返回主数据域、非空目录及最近成功发布模型，不增加虚拟根节点。
-     */
-    List<ModelTreeRespVO> getPublishedModelTree();
-
-    /**
-     * 按成功发布内容筛选并分页，固定按主模型ID升序；只返回当前可用主模型。
-     */
-    PageResult<ModelPublishedRespDTO> getPublishedModelPage(ModelPublishedPageReqDTO request);
-
-    /**
-     * 按主模型ID读取最近一次成功发布的基本信息；不可用或无成功记录时报错。
-     */
-    ModelPublishedRespDTO getPublishedModel(Long modelId);
-
-    /** 按成功实例定位主模型ID，不读取快照。 */
-    Long getPublishedModelId(Long instanceId);
-
-    /** 只核对当前成功实例和版本，不读取快照。 */
-    boolean isPublishedInstance(Long modelId, Long instanceId, Long versionId);
-
-    /**
-     * 查询同一次成功发布中的字段、直接子模型及字段引用的参考数据、编码方案。
-     *
-     * @param modelId 主模型ID
-     * @return 成功发布的正常使用配置及实例/版本标识，不含物化信息或规则配置
-     */
-    ModelPublishedStructureRespDTO getPublishedModelStructure(Long modelId);
-
-    /** 结构查询按需附带权威主表及列绑定。 */
-    ModelPublishedStructureRespDTO getPublishedModelStructure(Long modelId, boolean includeAuthorityTable);
-
-    /**
-     * 查询最近成功实例保存的目标数据库和来源、权威主子表完整物化信息。
-     *
-     * @param modelId 主模型ID
-     * @return 成功模型及完整表、字段、索引记录，含停用标记，不含连接凭证
-     */
-    ModelPublishedMaterializationRespDTO getPublishedModelMaterialization(Long modelId);
-
-    /**
-     * 查询成功发布时保存的本主模型关联规则，不查询当前规则配置。
-     *
-     * @param modelId      主模型ID
-     * @param ruleCategory MATCH匹配、SURVIVOR生存、QUALITY质量
-     * @return 对应成功版本及指定类别正常启用的规则
-     */
-    ModelPublishedRulesRespDTO getPublishedModelRules(Long modelId, String ruleCategory);
 
     /**
      * 从现有发布入口整体完成准备、计划、执行、失败处理和正式保存。

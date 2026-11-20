@@ -24,8 +24,6 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -34,8 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.DigestUtils;
-import tech.qiantong.qdata.mdm.common.core.page.PageParam;
-import tech.qiantong.qdata.mdm.common.core.page.PageResult;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.database.DbDialect;
 import tech.qiantong.qdata.mdm.common.database.DbQuery;
 import tech.qiantong.qdata.mdm.common.database.DialectFactory;
@@ -46,24 +43,12 @@ import tech.qiantong.qdata.mdm.common.database.core.DbIndex;
 import tech.qiantong.qdata.mdm.common.database.datasource.DefaultDataSourceFactoryBean;
 import tech.qiantong.qdata.mdm.common.database.dialect.MySqlDialect;
 import tech.qiantong.qdata.mdm.common.database.dialect.SQLServer2008Dialect;
-import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.StringUtils;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
-import tech.qiantong.qdata.mdm.model.base.dto.*;
-import tech.qiantong.qdata.mdm.model.controller.admin.base.vo.ModelTreeRespVO;
 import tech.qiantong.qdata.mdm.model.dal.dataobject.base.*;
-import tech.qiantong.qdata.mdm.model.dal.dataobject.layer.ModelLayerDO;
-import tech.qiantong.qdata.mdm.model.dal.dataobject.project.ModelProjectDO;
 import tech.qiantong.qdata.mdm.model.dal.mapper.base.*;
-import tech.qiantong.qdata.mdm.model.dal.mapper.layer.ModelLayerMapper;
-import tech.qiantong.qdata.mdm.model.dal.mapper.project.ModelProjectMapper;
-import tech.qiantong.qdata.mdm.model.dict.dto.ModelDictDataRespDTO;
-import tech.qiantong.qdata.mdm.model.dict.dto.ModelDictTypeRespDTO;
 import tech.qiantong.qdata.mdm.model.domain.*;
-import tech.qiantong.qdata.mdm.model.encoding.dto.ModelEncodingItemRespDTO;
-import tech.qiantong.qdata.mdm.model.encoding.dto.ModelEncodingRespDTO;
-import tech.qiantong.qdata.mdm.model.encoding.dto.ModelEncodingVersionRespDTO;
 import tech.qiantong.qdata.mdm.model.enums.ModelColumnCategoryEnum;
 import tech.qiantong.qdata.mdm.model.enums.materialization.*;
 import tech.qiantong.qdata.mdm.model.service.base.IModelDdlPlanService;
@@ -89,18 +74,17 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
 import java.util.*;
 import java.util.Date;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * 统一处理模型发布及成功信息查询，保留各步骤原有的校验和事务边界。
+ * 编排模型发布、恢复和补偿，并持久化各阶段的执行结果。
  */
 @Slf4j
 @Service
 public class ModelPublishServiceImpl implements IModelPublishService {
 
     /**
-     * 读取和保存发布实例；成功模型查询通过成功指针定位同一份发布内容。
+     * 读取和保存发布实例及执行进度。
      */
     @Resource
     private ModelInstanceMapper instanceMapper;
@@ -116,18 +100,6 @@ public class ModelPublishServiceImpl implements IModelPublishService {
      */
     @Resource
     private ModelMaterializedColumnMapper materializedColumnMapper;
-
-    /**
-     * 查询已发布模型所属的数据域，组装模型树。
-     */
-    @Resource
-    private ModelProjectMapper projectMapper;
-
-    /**
-     * 查询模型目录及父子关系，只保留含成功模型的目录。
-     */
-    @Resource
-    private ModelLayerMapper layerMapper;
 
     /**
      * 查询模型主体，包括当前版本ID和上次成功发布记录ID。
@@ -185,634 +157,6 @@ public class ModelPublishServiceImpl implements IModelPublishService {
      */
     private static final int MATERIALIZED_COLUMN_BATCH_SIZE = 500;
 
-    // 成功模型查询
-
-    /**
-     * 所属域、目录和模型信息按成功快照分组；目录统一放在域的第二层。
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public List<ModelTreeRespVO> getPublishedModelTree() {
-        List<ModelPublishedRespDTO> models = new ArrayList<>();
-        readPublished(null, instance -> models.add(publishedInfo(instance)));
-        if (models.isEmpty()) {
-            return new ArrayList<>();
-        }
-        Map<Long, ModelTreeRespVO> projects = new LinkedHashMap<>();
-        for (ModelProjectDO project : projectMapper.selectList(Wrappers.<ModelProjectDO>lambdaQuery()
-                .eq(ModelProjectDO::getValidFlag, true).orderByAsc(ModelProjectDO::getId))) {
-            ModelTreeRespVO node = treeNode("project", project.getId(), project.getName(), project.getCode(), null);
-            node.setIcon(project.getIcon());
-            node.setProjectId(project.getId());
-            projects.put(project.getId(), node);
-        }
-        Map<Long, ModelTreeRespVO> layers = new LinkedHashMap<>();
-        for (ModelLayerDO layer : layerMapper.selectList(Wrappers.<ModelLayerDO>lambdaQuery()
-                .eq(ModelLayerDO::getValidFlag, true)
-                .orderByAsc(ModelLayerDO::getSortOrder).orderByAsc(ModelLayerDO::getId))) {
-            ModelTreeRespVO project = projects.get(layer.getProjectId());
-            if (project == null) {
-                continue;
-            }
-            ModelTreeRespVO node = treeNode("layer", layer.getId(), layer.getName(), layer.getCode(), project.getId());
-            node.setProjectId(layer.getProjectId());
-            node.setLayerId(layer.getId());
-            layers.put(layer.getId(), node);
-        }
-        for (ModelPublishedRespDTO model : models) {
-            ModelTreeRespVO layer = layers.get(model.getLayerId());
-            if (layer == null || !Objects.equals(layer.getProjectId(), model.getProjectId())) {
-                continue;
-            }
-            ModelTreeRespVO node = treeNode("model", model.getId(), model.getName(), model.getCode(), layer.getId());
-            node.setProjectId(model.getProjectId());
-            node.setLayerId(model.getLayerId());
-            node.setModelId(model.getId());
-            node.setInstanceId(model.getInstanceId());
-            node.setVersionId(model.getVersionId());
-            node.setVersionNo(model.getVersionNo());
-            layer.getChildren().add(node);
-        }
-        // 不挂载空目录；无发布模型的主数据域也不产生空分支。
-        for (ModelTreeRespVO layer : layers.values()) {
-            if (!layer.getChildren().isEmpty()) {
-                projects.get(layer.getProjectId()).getChildren().add(layer);
-            }
-        }
-        return projects.values().stream().filter(node -> !node.getChildren().isEmpty()).collect(Collectors.toList());
-    }
-
-    /**
-     * 使用原始ID组装节点，域、目录和模型通过nodeType区分，不修改业务ID。
-     */
-    private ModelTreeRespVO treeNode(String type, Long id, String name, String code, Long parentId) {
-        ModelTreeRespVO node = new ModelTreeRespVO();
-        node.setId(id);
-        node.setParentId(parentId);
-        node.setNodeType(type);
-        node.setName(name);
-        node.setCode(code);
-        return node;
-    }
-
-    /**
-     * 数据库按成功快照筛选、计数并分页；pageSize为-1时返回全部匹配记录。
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public PageResult<ModelPublishedRespDTO> getPublishedModelPage(ModelPublishedPageReqDTO request) {
-        long total = instanceMapper.countPublishedInstances(request);
-        if (total == 0) {
-            return new PageResult<>(Collections.emptyList(), 0L);
-        }
-        // 全量查询不传分页参数，计数、分页与全量查询共用筛选条件。
-        List<ModelInstanceDO> instances;
-        if (PageParam.PAGE_SIZE_NONE.equals(request.getPageSize())) {
-            instances = instanceMapper.selectPublishedInstanceList(request);
-        } else {
-            Page<ModelInstanceDO> page = new Page<>(request.getPageNum(), request.getPageSize(), false);
-            instances = instanceMapper.selectPublishedInstancePage(page, request).getRecords();
-        }
-        Map<Long, Map<String, String>> statisticsColumns = loadStatisticsColumns(instances);
-        List<ModelPublishedRespDTO> rows = instances.stream()
-                .map(instance -> {
-                    ModelPublishedRespDTO model = publishedInfo(instance);
-                    model.setAuthorityStatisticsColumns(statisticsColumns.get(instance.getAuthorityTableId()));
-                    return model;
-                }).collect(Collectors.toList());
-        fillDomainNames(rows);
-        return new PageResult<>(rows, total);
-    }
-
-    /**
-     * 只读取当前页权威主表的三个统计系统列，保留实际列名大小写。
-     */
-    private Map<Long, Map<String, String>> loadStatisticsColumns(List<ModelInstanceDO> instances) {
-        Set<Long> tableIds = instances.stream().map(ModelInstanceDO::getAuthorityTableId)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        if (tableIds.isEmpty()) return Collections.emptyMap();
-        List<ModelMaterializedColumnDO> columns = materializedColumnMapper.selectList(
-                new LambdaQueryWrapper<ModelMaterializedColumnDO>()
-                        .select(ModelMaterializedColumnDO::getMaterializedTableId,
-                                ModelMaterializedColumnDO::getSystemFieldKey, ModelMaterializedColumnDO::getColumnName)
-                        .in(ModelMaterializedColumnDO::getMaterializedTableId, tableIds)
-                        .in(ModelMaterializedColumnDO::getSystemFieldKey, Arrays.asList("STATUS", "UPDATED_TIME", "DEL_FLAG"))
-                        .eq(ModelMaterializedColumnDO::getEnabledFlag, true)
-                        .eq(ModelMaterializedColumnDO::getValidFlag, true));
-        Map<Long, Map<String, String>> result = new HashMap<>();
-        for (ModelMaterializedColumnDO column : columns) {
-            result.computeIfAbsent(column.getMaterializedTableId(), id -> new LinkedHashMap<>())
-                    .put(column.getSystemFieldKey(), column.getColumnName());
-        }
-        return result;
-    }
-
-    /**
-     * 不可用的模型不能改为返回草稿或任意一条历史成功记录。
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public ModelPublishedRespDTO getPublishedModel(Long modelId) {
-        ModelPublishedRespDTO model = publishedInfo(requirePublishedInstance(modelId));
-        fillDomainNames(Collections.singletonList(model));
-        return model;
-    }
-
-    @Transactional(readOnly = true)
-    @Override
-    public Long getPublishedModelId(Long instanceId) {
-        if (instanceId == null || instanceId <= 0) throw new ServiceException("模型实例ID格式无效");
-        Long modelId = instanceMapper.selectPublishedModelId(instanceId);
-        if (modelId == null) throw new ServiceException("当前实例不可用，请返回卡片列表后重新进入", HttpStatus.WARN);
-        return modelId;
-    }
-
-    /**
-     * 按成功快照中的域ID批量补齐当前展示名称，避免逐模型查询或读取草稿归属。
-     */
-    private void fillDomainNames(List<ModelPublishedRespDTO> models) {
-        Set<Long> projectIds = models.stream().map(ModelPublishedRespDTO::getProjectId)
-                .filter(id -> id != null && id > 0).collect(Collectors.toSet());
-        if (projectIds.isEmpty()) return;
-        Map<Long, String> names = new HashMap<>();
-        for (ModelProjectDO project : projectMapper.selectBatchIds(projectIds)) {
-            if (!Boolean.TRUE.equals(project.getDelFlag())) names.put(project.getId(), project.getName());
-        }
-        for (ModelPublishedRespDTO model : models) model.setDomainName(names.get(model.getProjectId()));
-    }
-
-    /**
-     * 基础、字段查询都从同一次指针查询取原实例，不先查基础信息再重新查询指针。
-     */
-    private ModelInstanceDO requirePublishedInstance(Long modelId) {
-        return requirePublishedInstance(modelId, false);
-    }
-
-    /**
-     * 物化信息查询额外读取结构格式版本，不读取历史连接配置。
-     */
-    private ModelInstanceDO requirePublishedInstance(Long modelId, boolean includeMaterialization) {
-        if (modelId == null || modelId <= 0) {
-            throw new ServiceException("请提供有效的主模型ID");
-        }
-        List<ModelInstanceDO> instances = new ArrayList<>();
-        readPublished(modelId, includeMaterialization, instances::add);
-        if (instances.size() != 1) {
-            throw new ServiceException("主数据模型不存在或未发布。");
-        }
-        return instances.get(0);
-    }
-
-    /**
-     * 在Mapper连接关闭前逐条处理配置；配置错误先停止读取，再在查询外抛出业务提示，
-     * 避免MyBatis把配置错误包装成数据库访问错误。
-     */
-    private void readPublished(Long modelId, Consumer<ModelInstanceDO> consumer) {
-        readPublished(modelId, false, consumer);
-    }
-
-    /**
-     * 同一次SQL选定成功指针和返回内容，连接信息另按数据源ID读取当前配置。
-     */
-    private void readPublished(Long modelId, boolean includeMaterialization, Consumer<ModelInstanceDO> consumer) {
-        ServiceException[] failure = {null};
-        instanceMapper.selectPublishedInstances(modelId, includeMaterialization, result -> {
-            try {
-                consumer.accept(result.getResultObject());
-            } catch (ServiceException ex) {
-                failure[0] = ex;
-                result.stop();
-            }
-        });
-        if (failure[0] != null) {
-            throw failure[0];
-        }
-    }
-
-    /**
-     * 统一核对成功配置格式、根模型及版本归属，不使用草稿补齐损坏内容。
-     */
-    private ModelPublishedSnapshotData publishedSnapshot(ModelInstanceDO instance) {
-        try {
-            ModelPublishSnapshot snapshot = JSON.parseObject(instance.getModelSnapshot(), ModelPublishSnapshot.class);
-            if (snapshot == null || !Integer.valueOf(1).equals(snapshot.getFormatVersion())
-                    || !Objects.equals(instance.getModelId(), snapshot.getModelId())
-                    || !Objects.equals(instance.getModelVersionId(), snapshot.getModelVersionId())
-                    || snapshot.getModel() == null || instance.getPublishedTime() == null) {
-                throw new IllegalArgumentException();
-            }
-            // 沿用项目BeanUtils转为实体，字符串"1"、"0"会按布尔值处理，也兼容快照中带毫秒的时间。
-            ModelBaseDO model = BeanUtils.toBean(snapshot.getModel(), ModelBaseDO.class);
-            ModelVersionDO version = model.getVersion();
-            // 主模型原有配置可能用NULL或0表示没有父模型，两种都可以；不改写保存的成功快照。
-            if (!Objects.equals(instance.getModelId(), model.getId())
-                    || Boolean.TRUE.equals(model.getDelFlag()) || (model.getParentId() != null && model.getParentId() != 0L)
-                    || version == null || !Objects.equals(instance.getModelVersionId(), version.getId())
-                    || !Objects.equals(instance.getModelId(), version.getModelId())
-                    || empty(model.getCode()) || empty(model.getName()) || empty(version.getVersionNo())) {
-                throw new IllegalArgumentException();
-            }
-            ModelPublishedSnapshotData result = new ModelPublishedSnapshotData();
-            result.snapshot = snapshot;
-            result.model = model;
-            return result;
-        } catch (RuntimeException ex) {
-            throw new ServiceException("成功发布配置不完整，无法读取模型信息：" + instance.getModelId());
-        }
-    }
-
-    /**
-     * 明确映射允许返回的基本属性，不把完整配置JSON、字段或连接信息直接向外返回。
-     */
-    private ModelPublishedRespDTO publishedInfo(ModelInstanceDO instance) {
-        return publishedInfo(instance, publishedSnapshot(instance).model);
-    }
-
-    /**
-     * 使用已经解析好的模型组装基本信息，同一次查询不用重复解析成功快照。
-     */
-    private ModelPublishedRespDTO publishedInfo(ModelInstanceDO instance, ModelBaseDO model) {
-        return publishedInfo(instance, model, currentDatasource(instance.getDatasourceId()));
-    }
-
-    private ModelPublishedRespDTO publishedInfo(ModelInstanceDO instance, ModelBaseDO model, DbQueryProperty property) {
-        ModelPublishedRespDTO result = new ModelPublishedRespDTO();
-        result.setId(instance.getModelId());
-        result.setCode(model.getCode());
-        result.setName(model.getName());
-        result.setProjectId(model.getProjectId());
-        result.setLayerId(model.getLayerId());
-        result.setType(model.getType());
-        result.setDescription(model.getDescription());
-        result.setInstanceId(instance.getId());
-        result.setVersionId(instance.getModelVersionId());
-        result.setVersionNo(model.getVersion().getVersionNo());
-        result.setPublishedTime(instance.getPublishedTime());
-        result.setAuthorityDatasourceId(instance.getDatasourceId());
-        result.setAuthoritySchemaName(DialectFactory.getDialect(DbType.getDbType(property.getDbType())).getSchemaName(property));
-        result.setAuthorityTableName(instance.getAuthorityTableName());
-        return result;
-    }
-
-    /**
-     * 仅供本类查询使用：完整快照保留引用配置，实体负责主子模型、版本和字段的类型转换。
-     */
-    private static class ModelPublishedSnapshotData {
-        /**
-         * 原始成功快照，不改写其中未映射到实体的属性。
-         */
-        private ModelPublishSnapshot snapshot;
-        /**
-         * 本次从快照解析出的模型，包含版本、字段和子模型。
-         */
-        private ModelBaseDO model;
-    }
-
-    @Transactional(readOnly = true)
-    @Override
-    public boolean isPublishedInstance(Long modelId, Long instanceId, Long versionId) {
-        return instanceMapper.countPublishedInstance(modelId, instanceId, versionId) == 1;
-    }
-
-    /**
-     * 一次读取同一成功实例的主子字段及引用配置，停用只影响返回内容，不修改历史JSON。
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public ModelPublishedStructureRespDTO getPublishedModelStructure(Long modelId) {
-        return getPublishedModelStructure(modelId, false);
-    }
-
-    /**
-     * 与结构查询共用同一次快照，按需补齐权威主表及列绑定。
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public ModelPublishedStructureRespDTO getPublishedModelStructure(Long modelId, boolean includeAuthorityTable) {
-        if (modelId == null || modelId <= 0) throw new ServiceException("请提供有效的主模型ID");
-        ModelInstanceDO instance = instanceMapper.selectPublishedStructure(modelId, includeAuthorityTable);
-        if (instance == null) throw new ServiceException("主数据模型不存在或未发布。");
-        ModelPublishedStructureRespDTO result = new ModelPublishedStructureRespDTO();
-        try {
-            ModelPublishedSnapshotData data = publishedSnapshot(instance);
-            ModelPublishSnapshot snapshot = data.snapshot;
-            ModelBaseDO root = data.model;
-            // 先核对原JSON列表的格式，避免解析实体时把缺少的列表当成空列表。
-            publishedObjects(snapshot.getModel(), "fields");
-            List<JSONObject> children = publishedObjects(snapshot.getModel(), "subModels");
-            Set<Long> referenceIds = new LinkedHashSet<>();
-            Set<Long> encodingVersionIds = new LinkedHashSet<>();
-            result.setModel(publishedInfo(instance, root));
-            result.setModelId(modelId);
-            result.setInstanceId(instance.getId());
-            result.setVersionId(instance.getModelVersionId());
-            result.setVersionNo(root.getVersion().getVersionNo());
-            result.setFields(publishedFields(root, referenceIds, encodingVersionIds));
-            Set<Long> nodeIds = new LinkedHashSet<>();
-            nodeIds.add(modelId);
-            for (int i = 0; i < root.getSubModels().size(); i++) {
-                ModelBaseDO child = root.getSubModels().get(i);
-                ModelVersionDO version = child.getVersion();
-                Long status = version == null ? null : version.getStatus();
-                // 删除、封存的子模型不返回，沿用原有状态含义。
-                if (Boolean.TRUE.equals(child.getDelFlag()) || Long.valueOf(3).equals(status) || Long.valueOf(4).equals(status)) {
-                    continue;
-                }
-                Long childId = child.getId();
-                if (childId == null || !modelId.equals(child.getParentId()) || !nodeIds.add(childId)
-                        || empty(child.getCode()) || empty(child.getName())
-                        || version == null
-                        || !instance.getModelVersionId().equals(version.getId())) {
-                    throw new IllegalArgumentException();
-                }
-                ModelPublishedSubmodelRespDTO submodel = new ModelPublishedSubmodelRespDTO();
-                submodel.setId(childId);
-                submodel.setParentId(modelId);
-                submodel.setCode(child.getCode());
-                submodel.setName(child.getName());
-                submodel.setType(child.getType());
-                submodel.setDescription(child.getDescription());
-                publishedObjects(children.get(i), "fields");
-                submodel.setFields(publishedFields(child, referenceIds, encodingVersionIds));
-                result.getSubModels().add(submodel);
-            }
-            fillReferences(snapshot, result, referenceIds, encodingVersionIds);
-        } catch (RuntimeException ex) {
-            throw new ServiceException("成功发布字段或引用配置不完整，无法读取模型信息：" + modelId);
-        }
-        if (includeAuthorityTable) fillAuthorityBinding(instance, result);
-        return result;
-    }
-
-    /**
-     * 只读取启用权威主表的列绑定，不加载完整物化计划、索引或其他角色表。
-     */
-    private void fillAuthorityBinding(ModelInstanceDO instance, ModelPublishedStructureRespDTO result) {
-        if (instance.getAuthorityTableId() == null || empty(instance.getAuthorityTableName())) {
-            throw new ServiceException("成功发布的权威主表不存在");
-        }
-        List<ModelMaterializedColumnDO> columns = materializedColumnMapper.selectList(
-                new LambdaQueryWrapper<ModelMaterializedColumnDO>()
-                        .select(ModelMaterializedColumnDO::getModelFieldId, ModelMaterializedColumnDO::getSystemFieldKey,
-                                ModelMaterializedColumnDO::getColumnName, ModelMaterializedColumnDO::getSystemFlag,
-                                ModelMaterializedColumnDO::getEnabledFlag, ModelMaterializedColumnDO::getValidFlag,
-                                ModelMaterializedColumnDO::getDelFlag, ModelMaterializedColumnDO::getColumnPosition,
-                                ModelMaterializedColumnDO::getLogicalType, ModelMaterializedColumnDO::getNullable,
-                                ModelMaterializedColumnDO::getColumnComment)
-                        .eq(ModelMaterializedColumnDO::getMaterializedTableId, instance.getAuthorityTableId())
-                        .eq(ModelMaterializedColumnDO::getEnabledFlag, true)
-                        .eq(ModelMaterializedColumnDO::getValidFlag, true));
-        result.setAuthorityColumns(BeanUtils.toBean(columns, ModelMaterializedColumnRespDTO.class));
-    }
-
-    /**
-     * 只保留正常字段，并收集它们实际使用的字典及编码版本，避免带出停用字段的引用。
-     */
-    private List<ModelPublishedColumnRespDTO> publishedFields(ModelBaseDO model, Set<Long> referenceIds, Set<Long> encodingVersionIds) {
-        List<ModelPublishedColumnRespDTO> fields = new ArrayList<>();
-        Set<Long> fieldIds = new LinkedHashSet<>();
-        for (ModelColumnDO field : model.getFields()) {
-            if (Boolean.TRUE.equals(field.getDelFlag())) {
-                continue;
-            }
-            Long fieldId = field.getId();
-            if (fieldId == null || !Objects.equals(model.getId(), field.getModelId())
-                    || !fieldIds.add(fieldId) || empty(field.getCode()) || empty(field.getName())) {
-                throw new IllegalArgumentException();
-            }
-            // 转为明确的字段DTO，未声明的内部配置不会作为任意JSON向外返回。
-            ModelPublishedColumnRespDTO column = BeanUtils.toBean(field, ModelPublishedColumnRespDTO.class);
-            fields.add(column);
-            if (column.getDictTypeId() != null) {
-                referenceIds.add(column.getDictTypeId());
-            }
-            if (column.getEncodingVersionId() != null) {
-                encodingVersionIds.add(column.getEncodingVersionId());
-            }
-        }
-        return fields;
-    }
-
-    /**
-     * 引用内容从同一成功配置按ID组装；多个字段引用同一对象只返回一份。
-     */
-    private void fillReferences(ModelPublishSnapshot snapshot, ModelPublishedStructureRespDTO result,
-                                Set<Long> referenceIds, Set<Long> encodingVersionIds) {
-        List<JSONObject> types = referenced(snapshot.getReferenceData(), "types", referenceIds);
-        result.setReferenceTypes(types.stream().map(row -> BeanUtils.toBean(row, ModelDictTypeRespDTO.class)).collect(Collectors.toList()));
-        result.setReferenceItems(relatedItems(snapshot.getReferenceData(), "items", "typeId", referenceIds).stream()
-                .map(row -> BeanUtils.toBean(row, ModelDictDataRespDTO.class)).collect(Collectors.toList()));
-        List<JSONObject> versions = referenced(snapshot.getEncodingSchemes(), "versions", encodingVersionIds);
-        Set<Long> schemeIds = new LinkedHashSet<>();
-        for (JSONObject version : versions) {
-            if (!Integer.valueOf(3).equals(version.getInteger("status")) || version.getLong("encodingId") == null) {
-                throw new IllegalArgumentException();
-            }
-            schemeIds.add(version.getLong("encodingId"));
-        }
-        result.setEncodingVersions(versions.stream().map(row -> BeanUtils.toBean(row, ModelEncodingVersionRespDTO.class)).collect(Collectors.toList()));
-        result.setEncodingSchemes(referenced(snapshot.getEncodingSchemes(), "schemes", schemeIds).stream()
-                .map(row -> BeanUtils.toBean(row, ModelEncodingRespDTO.class)).collect(Collectors.toList()));
-        result.setEncodingItems(relatedItems(snapshot.getEncodingSchemes(), "items", "encodingVersionId", encodingVersionIds).stream()
-                .map(row -> BeanUtils.toBean(row, ModelEncodingItemRespDTO.class)).collect(Collectors.toList()));
-    }
-
-    /**
-     * 字段实际引用的对象必须存在且可用；缺少或重复都报错，不去当前字典或编码表补查。
-     */
-    private List<JSONObject> referenced(JSONObject section, String key, Set<Long> ids) {
-        Map<Long, JSONObject> found = new LinkedHashMap<>();
-        if (!ids.isEmpty()) {
-            for (JSONObject row : publishedObjects(section, key)) {
-                Long id = row.getLong("id");
-                if (ids.contains(id) && (!publishedRowAvailable(row) || found.putIfAbsent(id, row) != null)) {
-                    throw new IllegalArgumentException();
-                }
-            }
-            if (!found.keySet().containsAll(ids)) {
-                throw new IllegalArgumentException();
-            }
-        }
-        return new ArrayList<>(found.values());
-    }
-
-    /**
-     * 只返回选中集合或版本下面正常使用的数据项，不返回无关对象或停用项。
-     */
-    private List<JSONObject> relatedItems(JSONObject section, String key, String ownerKey, Set<Long> ownerIds) {
-        List<JSONObject> result = new ArrayList<>();
-        Set<Long> itemIds = new LinkedHashSet<>();
-        if (!ownerIds.isEmpty()) {
-            for (JSONObject row : publishedObjects(section, key)) {
-                if (ownerIds.contains(row.getLong(ownerKey)) && publishedRowAvailable(row)) {
-                    if (row.getLong("id") == null || !itemIds.add(row.getLong("id"))) {
-                        throw new IllegalArgumentException();
-                    }
-                    result.add(row);
-                }
-            }
-        }
-        return result;
-    }
-
-    /**
-     * 沿用发布配置中的可用口径：未删除，且没有明确标记为无效。
-     */
-    private boolean publishedRowAvailable(JSONObject row) {
-        return !row.getBooleanValue("delFlag") && !Boolean.FALSE.equals(row.getBoolean("validFlag"));
-    }
-
-    /**
-     * 必需的列表必须是对象数组，格式损坏时不能静默当成没有字段或没有引用。
-     */
-    private List<JSONObject> publishedObjects(JSONObject section, String key) {
-        if (section == null || !(section.get(key) instanceof JSONArray)) {
-            throw new IllegalArgumentException();
-        }
-        List<JSONObject> result = new ArrayList<>();
-        for (Object value : section.getJSONArray(key)) {
-            if (!(value instanceof JSONObject)) {
-                throw new IllegalArgumentException();
-            }
-            result.add((JSONObject) value);
-        }
-        return result;
-    }
-
-    /**
-     * 查询成功物化记录及原目标描述；保留物理上仍存在的停用表列，不生成或执行任何DDL。
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public ModelPublishedMaterializationRespDTO getPublishedModelMaterialization(Long modelId) {
-        ModelInstanceDO instance = requirePublishedInstance(modelId, true);
-        try {
-            DbQueryProperty property = currentDatasource(instance.getDatasourceId());
-            ModelPublishedMaterializationRespDTO result = BeanUtils.toBean(
-                    publishedInfo(instance, publishedSnapshot(instance).model, property), ModelPublishedMaterializationRespDTO.class);
-            if (!Integer.valueOf(1).equals(instance.getStructureFormatVersion())
-                    || instance.getDatasourceId() == null) {
-                throw new IllegalArgumentException();
-            }
-            // 发布记录只确定数据源ID和物化结构，连接描述始终读取当前数据连接配置。
-            result.setDatasourceId(instance.getDatasourceId());
-            result.setDatabaseType(property.getDbType());
-            result.setDatabaseName(property.getDbName());
-            result.setSchemaName(result.getAuthoritySchemaName());
-            result.setTables(materializedTables(instance));
-            return result;
-        } catch (RuntimeException ex) {
-            throw new ServiceException("成功物化记录不完整，无法读取模型信息：" + modelId);
-        }
-    }
-
-    /**
-     * 按成功实例分组字段并核对主子、角色和配对，避免把历史实例或其他目标的记录当作当前绑定。
-     */
-    private List<ModelPublishedMaterializedTableRespDTO> materializedTables(ModelInstanceDO instance) {
-        List<ModelMaterializedTableDO> tables = materializedTableMapper.selectPublishedTables(instance.getId());
-        Map<Long, ModelPublishedMaterializedTableRespDTO> byId = new LinkedHashMap<>();
-        Set<String> identities = new HashSet<>();
-        Set<String> tableNames = new HashSet<>();
-        for (ModelMaterializedTableDO table : tables) {
-            if (table.getId() == null || table.getModelId() == null || table.getParentId() == null
-                    || !instance.getId().equals(table.getInstanceId()) || !instance.getDatasourceId().equals(table.getDatasourceId())
-                    || !Boolean.TRUE.equals(table.getValidFlag()) || !Boolean.FALSE.equals(table.getDelFlag())
-                    || table.getEnabledFlag() == null || empty(table.getTableName()) || !tableNames.add(table.getTableName())) {
-                throw new IllegalArgumentException();
-            }
-            ModelTableRole role = ModelTableRole.valueOf(table.getTableRole());
-            if (!identities.add(table.getModelId() + ":" + role.name())) {
-                throw new IllegalArgumentException();
-            }
-            ModelPublishedMaterializedTableRespDTO result = BeanUtils.toBean(table, ModelPublishedMaterializedTableRespDTO.class);
-            List<ModelMaterializedIndexDefinition> indexes = JSON.parseArray(table.getIndexDefinition(), ModelMaterializedIndexDefinition.class);
-            if (indexes == null || indexes.stream().anyMatch(Objects::isNull) || byId.putIfAbsent(table.getId(), result) != null) {
-                throw new IllegalArgumentException();
-            }
-            // 用明确的索引定义重新输出JSON，未知内部属性不跟随保存文本直接暴露。
-            result.setIndexDefinition(JSON.toJSONString(indexes));
-        }
-        if (!identities.contains(instance.getModelId() + ":SOURCE") || !identities.contains(instance.getModelId() + ":AUTHORITY")) {
-            throw new IllegalArgumentException();
-        }
-        for (ModelPublishedMaterializedTableRespDTO table : byId.values()) {
-            if (!identities.contains(table.getModelId() + ":SOURCE") || !identities.contains(table.getModelId() + ":AUTHORITY")) {
-                throw new IllegalArgumentException();
-            }
-            if (Long.valueOf(0).equals(table.getParentId())) {
-                if (!instance.getModelId().equals(table.getModelId()) || table.getParentTableId() != null) {
-                    throw new IllegalArgumentException();
-                }
-            } else {
-                ModelPublishedMaterializedTableRespDTO parent = byId.get(table.getParentTableId());
-                if (!instance.getModelId().equals(table.getParentId()) || parent == null || !Long.valueOf(0).equals(parent.getParentId())
-                        || !instance.getModelId().equals(parent.getModelId()) || !table.getTableRole().equals(parent.getTableRole())) {
-                    throw new IllegalArgumentException();
-                }
-            }
-        }
-        // 已经确认至少有来源、权威主表，表ID集合不会为空；所有字段只批量查一次。
-        Map<Long, Set<String>> columnNames = new LinkedHashMap<>();
-        for (ModelMaterializedColumnDO column : materializedColumnMapper.selectPublishedColumns(byId.keySet())) {
-            ModelPublishedMaterializedTableRespDTO table = byId.get(column.getMaterializedTableId());
-            if (table == null || !Boolean.TRUE.equals(column.getValidFlag()) || !Boolean.FALSE.equals(column.getDelFlag())
-                    || column.getEnabledFlag() == null || empty(column.getColumnName()) || empty(column.getPhysicalType())
-                    || !columnNames.computeIfAbsent(table.getId(), key -> new HashSet<>()).add(column.getColumnName())) {
-                throw new IllegalArgumentException();
-            }
-            table.getColumns().add(BeanUtils.toBean(column, ModelMaterializedColumnRespDTO.class));
-        }
-        if (byId.values().stream().anyMatch(table -> table.getColumns().isEmpty())) {
-            throw new IllegalArgumentException();
-        }
-        return new ArrayList<>(byId.values());
-    }
-
-    /**
-     * 按指定类别返回本主模型的已发布规则，不使用当前规则表覆盖历史配置。
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public ModelPublishedRulesRespDTO getPublishedModelRules(Long modelId, String ruleCategory) {
-        String category = ruleCategory == null ? "" : ruleCategory.trim().toUpperCase(Locale.ROOT);
-        if (!"MATCH".equals(category) && !"SURVIVOR".equals(category) && !"QUALITY".equals(category)) {
-            throw new ServiceException("规则类别应为MATCH、SURVIVOR或QUALITY");
-        }
-        ModelInstanceDO instance = requirePublishedInstance(modelId);
-        try {
-            ModelPublishedSnapshotData data = publishedSnapshot(instance);
-            ModelPublishSnapshot snapshot = data.snapshot;
-            ModelPublishedRulesRespDTO result = BeanUtils.toBean(publishedInfo(instance, data.model), ModelPublishedRulesRespDTO.class);
-            result.setRuleCategory(category);
-            Set<Long> ids = new HashSet<>();
-            for (JSONObject rule : publishedObjects(snapshot.getRules(), category.toLowerCase(Locale.ROOT))) {
-                Long ownerId = rule.getLong("modelId");
-                if (ownerId == null) {
-                    throw new IllegalArgumentException();
-                }
-                // 发布配置同时保存子模型规则；此接口按输入主模型ID精确查询，不把子模型规则混进来。
-                if (!modelId.equals(ownerId) || !publishedRowAvailable(rule)) {
-                    continue;
-                }
-                if (rule.getLong("id") == null || !ids.add(rule.getLong("id"))) {
-                    throw new IllegalArgumentException();
-                }
-                result.getRules().add(BeanUtils.toBean(rule, ModelPublishedRuleRespDTO.class));
-            }
-            return result;
-        } catch (RuntimeException ex) {
-            throw new ServiceException("成功发布规则配置不完整，无法读取模型信息：" + modelId);
-        }
-    }
-
-    /**
-     * 空白查询条件与未传条件采用相同处理。
-     */
-    private boolean empty(String value) {
-        return value == null || value.trim().isEmpty();
-    }
-
     // 整体发布和恢复
 
     /**
@@ -829,43 +173,28 @@ public class ModelPublishServiceImpl implements IModelPublishService {
         // 作用域只属于本次同步调用；任意返回或异常都会统一释放目标连接并清理线程引用。
         try (ModelPublishLogScope logs = new ModelPublishLogScope();
              ModelPublishTargetResourceScope resources = ModelPublishTargetResourceScope.begin()) {
-            // 此入口不包平台长事务：业务库DDL可能耗时或隐式提交，平台过程记录由各步骤的独立短事务保存。
-            // 发布顺序：处理旧实例 → 读取本次配置 → 校验并生成计划 → 逐条执行及核验 → 保存正式结果。
-
-            // 第1步：先查上一次是否还没处理完，避免重复点击后另起一份SQL计划。
             ModelInstanceDO pending = findUnfinishedInstance(modelId);
             if (pending != null) {
-                // 旧实例没有处理完时，本次点击只处理它，不拿当前草稿生成另一份计划。
                 return resumePublication(modelId, datasourceId, pending);
             }
-            // 第2步：登记发布实例，保存点击发布时的完整配置，并读取上一次成功结构。
+
             ModelPublishContext context = prepare(modelId, datasourceId, userId, userName);
-            // 当前版本已经整体成功时直接复用结果，不重复建表，也不再生成发布实例。
             if (context.getStatus() == ModelPublishStatus.SUCCEEDED) {
                 return context;
             }
+
             try {
-                // preparePlan内部依次执行CONFIG、BUILD、DIFF、CHANGE、TARGET及计划保存。
-                // 第3步：得到已保存的完整SQL计划；此时只做准备，尚未向业务库发送DDL。
                 ddlPlanService.preparePlan(context);
             } catch (RuntimeException ex) {
                 throw publishFailure(context, ex instanceof ServiceException ? ex.getMessage() : "发布配置校验或计划生成失败");
             }
             try {
-                // 第4步：逐条执行SQL并暂存结果，整批结束统一核验、保存；失败立即停止并保存回滚所需结果。
-                // 本次执行一旦失败就走回滚或补偿，不在这里自动恢复后继续发送。
                 ddlPlanService.executePlan(context);
             } catch (RuntimeException ex) {
-                // 执行服务负责保存原始证据；这里不把已经发送DDL的异常记成普通准备失败。
+                // 执行服务保存原始证据，本入口根据记录状态决定后续处理。
                 log.error("模型物化执行未完成，modelId={}, instanceId={}", modelId, context.getInstanceId(), ex);
             }
-            // COMMIT_PENDING表示业务库结构已经核验通过、平台正式结果尚未保存；其他状态先进入失败处理。
-            if (context.getStatus() != ModelPublishStatus.COMMIT_PENDING) {
-                compensateFailure(context);
-                throw publishFailure(context, "物化执行未完成，请查看原实例的执行、核验和补偿日志");
-            }
-            // 第5步：保存真实表列信息、版本状态和成功指针；这一步完成才算整次发布成功。
-            return completePublish(context);
+            return completeVerifiedPublish(context, "物化执行未完成，请查看原实例的执行、核验和补偿日志");
         } catch (RuntimeException | Error ex) {
             timing.failed(ex);
             throw ex;
@@ -899,16 +228,15 @@ public class ModelPublishServiceImpl implements IModelPublishService {
             // 恢复也只能从原主模型进入，不能拿其他模型的实例继续执行。
             if (model == null || (model.getParentId() != null && model.getParentId() != 0L)
                     || !Objects.equals(modelId, record.getModelId())) {
-                throw new ServiceException("必须从存在且未删除的主模型恢复发布");
+                throw new ServiceException("必须从存在且未删除的主模型恢复发布", HttpStatus.WARN);
             }
             if (!Objects.equals(datasourceId, record.getDatasourceId())) {
-                throw new ServiceException("模型还有未完成发布，请使用原数据源处理，不能更换本次发布目标");
+                throw new ServiceException("模型还有未完成发布，请使用原数据源处理，不能更换本次发布目标", HttpStatus.WARN);
             }
-            // 准备中断且连完整计划都没保存时，只能核对后结束本次准备，不能凭当前草稿猜原SQL。
+            Long instanceId = record.getId();
+            ModelPublishContext context = readInstanceContext(modelId, instanceId);
             if (ModelPublishStatus.PREPARING.name().equals(record.getStatus()) && StringUtils.isBlank(record.getExecutionPlan())) {
-                ModelPublishContext context = readInstanceContext(modelId, record.getId());
-                // 正常流程必须先保存完整计划才会发送SQL。仅对仍处于准备阶段、没有执行证据的记录结束失败。
-                // 已有计划摘要或SQL记录却缺计划，属于记录不完整，不能清掉状态再重新建表。
+                // 只有仍处于准备阶段且没有执行证据的实例可以直接结束。
                 if (context.getCurrentStage().ordinal() > ModelPublishStage.PLAN.ordinal()
                         || StringUtils.isNotBlank(record.getExecutedSql()) || StringUtils.isNotBlank(record.getStructureHash())) {
                     throw publishFailure(context, "原计划缺失但存在执行信息，保留记录，不能重新发布");
@@ -917,43 +245,19 @@ public class ModelPublishServiceImpl implements IModelPublishService {
                 context.setStatus(ModelPublishStatus.FAILED);
                 throw publishFailure(context, "原准备过程已结束失败，当前草稿保留，请重新点击发布");
             }
-            // recover内部按原阶段分流：待提交只保存，补偿只继续补偿，执行中断先核验再决定是否重试。
-            return recover(modelId, record.getId());
-        } catch (RuntimeException | Error ex) {
-            timing.failed(ex);
-            throw ex;
-        } finally {
-            timing.close();
-        }
-    }
-
-    /**
-     * 恢复只使用原实例。正向执行与补偿分开处理，不能把已经补偿过的计划重新从头执行。
-     */
-    private ModelPublishContext recover(Long modelId, Long instanceId) {
-        // 只记录调用耗时，finally确保提前返回或异常时也结束计时；原事务注解和异常继续保留。
-        ModelPublishTimingUtils.ModelPublishTiming timing = ModelPublishTimingUtils.start("RECOVER", modelId, instanceId);
-        try {
-            ModelPublishContext context = readInstanceContext(modelId, instanceId);
-            // 已经成功则返回原结果；待保存则补存正式结果，两种情况都不重新执行DDL。
             if (context.getStatus() == ModelPublishStatus.SUCCEEDED || context.getStatus() == ModelPublishStatus.COMMIT_PENDING) {
                 return completePublish(context);
             }
-            // 进入过补偿的实例只能继续处理补偿，不能再回到正向建表流程。
             if (context.getCurrentStage() == ModelPublishStage.COMPENSATE || context.getStatus() == ModelPublishStatus.COMPENSATING) {
                 compensateFailure(context);
                 throw publishFailure(context, context.getStatus() == ModelPublishStatus.FAILED
                         ? "原实例补偿已处理完成，本次发布仍失败，可修改草稿后重新发布"
                         : "原实例仍有补偿失败或未知效果，请查看原实例记录");
             }
-            // 由现有恢复服务核对归属、原计划、执行证据和目标身份；不读取草稿，也不重新生成计划。
-            context = ddlPlanService.recoverPlan(modelId, instanceId);
-            context = recoverExecution(context);
-            if (context.getStatus() != ModelPublishStatus.COMMIT_PENDING) {
-                compensateFailure(context);
-                throw publishFailure(context, "原实例恢复尚未完成，请查看执行、核验和补偿日志");
-            }
-            return completePublish(context);
+
+            // 恢复使用原计划核对已经发送的 DDL，再按原计划决定是否重试。
+            context = recoverExecution(ddlPlanService.recoverPlan(modelId, instanceId));
+            return completeVerifiedPublish(context, "原实例恢复尚未完成，请查看执行、核验和补偿日志");
         } catch (RuntimeException | Error ex) {
             timing.failed(ex);
             throw ex;
@@ -967,11 +271,11 @@ public class ModelPublishServiceImpl implements IModelPublishService {
      */
     private ModelPublishContext readInstanceContext(Long modelId, Long instanceId) {
         if (modelId == null || modelId <= 0 || instanceId == null || instanceId <= 0) {
-            throw new ServiceException("主模型ID和原发布实例ID必须为正数");
+            throw new ServiceException("主模型ID和原发布实例ID必须为正数", HttpStatus.WARN);
         }
         ModelInstanceDO record = instanceMapper.selectById(instanceId);
         if (record == null || !modelId.equals(record.getModelId())) {
-            throw new ServiceException("原发布实例不存在或不属于当前主模型");
+            throw new ServiceException("原发布实例不存在或不属于当前主模型", HttpStatus.WARN);
         }
         ModelPublishContext context = new ModelPublishContext();
         context.setModelId(modelId);
@@ -987,6 +291,17 @@ public class ModelPublishServiceImpl implements IModelPublishService {
         }
         ModelPublishTimingUtils.bind(context);
         return context;
+    }
+
+    /**
+     * 执行和核验通过后提交；其他状态走原实例的失败处理。
+     */
+    private ModelPublishContext completeVerifiedPublish(ModelPublishContext context, String failureReason) {
+        if (context.getStatus() != ModelPublishStatus.COMMIT_PENDING) {
+            compensateFailure(context);
+            throw publishFailure(context, failureReason);
+        }
+        return completePublish(context);
     }
 
     /**
@@ -1171,7 +486,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
         try {
             ModelBaseDO model = modelMapper.selectById(modelId);
             if (model == null || (model.getParentId() != null && model.getParentId() != 0)) {
-                throw new ServiceException("必须从存在且未删除的主模型整体发布");
+                throw new ServiceException("必须从存在且未删除的主模型整体发布", HttpStatus.WARN);
             }
             // 只排除整体成功和已确认处理完的失败，其余记录都要先核对。
             // 例如服务重启后留下的PREPARING，也不能直接当作没发布过。
@@ -1180,7 +495,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
                     .eq(ModelInstanceDO::getModelId, modelId)
                     .notIn(ModelInstanceDO::getStatus, ModelPublishStatus.SUCCEEDED.name(), ModelPublishStatus.FAILED.name()));
             if (unresolved == null || unresolved > 0) {
-                throw new ServiceException("模型存在未决发布实例，请先核验恢复，不能重新发布");
+                throw new ServiceException("模型存在未决发布实例，请先核验恢复，不能重新发布", HttpStatus.WARN);
             }
             // 先整理本次发布记录；BASE_INSTANCE_ID指向上次成功实例，不是本次实例自身。
             ModelInstanceDO record = new ModelInstanceDO();
@@ -1211,7 +526,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
                     && modelId.equals(version.getModelId()) && validBase(modelId, base)
                     && version.getId().equals(base.getModelVersionId())) {
                 if (!java.util.Objects.equals(datasourceId, base.getDatasourceId())) {
-                    throw new ServiceException("已成功版本不能通过重复发布切换目标数据源");
+                    throw new ServiceException("已成功版本不能通过重复发布切换目标数据源", HttpStatus.WARN);
                 }
                 ModelPublishContext existing = context(model, version, base.getId());
                 existing.setStatus(ModelPublishStatus.SUCCEEDED);
@@ -1227,17 +542,17 @@ public class ModelPublishServiceImpl implements IModelPublishService {
                 ModelVersionStatus versionStatus = ModelVersionStatus.fromStatus(version.getStatus());
                 // 草稿是第一次发布，修订中是已有成功版本后再次发布；其余状态不能走新的发布流程。
                 if (versionStatus != ModelVersionStatus.DRAFT && versionStatus != ModelVersionStatus.REVISING) {
-                    throw new ServiceException("只有草稿或修订中的模型可以发布");
+                    throw new ServiceException("只有草稿或修订中的模型可以发布", HttpStatus.WARN);
                 }
                 if (datasourceId == null || datasourceId <= 0) {
-                    throw new ServiceException("目标数据源未指定");
+                    throw new ServiceException("目标数据源未指定", HttpStatus.WARN);
                 }
                 // 有上次成功记录ID却查不到对应的有效记录，说明历史信息有问题，不能按首次发布重新建表。
                 if (model.getPublishedInstanceId() != null && !validBase(modelId, base)) {
                     throw new ServiceException("模型元数据出错");
                 }
                 if (base != null && !datasourceId.equals(base.getDatasourceId())) {
-                    throw new ServiceException("已发布模型不能切换目标数据源");
+                    throw new ServiceException("已发布模型不能切换目标数据源", HttpStatus.WARN);
                 }
                 ModelPublishContext context = context(model, version, record.getId());
                 // 通过代理开启独立只读事务，一次读取主子模型、字段及关联配置，形成这次发布的固定副本。
@@ -1328,12 +643,12 @@ public class ModelPublishServiceImpl implements IModelPublishService {
         ModelPublishTimingUtils.ModelPublishTiming timing = ModelPublishTimingUtils.start("TARGET_OPEN", context);
         try {
             if (context.getDatasourceId() == null) {
-                throw new ServiceException("发布缺少目标数据源ID");
+                throw new ServiceException("发布缺少目标数据源ID", HttpStatus.WARN);
             }
-            List<JSONObject> rows = configObjects(configMapper.selectPublishDatasource(context.getDatasourceId()));
+            List<JSONObject> rows = ModelPublishUtils.configObjects(configMapper.selectPublishDatasource(context.getDatasourceId()));
             if (rows.size() != 1 || !context.getDatasourceId().equals(rows.get(0).getLong("id"))
                     || rows.get(0).getBooleanValue("delFlag") || !rows.get(0).getBooleanValue("validFlag")) {
-                throw new ServiceException("目标数据源不存在、已删除或已停用");
+                throw new ServiceException("目标数据源不存在、已删除或已停用", HttpStatus.WARN);
             }
             JSONObject row = rows.get(0);
             DbQuery query = null;
@@ -1420,21 +735,6 @@ public class ModelPublishServiceImpl implements IModelPublishService {
     }
 
     /**
-     * 连接配置可修改，成功发布信息也按数据源ID读取当前配置，不回退到发布快照。
-     */
-    private DbQueryProperty currentDatasource(Long datasourceId) {
-        if (datasourceId == null || datasourceId <= 0) throw new ServiceException("发布数据源ID无效");
-        List<JSONObject> rows = configObjects(configMapper.selectPublishDatasource(datasourceId));
-        if (rows.size() != 1 || !datasourceId.equals(rows.get(0).getLong("id"))
-                || rows.get(0).getBooleanValue("delFlag")) {
-            throw new ServiceException("发布模型的数据连接不存在或已删除");
-        }
-        JSONObject row = rows.get(0);
-        return new DbQueryProperty(row.getString("datasourceType"), row.getString("ip"),
-                row.getLong("port"), row.getString("datasourceConfig"));
-    }
-
-    /**
      * 同一个未完成DDL计划不能在执行期间切换物理目标。
      */
     private void verifyTargetIdentity(ModelPublishTarget expected, ModelPublishTarget actual) {
@@ -1458,7 +758,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
         ModelPublishTimingUtils.ModelPublishTiming timing = ModelPublishTimingUtils.start("READ_CONFIG", modelId, null);
         try {
             // 配置读取由独立只读事务包住；模型、字段、引用数据及规则共同组成MODEL_SNAPSHOT。
-            List<JSONObject> nodes = configObjects(configMapper.selectNodes(modelId));
+            List<JSONObject> nodes = ModelPublishUtils.configObjects(configMapper.selectNodes(modelId));
             // 先从模型及子模型清单中找到主模型；找不到就报错，不返回一份缺主模型的配置。
             JSONObject root = nodes.stream().filter(node -> modelId.equals(node.getLong("id"))).findFirst()
                     .orElseThrow(() -> new ServiceException("根模型配置不存在"));
@@ -1481,10 +781,10 @@ public class ModelPublishServiceImpl implements IModelPublishService {
             if (!childIds.isEmpty()) {
                 Long descendants = configMapper.countActiveDescendants(childIds);
                 if (descendants == null || descendants > 0) {
-                    throw new ServiceException("模型存在未支持的下级结构或无法确认层级");
+                    throw new ServiceException("模型存在未支持的下级结构或无法确认层级", HttpStatus.WARN);
                 }
             }
-            List<JSONObject> fields = configObjects(configMapper.selectFields(ids));
+            List<JSONObject> fields = ModelPublishUtils.configObjects(configMapper.selectFields(ids));
             // 使用Set去重，多个字段引用同一字典或编码版本时，只需要查询一次。
             Set<Long> referenceIds = new LinkedHashSet<>();
             Set<Long> encodingVersionIds = new LinkedHashSet<>();
@@ -1511,19 +811,19 @@ public class ModelPublishServiceImpl implements IModelPublishService {
             snapshot.setModel(root);
             // 先查需要的参考数据集合并检查是否查全，再查这些集合下面的数据项。没有引用就不查询。
             if (!referenceIds.isEmpty()) {
-                snapshot.getReferenceData().put("types", requireIds(configObjects(configMapper.selectReferenceTypes(referenceIds)), referenceIds, "参考数据集合"));
-                snapshot.getReferenceData().put("items", configObjects(configMapper.selectReferenceItems(referenceIds)));
+                snapshot.getReferenceData().put("types", requireIds(ModelPublishUtils.configObjects(configMapper.selectReferenceTypes(referenceIds)), referenceIds, "参考数据集合"));
+                snapshot.getReferenceData().put("items", ModelPublishUtils.configObjects(configMapper.selectReferenceItems(referenceIds)));
             }
             // 先查字段实际引用的编码版本，再由版本查编码方案主体，最后补齐版本的全部组成项。
             if (!encodingVersionIds.isEmpty()) {
-                List<JSONObject> versions = requireIds(configObjects(configMapper.selectEncodingVersions(encodingVersionIds)), encodingVersionIds, "编码方案版本");
+                List<JSONObject> versions = requireIds(ModelPublishUtils.configObjects(configMapper.selectEncodingVersions(encodingVersionIds)), encodingVersionIds, "编码方案版本");
                 Set<Long> encodingIds = new LinkedHashSet<>();
                 for (JSONObject encodingVersion : versions) {
                     encodingIds.add(encodingVersion.getLong("encodingId"));
                 }
                 snapshot.getEncodingSchemes().put("versions", versions);
-                snapshot.getEncodingSchemes().put("schemes", requireIds(configObjects(configMapper.selectEncodings(encodingIds)), encodingIds, "编码方案"));
-                snapshot.getEncodingSchemes().put("items", configObjects(configMapper.selectEncodingItems(encodingVersionIds)));
+                snapshot.getEncodingSchemes().put("schemes", requireIds(ModelPublishUtils.configObjects(configMapper.selectEncodings(encodingIds)), encodingIds, "编码方案"));
+                snapshot.getEncodingSchemes().put("items", ModelPublishUtils.configObjects(configMapper.selectEncodingItems(encodingVersionIds)));
             }
             // 通过规则模块公共API读取主子模型的完整规则，再复制成独立JSON保存。
             // 后续查询成功版本时读取这份配置，不受当前规则修改或API返回对象变化影响。
@@ -1543,44 +843,6 @@ public class ModelPublishServiceImpl implements IModelPublishService {
     }
 
     /**
-     * 把数据库查询结果转成独立JSON：大写下划线列名转成驼峰命名，Clob（大文本）读成字符串。DO里暂时没有的配置列也保留。
-     *
-     * @param rows 原始查询结果，不能以null表示读取失败
-     * @return 独立JSON记录列表
-     */
-    private List<JSONObject> configObjects(List<Map<String, Object>> rows) {
-        if (rows == null) {
-            throw new ServiceException("发布配置读取结果无效");
-        }
-        List<JSONObject> result = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            JSONObject object = new JSONObject();
-            for (Map.Entry<String, Object> entry : row.entrySet()) {
-                // 例如MODEL_VERSION_ID先拆成model、version、id，再拼成modelVersionId，方便后面按Java属性名读取。
-                String[] parts = entry.getKey().toLowerCase(Locale.ROOT).split("_");
-                StringBuilder key = new StringBuilder(parts[0]);
-                for (int i = 1; i < parts.length; i++) {
-                    key.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
-                }
-                Object value = entry.getValue();
-                if (value instanceof Clob) {
-                    try {
-                        Clob clob = (Clob) value;
-                        // Clob是数据库的大文本对象，趁连接还有效时读成普通字符串；它的读取位置从1开始。
-                        value = clob.getSubString(1, Math.toIntExact(clob.length()));
-                    } catch (SQLException ex) {
-                        throw new ServiceException("发布配置大文本读取失败");
-                    }
-                }
-                object.put(key.toString(), value);
-            }
-            // 通过JSON转换再复制一份，避免快照继续引用查询结果中的可变对象。
-            result.add(JSON.parseObject(JSON.toJSONString(object)));
-        }
-        return result;
-    }
-
-    /**
      * 逐个检查需要的字典、编码方案是否都查到了，少了任何一条就报错。
      *
      * @param rows  读取的引用记录
@@ -1592,7 +854,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
         for (Long id : ids) {
             // noneMatch表示“一条也没找到”；需要的ID为空或找不到对应记录，都说明引用配置不完整。
             if (id == null || rows.stream().noneMatch(row -> id.equals(row.getLong("id")))) {
-                throw new ServiceException(label + "不存在，ID：" + id);
+                throw new ServiceException(label + "不存在，ID：" + id, HttpStatus.WARN);
             }
         }
         return rows;
@@ -1643,7 +905,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
                     throw new ServiceException("成功模型配置快照不完整或归属不一致");
                 }
                 // 这里读取的是平台保存的成功物化记录；目标数据库的真实结构会在TARGET阶段另行核对。
-                List<JSONObject> tables = configObjects(configMapper.selectMaterializedTables(baseInstance.getId()));
+                List<JSONObject> tables = ModelPublishUtils.configObjects(configMapper.selectMaterializedTables(baseInstance.getId()));
                 if (tables.isEmpty()) {
                     throw new ServiceException("成功实例缺少物化表");
                 }
@@ -1652,7 +914,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
                     requireHistoryRow(table);
                     tableIds.add(table.getLong("id"));
                 }
-                List<JSONObject> columns = configObjects(configMapper.selectMaterializedColumns(tableIds));
+                List<JSONObject> columns = ModelPublishUtils.configObjects(configMapper.selectMaterializedColumns(tableIds));
                 Set<ModelMaterializedTableIdentity> identities = new HashSet<>();
                 for (JSONObject row : tables) {
                     ModelMaterializedTableDefinition table = JSON.parseObject(row.toJSONString(), ModelMaterializedTableDefinition.class);
@@ -1912,7 +1174,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
      */
     private ModelPublishExecutionPlan requireCommitInstance(ModelInstanceDO stored, Long modelId) {
         if (stored == null || !Objects.equals(modelId, stored.getModelId())) {
-            throw new ServiceException("正式保存的实例不存在或不属于当前主模型");
+            throw new ServiceException("正式保存的实例不存在或不属于当前主模型", HttpStatus.WARN);
         }
         if (ModelPublishStatus.SUCCEEDED.name().equals(stored.getStatus())) {
             return null;
@@ -1920,7 +1182,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
         if (!ModelPublishStatus.COMMIT_PENDING.name().equals(stored.getStatus())
                 || !ModelPublishStage.VERIFY.name().equals(stored.getCurrentStage())
                 || !ModelCompensationStatus.NOT_REQUIRED.name().equals(stored.getCompensationStatus())) {
-            throw new ServiceException("只有完整物化核验通过的待提交实例才能保存正式结果");
+            throw new ServiceException("只有完整物化核验通过的待提交实例才能保存正式结果", HttpStatus.WARN);
         }
         // 计划只在本次方法调用中解析一次；调用方继续使用同一个已校验对象。
         ModelPublishExecutionPlan savedPlan;
@@ -2741,7 +2003,7 @@ public class ModelPublishServiceImpl implements IModelPublishService {
     public ModelPublishContext beginCompensation(Long modelId, Long instanceId) {
         ModelInstanceDO stored = instanceMapper.selectById(instanceId);
         if (stored == null || !Objects.equals(modelId, stored.getModelId())) {
-            throw new ServiceException("补偿实例不存在或不属于当前主模型");
+            throw new ServiceException("补偿实例不存在或不属于当前主模型", HttpStatus.WARN);
         }
         // finished表示此前已确认清理完成，重复进入只返回原结果；continuing表示继续原补偿，不新建实例。
         boolean finished = ModelPublishStatus.FAILED.name().equals(stored.getStatus())
@@ -2752,13 +2014,13 @@ public class ModelPublishServiceImpl implements IModelPublishService {
                 || ModelPublishStatus.COMPENSATING.name().equals(stored.getStatus()))
                 || !(continuing || ModelPublishStage.EXECUTE.name().equals(stored.getCurrentStage())
                 || ModelPublishStage.VERIFY.name().equals(stored.getCurrentStage())))) {
-            throw new ServiceException("只有失败或中断的执行实例可补偿，已成功、待提交及准备中的实例不允许清理");
+            throw new ServiceException("只有失败或中断的执行实例可补偿，已成功、待提交及准备中的实例不允许清理", HttpStatus.WARN);
         }
         // 先确认实例从未正式绑定成功；哪怕模型后来被停用，也不能把已正式生效的物理表当失败对象清理。
         assertNotPublished(instanceId);
         ModelPublishExecutionPlan plan = readExecutionPlan(stored);
         if (plan.getDdlTransactionStatus() != ModelDdlTransactionStatus.NONE) {
-            throw new ServiceException("事务型DDL不能走逆向删除补偿，请核对原业务库事务结果");
+            throw new ServiceException("事务型DDL不能走逆向删除补偿，请核对原业务库事务结果", HttpStatus.WARN);
         }
         if (plan.getCompensationMaxRetries() == null || plan.getCompensationMaxRetries() < 0 || plan.getCompensationMaxRetries() > 3) {
             throw new ServiceException("保存计划的补偿重试次数无效");
@@ -4100,12 +3362,11 @@ public class ModelPublishServiceImpl implements IModelPublishService {
             }
             String path = ModelPublishUtils.path(model);
             String code = model.getString("code");
+            String modelLabel = Objects.equals(context.getModelId(), model.getLong("id")) ? "模型" : "子模型";
             if (!identifier(code)) {
-                // 根据根模型ID区分主子模型，主模型沿用原提示，子模型明确提示“子模型编码”。
-                String modelLabel = Objects.equals(context.getModelId(), model.getLong("id")) ? "模型" : "子模型";
                 modelStructureError(issues, path, modelLabel + "编码只允许英文字母、数字、下划线，且不能是通用数据库关键字");
             } else if (!modelCodes.add(code.toLowerCase(Locale.ROOT))) {
-                modelStructureError(issues, path, "本次主子模型编码重复");
+                modelStructureError(issues, path, modelLabel + "“" + code + "”编码重复");
             }
             // 允许大写编码后，查询参数仍需匹配数据库原有的 LOWER(CODE) 查询。
             expectedOwners.put(code == null ? null : code.toLowerCase(Locale.ROOT), model.getLong("id"));
@@ -4145,7 +3406,9 @@ public class ModelPublishServiceImpl implements IModelPublishService {
                 Object ownerCode = owner.get("CODE") == null ? owner.get("code") : owner.get("CODE");
                 Long expectedId = ownerCode == null ? null : expectedOwners.get(ownerCode.toString().toLowerCase(Locale.ROOT));
                 if (id == null || expectedId == null || !expectedId.equals(Long.valueOf(id.toString()))) {
-                    modelStructureError(issues, "模型编码", "模型编码已被其他模型占用");
+                    String message = ownerCode == null ? "模型编码已被其他模型占用"
+                            : "模型编码“" + ownerCode + "”已被其他模型占用";
+                    modelStructureError(issues, "模型编码", message);
                 }
             }
         }

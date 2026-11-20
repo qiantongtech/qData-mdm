@@ -91,14 +91,23 @@ public class ModelDictTypeController extends BaseController {
         exportReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
         List<ModelDictTypeDO> list = (List<ModelDictTypeDO>) modelDictTypeService.getModelDictTypePage(exportReqVO).getRows();
         ExcelUtil<ModelDictTypeRespVO> util = new ExcelUtil<>(ModelDictTypeRespVO.class);
-        util.exportExcel(response, BeanUtils.toBean(list, ModelDictTypeRespVO.class), "应用管理数据");
+        util.exportExcel(response, BeanUtils.toBean(list, ModelDictTypeRespVO.class), "参考数据");
+    }
+
+    @Operation(summary = "下载参考数据导入模板")
+    @PreAuthorize("@ss.hasPermi('model:dict:type:import')")
+    @PostMapping("/importTemplate")
+    public void importTemplate(HttpServletResponse response) {
+        ExcelUtil<ModelDictTypeRespVO> util = new ExcelUtil<>(ModelDictTypeRespVO.class);
+        util.importTemplateExcel(response, "参考数据导入模板");
     }
 
     @Operation(summary = "导入参考数据列表")
     @PreAuthorize("@ss.hasPermi('model:dict:type:import')")
     @Log(title = "参考数据", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
-    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestParam("file") MultipartFile file,
+                                 @RequestParam(defaultValue = "false") boolean updateSupport) throws Exception {
         ExcelUtil<ModelDictTypeRespVO> util = new ExcelUtil<>(ModelDictTypeRespVO.class);
         List<ModelDictTypeRespVO> importExcelList = util.importExcel(file.getInputStream());
         String operName = getUsername();
@@ -119,8 +128,6 @@ public class ModelDictTypeController extends BaseController {
     @Log(title = "参考数据", businessType = BusinessType.INSERT)
     @PostMapping
     public CommonResult<Long> add(@Valid @RequestBody ModelDictTypeSaveReqVO modelDictType) {
-        if (!modelDictTypeService.checkCodeUnique(modelDictType.getCode(), null))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "新增'" + modelDictType.getCode() + "'失败，编码已存在");
         modelDictType.setCreatorId(getUserId());
         modelDictType.setCreateBy(getNickName());
         modelDictType.setCreateTime(DateUtil.date());
@@ -132,8 +139,6 @@ public class ModelDictTypeController extends BaseController {
     @Log(title = "参考数据", businessType = BusinessType.UPDATE)
     @PutMapping
     public CommonResult<Integer> edit(@Valid @RequestBody ModelDictTypeSaveReqVO modelDictType) {
-        if (!modelDictTypeService.checkCodeUnique(modelDictType.getCode(), modelDictType.getId()))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "修改'" + modelDictType.getCode() + "'失败，编码已存在");
         modelDictType.setUpdatorId(getUserId());
         modelDictType.setUpdateBy(getNickName());
         modelDictType.setUpdateTime(DateUtil.date());

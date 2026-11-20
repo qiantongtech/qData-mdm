@@ -60,10 +60,6 @@ public interface IModelDictTypeService extends IService<ModelDictTypeDO> {
      */
     int updateModelDictType(ModelDictTypeSaveReqVO updateReqVO);
 
-    /**
-     * 校验参考数据编码是否唯一
-     */
-    boolean checkCodeUnique(String code, Long id);
 
     /**
      * 更新参考数据状态

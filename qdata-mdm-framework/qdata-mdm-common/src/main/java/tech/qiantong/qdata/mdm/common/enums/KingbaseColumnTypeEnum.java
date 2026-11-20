@@ -26,13 +26,17 @@ import tech.qiantong.qdata.mdm.common.database.utils.MD5Util;
  */
 @Getter
 public enum KingbaseColumnTypeEnum {
+    INT2("INT2", DmColumnTypeEnum.INTEGER),
+    INT4("INT4", DmColumnTypeEnum.INTEGER),
+    INT8("INT8", DmColumnTypeEnum.BIGINT),
     TINYINT("TINYINT", DmColumnTypeEnum.TINYINT),
-    SMALLINT("SMALLINT", DmColumnTypeEnum.TINYINT),
+    SMALLINT("SMALLINT", DmColumnTypeEnum.INTEGER),
     INTEGER("INTEGER", DmColumnTypeEnum.INTEGER),
     INT("INT", DmColumnTypeEnum.INTEGER),
     BIGINT("BIGINT", DmColumnTypeEnum.BIGINT),
+    BIGSERIAL("BIGSERIAL", DmColumnTypeEnum.BIGINT),
     DECIMAL("DECIMAL", DmColumnTypeEnum.DECIMAL),
-    NUMERIC("NUMERIC", DmColumnTypeEnum.NUMERIC),
+    NUMERIC("NUMERIC", DmColumnTypeEnum.DECIMAL),
     FLOAT("FLOAT", DmColumnTypeEnum.FLOAT),
     DOUBLE("DOUBLE", DmColumnTypeEnum.DOUBLE),
     NUMBER("NUMBER", DmColumnTypeEnum.NUMBER),

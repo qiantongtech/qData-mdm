@@ -32,14 +32,12 @@ import tech.qiantong.qdata.mdm.common.core.domain.CommonResult;
 import tech.qiantong.qdata.mdm.common.core.page.PageParam;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.enums.BusinessType;
-import tech.qiantong.qdata.mdm.common.exception.enums.GlobalErrorCodeConstants;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.common.utils.poi.ExcelUtil;
 import tech.qiantong.qdata.mdm.model.controller.admin.dict.vo.ModelDictDataPageReqVO;
 import tech.qiantong.qdata.mdm.model.controller.admin.dict.vo.ModelDictDataRespVO;
 import tech.qiantong.qdata.mdm.model.controller.admin.dict.vo.ModelDictDataSaveReqVO;
 import tech.qiantong.qdata.mdm.model.controller.admin.dict.vo.ModelDictDataUsageRespVO;
-import tech.qiantong.qdata.mdm.model.convert.dict.ModelDictDataConvert;
 import tech.qiantong.qdata.mdm.model.dal.dataobject.dict.ModelDictDataDO;
 import tech.qiantong.qdata.mdm.model.service.dict.IModelDictDataService;
 
@@ -97,22 +95,32 @@ public class ModelDictDataController extends BaseController {
     @PreAuthorize("@ss.hasPermi('model:dict:data:export')")
     @Log(title = "参考数据项", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
-    public void export(HttpServletResponse response, ModelDictDataPageReqVO exportReqVO) {
-        exportReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
-        List<ModelDictDataDO> list = (List<ModelDictDataDO>) modelDictDataService.getModelDictDataPage(exportReqVO).getRows();
+    public void export(HttpServletResponse response, ModelDictDataPageReqVO exportReqVO,
+                       @RequestParam("typeCode") String typeCode) {
+        List<ModelDictDataRespVO> rows = modelDictDataService.getModelDictDataExportRows(exportReqVO, typeCode);
         ExcelUtil<ModelDictDataRespVO> util = new ExcelUtil<>(ModelDictDataRespVO.class);
-        util.exportExcel(response, ModelDictDataConvert.INSTANCE.convertToRespVOList(list), "应用管理数据");
+        util.exportExcel(response, rows, "参考数据项");
+    }
+
+    @Operation(summary = "下载参考数据项导入模板")
+    @PreAuthorize("@ss.hasPermi('model:dict:data:import')")
+    @PostMapping("/importTemplate")
+    public void importTemplate(HttpServletResponse response) {
+        ExcelUtil<ModelDictDataRespVO> util = new ExcelUtil<>(ModelDictDataRespVO.class);
+        util.importTemplateExcel(response, "参考数据项导入模板");
     }
 
     @Operation(summary = "导入参考数据项列表")
     @PreAuthorize("@ss.hasPermi('model:dict:data:import')")
     @Log(title = "参考数据项", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
-    public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestParam("file") MultipartFile file,
+                                 @RequestParam(defaultValue = "false") boolean updateSupport,
+                                 @RequestParam(value = "typeCode", required = false) String typeCode) throws Exception {
         ExcelUtil<ModelDictDataRespVO> util = new ExcelUtil<>(ModelDictDataRespVO.class);
         List<ModelDictDataRespVO> importExcelList = util.importExcel(file.getInputStream());
         String operName = getUsername();
-        String message = modelDictDataService.importModelDictData(importExcelList, updateSupport, operName);
+        String message = modelDictDataService.importModelDictData(importExcelList, typeCode, updateSupport, operName);
         return success(message);
     }
 
@@ -129,8 +137,6 @@ public class ModelDictDataController extends BaseController {
     @Log(title = "参考数据项", businessType = BusinessType.INSERT)
     @PostMapping
     public CommonResult<Long> add(@Valid @RequestBody ModelDictDataSaveReqVO modelDictData) {
-        if (!modelDictDataService.checkCodeUnique(modelDictData.getCode(), null))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "新增参考数据项'" + modelDictData.getCode() + "'失败，编码已存在");
         modelDictData.setCreatorId(getUserId());
         modelDictData.setCreateBy(getNickName());
         modelDictData.setCreateTime(DateUtil.date());
@@ -142,8 +148,6 @@ public class ModelDictDataController extends BaseController {
     @Log(title = "参考数据项", businessType = BusinessType.UPDATE)
     @PutMapping
     public CommonResult<Integer> edit(@Valid @RequestBody ModelDictDataSaveReqVO modelDictData) {
-        if (!modelDictDataService.checkCodeUnique(modelDictData.getCode(), modelDictData.getId()))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "修改参考数据项'" + modelDictData.getCode() + "'失败，编码已存在");
         modelDictData.setUpdatorId(getUserId());
         modelDictData.setUpdateBy(getNickName());
         modelDictData.setUpdateTime(DateUtil.date());
@@ -163,10 +167,6 @@ public class ModelDictDataController extends BaseController {
     @Log(title = "参考数据项", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public CommonResult<Integer> remove(@PathVariable Long[] ids) {
-        boolean hasEnabledData = modelDictDataService.lambdaQuery().in(ModelDictDataDO::getId, Arrays.asList(ids)).eq(ModelDictDataDO::getValidFlag, Boolean.TRUE).count() > 0;
-        if (hasEnabledData) {
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "删除参考数据失败,请先停用!");
-        }
         return CommonResult.toAjax(modelDictDataService.removeModelDictData(Arrays.asList(ids)));
     }
 

@@ -62,7 +62,7 @@ public class QualityTaskInstanceController extends BaseController {
     private IQualityTaskInstanceService qualityTaskInstanceService;
 
     @Operation(summary = "手动执行质量任务并生成运行记录")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytask:edit') and @ss.hasPermi('quality:qualitytaskinstance:add')")
+    @PreAuthorize("@ss.hasPermi('quality:task:edit') and @ss.hasPermi('quality:taskInstance:add')")
     @Log(title = "执行质量任务", businessType = BusinessType.INSERT)
     @PostMapping("/execute/{taskId}")
     public CommonResult<QualityTaskInstanceRespVO> execute(@PathVariable("taskId") Long taskId) {
@@ -71,7 +71,7 @@ public class QualityTaskInstanceController extends BaseController {
     }
 
     @Operation(summary = "查询主数据质量任务执行实例列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytaskinstance:list')")
+    @PreAuthorize("@ss.hasPermi('quality:taskInstance:list')")
     @GetMapping("/list")
     public CommonResult<PageResult<QualityTaskInstanceRespVO>> list(QualityTaskInstancePageReqVO qualityTaskInstance) {
         PageResult<QualityTaskInstanceDO> page = qualityTaskInstanceService.getQualityTaskInstancePage(qualityTaskInstance);
@@ -79,7 +79,7 @@ public class QualityTaskInstanceController extends BaseController {
     }
 
     @Operation(summary = "导出主数据质量任务执行实例列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytaskinstance:export')")
+    @PreAuthorize("@ss.hasPermi('quality:taskInstance:export')")
     @Log(title = "主数据质量任务执行实例", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, QualityTaskInstancePageReqVO exportReqVO) {
@@ -90,7 +90,7 @@ public class QualityTaskInstanceController extends BaseController {
     }
 
     @Operation(summary = "导入主数据质量任务执行实例列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytaskinstance:import')")
+    @PreAuthorize("@ss.hasPermi('quality:taskInstance:import')")
     @Log(title = "主数据质量任务执行实例", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
@@ -102,7 +102,7 @@ public class QualityTaskInstanceController extends BaseController {
     }
 
     @Operation(summary = "获取主数据质量任务执行实例详细信息")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytaskinstance:query')")
+    @PreAuthorize("@ss.hasPermi('quality:taskInstance:query')")
     @GetMapping(value = "/{id}")
     public CommonResult<QualityTaskInstanceRespVO> getInfo(@PathVariable("id") Long id) {
         QualityTaskInstanceDO qualityTaskInstanceDO = qualityTaskInstanceService.getQualityTaskInstanceById(id);
@@ -110,7 +110,7 @@ public class QualityTaskInstanceController extends BaseController {
     }
 
     @Operation(summary = "新增主数据质量任务执行实例")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytaskinstance:add')")
+    @PreAuthorize("@ss.hasPermi('quality:taskInstance:add')")
     @Log(title = "主数据质量任务执行实例", businessType = BusinessType.INSERT)
     @PostMapping
     public CommonResult<Long> add(@Valid @RequestBody QualityTaskInstanceSaveReqVO qualityTaskInstance) {
@@ -121,7 +121,7 @@ public class QualityTaskInstanceController extends BaseController {
     }
 
     @Operation(summary = "修改主数据质量任务执行实例")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytaskinstance:edit')")
+    @PreAuthorize("@ss.hasPermi('quality:taskInstance:edit')")
     @Log(title = "主数据质量任务执行实例", businessType = BusinessType.UPDATE)
     @PutMapping
     public CommonResult<Integer> edit(@Valid @RequestBody QualityTaskInstanceSaveReqVO qualityTaskInstance) {
@@ -132,7 +132,7 @@ public class QualityTaskInstanceController extends BaseController {
     }
 
     @Operation(summary = "删除主数据质量任务执行实例")
-    @PreAuthorize("@ss.hasPermi('quality:qualitytaskinstance:remove')")
+    @PreAuthorize("@ss.hasPermi('quality:taskInstance:remove')")
     @Log(title = "主数据质量任务执行实例", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public CommonResult<Integer> remove(@PathVariable Long[] ids) {

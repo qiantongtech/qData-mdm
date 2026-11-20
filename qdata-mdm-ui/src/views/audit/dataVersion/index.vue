@@ -61,8 +61,10 @@
               <div :title="`${displayValue(row.name)}（${displayValue(row.businessCode)}）`" class="version-name">
                 <el-link
                   v-if="getDisplayTitle(displayValue(row.name))"
-                  type="primary" :underline="false"
-                  role="link" tabindex="0"
+                  type="primary"
+                  :underline="false"
+                  role="link"
+                  tabindex="0"
                   class="qt-detail-link text-ellipsis version-name-text"
                   :title="String(displayValue(row.name))"
                   @click.stop="handleDetail(row)"
@@ -207,11 +209,10 @@ import { onActivated, onDeactivated } from 'vue'
 import axios from 'axios'
 
 import GuideTipPanel from '@/components/GuideTip/GuideTipPanel.vue'
-import { listAuditModels, listAuditObjectVersions, listAuditVersions } from '@/api/audit/trace'
+import { listAuditObjectVersions, listAuditVersions } from '@/api/audit/trace'
 import QtTree from '@/components/QtTree/index.vue'
 import { usePublishedModelTree } from '@/composables/usePublishedModelTree'
 import { getBase } from '@/api/model/base/base'
-
 
 const tableRef = ref(null);
 const { proxy } = getCurrentInstance();
@@ -340,7 +341,7 @@ const tableStore = reactive({
   events: { formatData: data => data },
 });
 
-const modelOptions = ref([{ value: '', label: '全部模型' }]);
+const modelOptions = reactive([]);
 function addTreeKeys(nodes = []) {
   return nodes.map(node => ({
     ...node,
@@ -387,8 +388,8 @@ function handleModelTreeClick(node) {
     return
   }
   selectedTreeKey.value = node.treeKey
-  if (!modelOptions.value.some(option => option.value === node.name)) {
-    modelOptions.value.push({ value: node.name, label: node.name })
+  if (!modelOptions.some(option => option.value === node.name)) {
+    modelOptions.push({ value: node.name, label: node.name })
   }
   queryParams.model = node.name
   tableRef.value?.resetQuery()
@@ -409,16 +410,32 @@ watch([() => queryParams.model, modelTreeData, modelOptions], async ([name, node
   const selected = matches.find(node => node.treeKey === selectedTreeKey.value)
     || (matches.length === 1 ? matches[0] : null)
   selectedTreeKey.value = selected?.treeKey || null
-  if (selected && !modelOptions.value.some(option => option.value === selected.name)) {
-    modelOptions.value.push({ value: selected.name, label: selected.name })
+  if (selected && !modelOptions.some(option => option.value === selected.name)) {
+    modelOptions.push({ value: selected.name, label: selected.name })
   }
   modelTreeRef.value?.setCurrentKey(selectedTreeKey.value, false)
 }, { flush: 'post' })
-onMounted(() => listAuditModels().then(res => {
-  if (res?.data) modelOptions.value = [{ value: '', label: '全部模型' }, ...res.data];
-}).catch(() => {
-  // 请求工具已提示错误，保留现有模型选项。
-}));
+/** 从模型树提取审计筛选项，接口按模型名称查询。 */
+function getAuditModelOptions(nodes = []) {
+  const options = new Map();
+  function visit(items) {
+    for (const node of items) {
+      if (node.nodeType === 'model' && node.modelId != null && node.name && !options.has(node.name)) {
+        options.set(node.name, {
+          value: node.name,
+          label: node.versionNo ? `${node.name}（${node.versionNo}）` : node.name,
+        });
+      }
+      visit(node.children || []);
+    }
+  }
+  visit(nodes);
+  return [...options.values()];
+}
+
+watch(modelTreeData, nodes => {
+  modelOptions.splice(0, modelOptions.length, ...getAuditModelOptions(nodes));
+}, { immediate: true });
 
 const searchStore = reactive({
   items: [
@@ -427,7 +444,7 @@ const searchStore = reactive({
       prop: "model",
       component: {
         is: "select",
-        placeholder: "全部模型",
+        placeholder: "全部",
         options: modelOptions,
       },
     },
@@ -435,11 +452,6 @@ const searchStore = reactive({
       label: "主数据名称",
       prop: "name",
       component: { is: "input", placeholder: "请输入主数据名称" },
-    },
-    {
-      label: "主数据ID",
-      prop: "code",
-      component: { is: "input", placeholder: "请输入主数据ID" },
     },
     {
       label: "版本号",
@@ -497,13 +509,13 @@ const compareRows = computed(() => {
   const before = new Map(versionContentRows(left, false).map(item => [item.code, item]));
   const after = new Map(versionContentRows(right, false).map(item => [item.code, item]));
   return [...new Set([...before.keys(), ...after.keys()])]
-      .map(code => ({
-        field: before.get(code)?.field || after.get(code)?.field || code,
-        before: before.get(code)?.value ?? '-',
-        after: after.get(code)?.value ?? '-',
-      }))
-      .map(row => ({ ...row, changed: row.before !== row.after }))
-      .filter(row => !onlyChanged.value || row.changed);
+    .map(code => ({
+      field: before.get(code)?.field || after.get(code)?.field || code,
+      before: before.get(code)?.value ?? '-',
+      after: after.get(code)?.value ?? '-',
+    }))
+    .map(row => ({ ...row, changed: row.before !== row.after }))
+    .filter(row => !onlyChanged.value || row.changed);
 });
 
 /** 数据版本记录数（由表格数据回传，不依赖 qt-table 内部状态） */

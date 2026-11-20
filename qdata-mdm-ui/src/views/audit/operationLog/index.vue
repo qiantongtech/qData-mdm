@@ -74,7 +74,11 @@
           <qt-table v-bind="masterTableStore" ref="masterTableRef">
             <template #modelInfo="{ row }"><audit-operation-cell kind="model" :row="row" scope="master" /></template>
             <template #location="{ row }"><audit-operation-cell kind="location" :row="row" scope="master" /></template>
-            <template #masterData="{ row }"><audit-operation-cell kind="masterData" :row="row" scope="master" @open-detail="handleDetail" /></template>
+            <template #masterData="{ row }"><audit-operation-cell kind="masterData"
+                                                                  :row="row"
+                                                                  scope="master"
+                                                                  @open-detail="handleDetail"
+            /></template>
             <template #operationInfo="{ row }"><audit-operation-cell kind="operation" :row="row" scope="master" /></template>
             <template #operatorInfo="{ row }"><audit-operation-cell kind="operator" :row="row" scope="master" /></template>
             <template #action="{ row }">
@@ -136,7 +140,7 @@
 </template>
 
 <script setup name="AuditOperationLog">
-import { listAuditModels, listAuditOperations } from '@/api/audit/trace'
+import { listAuditOperations } from '@/api/audit/trace'
 import { usePublishedModelTree } from '@/composables/usePublishedModelTree'
 import QtTree from '@/components/QtTree/index.vue'
 import AuditOperationCell from './AuditOperationCell.vue'
@@ -275,8 +279,8 @@ function handleModelTreeClick(node) {
     return;
   }
   applyTreeModel(node);
-  if (!masterModelOptions.value.some(option => option.value === node.name)) {
-    masterModelOptions.value.push({ value: node.name, label: node.name });
+  if (!masterModelOptions.some(option => option.value === node.name)) {
+    masterModelOptions.push({ value: node.name, label: node.name });
   }
   masterParams.objectType = node.name;
   masterTableRef.value?.resetQuery();
@@ -291,7 +295,7 @@ async function getModelList(params) {
   return listAuditOperations({ ...params, scope: 'model' });
 }
 
-const masterModelOptions = ref([{ value: '', label: '全部模型' }]);
+const masterModelOptions = reactive([]);
 let treeSyncVersion = 0;
 watch([() => masterParams.objectType, modelTreeData, masterModelOptions], async ([name, nodes]) => {
   const version = ++treeSyncVersion;
@@ -301,18 +305,32 @@ watch([() => masterParams.objectType, modelTreeData, masterModelOptions], async 
   const selected = matches.find(node => node.treeKey === selectedTreeKey.value)
       || (matches.length === 1 ? matches[0] : null);
   applyTreeModel(selected);
-  if (selected && !masterModelOptions.value.some(option => option.value === selected.name)) {
-    masterModelOptions.value.push({ value: selected.name, label: selected.name });
+  if (selected && !masterModelOptions.some(option => option.value === selected.name)) {
+    masterModelOptions.push({ value: selected.name, label: selected.name });
   }
   modelTreeRef.value?.setCurrentKey(selectedTreeKey.value, false);
 }, { flush: 'post' });
-onMounted(() => {
-  listAuditModels().then(res => {
-    if (res?.data) masterModelOptions.value = [{ value: '', label: '全部模型' }, ...res.data];
-  }).catch(() => {
-    // 请求工具已提示错误，保留现有模型选项。
-  });
-});
+/** 从模型树提取审计筛选项，接口按模型名称查询。 */
+function getAuditModelOptions(nodes = []) {
+  const options = new Map();
+  function visit(items) {
+    for (const node of items) {
+      if (node.nodeType === 'model' && node.modelId != null && node.name && !options.has(node.name)) {
+        options.set(node.name, {
+          value: node.name,
+          label: node.versionNo ? `${node.name}（${node.versionNo}）` : node.name,
+        });
+      }
+      visit(node.children || []);
+    }
+  }
+  visit(nodes);
+  return [...options.values()];
+}
+
+watch(modelTreeData, nodes => {
+  masterModelOptions.splice(0, masterModelOptions.length, ...getAuditModelOptions(nodes));
+}, { immediate: true });
 
 const baseConfig = {
   stripe: true,
@@ -363,17 +381,12 @@ const masterSearchStore = reactive({
     {
       label: "主数据模型",
       prop: "objectType",
-      component: { is: "select", placeholder: "全部模型", options: masterModelOptions },
+      component: { is: "select", placeholder: "全部", options: masterModelOptions },
     },
     {
       label: "主数据名称",
       prop: "objectName",
       component: { is: "input", placeholder: "请输入主数据名称" },
-    },
-    {
-      label: "主数据ID",
-      prop: "objectId",
-      component: { is: "input", placeholder: "请输入主数据ID" },
     },
     {
       label: "操作类型",

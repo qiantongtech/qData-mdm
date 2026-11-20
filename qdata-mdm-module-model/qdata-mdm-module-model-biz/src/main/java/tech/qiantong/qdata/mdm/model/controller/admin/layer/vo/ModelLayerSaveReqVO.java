@@ -23,6 +23,8 @@ import lombok.Data;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
+import javax.validation.constraints.PositiveOrZero;
 import javax.validation.constraints.Size;
 import java.util.Date;
 
@@ -45,17 +47,23 @@ public class ModelLayerSaveReqVO extends BaseEntity {
     private Long id;
 
     @Schema(description = "主数据域ID，MODEL_PROJECT.ID", example = "")
+    @NotNull(message = "请选择所属主数据域")
     private Long projectId;
 
     @Schema(description = "上级模型目录ID；0表示根目录", example = "")
+    @NotNull(message = "请选择上级模型目录")
     private Long parentId;
 
     @Schema(description = "模型目录编码", example = "")
-    @Size(max = 512, message = "模型目录编码长度不能超过512个字符")
+    @NotBlank(message = "模型目录编码不能为空")
+    @Size(max = 64, message = "模型目录编码长度不能超过64个字符")
+    @Pattern(regexp = "[A-Za-z0-9_]*", message = "模型目录编码支持英文字母、数字和下划线")
     private String code;
 
     @Schema(description = "模型目录名称", example = "")
-    @Size(max = 512, message = "模型目录名称长度不能超过512个字符")
+    @NotBlank(message = "模型目录名称不能为空")
+    @Size(max = 64, message = "模型目录名称长度不能超过64个字符")
+    @Pattern(regexp = "[\u4e00-\u9fa5A-Za-z0-9_-]*", message = "模型目录名称支持中文、英文字符、数字、下划线和短横线")
     private String name;
 
     /**
@@ -65,9 +73,18 @@ public class ModelLayerSaveReqVO extends BaseEntity {
     private Long responsibleUserId;
 
     @Schema(description = "同级目录排序号，按数值从小到大排列，默认0", example = "")
+    @PositiveOrZero(message = "排序不能小于0")
     private Long sortOrder;
 
     @Schema(description = "模型目录的业务分类范围说明", example = "")
-    @Size(max = 512, message = "模型目录的业务分类范围说明长度不能超过512个字符")
+    @Size(max = 256, message = "描述长度不能超过256个字符")
     private String description;
+
+    public void setCode(String code) {
+        this.code = code == null ? null : code.trim();
+    }
+
+    public void setName(String name) {
+        this.name = name == null ? null : name.trim();
+    }
 }

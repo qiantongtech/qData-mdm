@@ -137,7 +137,8 @@
             </qt-form-item>
             <!-- 默认图标只用于展示，保存时仍传空路径，之后切换模型类型才能自动换图标。 -->
             <qt-form-item label="图标" prop="icon"
-                          tip="请上传大小不超过 <span class='text-danger'>5MB</span> 格式为 <span class='text-danger'>png/jpg/jpeg</span> 的图片，未上传时按模型类型展示默认图标。">
+                          tip="请上传大小不超过 <span class='text-danger'>5MB</span> 格式为 <span class='text-danger'>png/jpg/jpeg</span> 的图片，未上传时按模型类型展示默认图标。"
+            >
               <div class="model-icon-field">
                 <model-icon-upload
                     v-model="form.icon"
@@ -169,7 +170,7 @@
               <el-input
                   v-model="form.description"
                   type="textarea"
-                  maxlength="256个字符"
+                  :maxlength="256"
                   show-word-limit
                   :min-height="192"
                   placeholder="请输入描述"
@@ -292,7 +293,7 @@
                           <el-input
                               v-model="activeSubModel.description"
                               type="textarea"
-                              maxlength="256个字符"
+                              :maxlength="256"
                               show-word-limit
                               placeholder="请输入子模型说明"
                               :rows="5"
@@ -302,7 +303,8 @@
                       </el-form>
                     </qt-tab-pane>
                     <qt-tab-pane :label="model_column_category.find(item => item.value === 'BUSINESS')?.label || ''"
-                                 :name="'BUSINESS'">
+                                 :name="'BUSINESS'"
+                    >
                       <model-fields-editor
                           ref="subModelFieldsEditorRef"
                           v-model="activeSubModel.fields"
@@ -320,7 +322,8 @@
                       />
                     </qt-tab-pane>
                     <qt-tab-pane :label="model_column_category.find(item => item.value === 'RELATION')?.label || ''"
-                                 :name="'RELATION'">
+                                 :name="'RELATION'"
+                    >
                       <model-fields-editor
                           ref="subModelRelationEditorRef"
                           v-model="activeSubModel.fields"
@@ -338,7 +341,8 @@
                       />
                     </qt-tab-pane>
                     <qt-tab-pane :label="model_column_category.find(item => item.value === 'SYSTEM')?.label || ''"
-                                 :name="'SYSTEM'">
+                                 :name="'SYSTEM'"
+                    >
                       <model-fields-editor
                           v-model="activeSubModel.fields"
                           compact
@@ -460,11 +464,13 @@
         />
         <qt-form-item label="子模型名称" prop="name" class="row-full">
           <el-input v-model="subModelDraft.name" placeholder="请输入子模型名称，支持中文、英文字符、数字、下划线和短横线"
-                    maxlength="64"/>
+                    maxlength="64"
+          />
         </qt-form-item>
         <qt-form-item label="子模型编码" prop="code" class="row-full">
           <el-input v-model="subModelDraft.code" placeholder="请输入子模型编码，支持英文字母、数字和下划线"
-                    maxlength="64"/>
+                    maxlength="64"
+          />
         </qt-form-item>
         <qt-form-item label="图标" prop="icon" class="row-full" tip="未上传时使用默认子模型图标。">
           <model-icon-upload v-model="subModelDraft.icon" is-sub-model/>
@@ -474,7 +480,7 @@
               v-model="subModelDraft.description"
               type="textarea"
               :rows="5"
-              maxlength="256个字符"
+              :maxlength="256"
               show-word-limit
               placeholder="请输入子模型描述"
           />
@@ -1191,7 +1197,7 @@ async function confirmAddSubModel() {
     return;
   }
   if (subModels.value.some(model => model.code === subModelDraft.code) || form.code === subModelDraft.code) {
-    proxy.$modal.msgWarning('主子模型编码不能重复');
+    proxy.$modal.msgWarning(`子模型“${subModelDraft.code}”编码重复`);
     return;
   }
   const localId = `sub-${Date.now()}`;
@@ -1261,15 +1267,29 @@ function resetModelGraphDialog() {
 /** 汇总基础信息、主模型字段和子模型，形成保存接口参数。 */
 function buildSubmitPayload() {
   // 提交页面中已按模型类型补齐的字段，保留原有字段记录ID。
-  return {
+  const payload = {
     ...form, fields: JSON.parse(JSON.stringify(modelFields.value)),
     subModels: JSON.parse(JSON.stringify(subModels.value))
   };
+  if (publishedRevision.value) {
+    for (const model of [payload, ...payload.subModels]) {
+      const publishedIds = new Set(publishedFieldsFor(model).map(field => String(field.id)));
+      for (const field of model.fields || []) {
+        if (!field.dataType || field.columnCategory === 'SYSTEM' || publishedIds.has(String(field.id))) continue;
+        // 历史修订可能残留已隐藏的长度和小数位，随完整字段配置清空。
+        if (!['STRING', 'DECIMAL'].includes(field.dataType)) field.dataLength = null;
+        if (field.dataType !== 'DECIMAL') field.dataScale = null;
+      }
+    }
+  }
+  return payload;
 }
 
 // 两个按钮共用保存接口，草稿保存成功后留在当前步骤。
 async function saveDraft() {
-  await saveModel(true);
+  if (await canLeaveStep(currentStep.value)) {
+    await saveModel(true);
+  }
 }
 
 // 保存并退出在保存成功后返回列表。
@@ -1343,7 +1363,7 @@ initializeWizard();
   min-height: 350px;
 
   .hasTagsView & {
-    height: calc(100vh - 84px);
+    height: calc(100vh - 124px);
   }
 }
 

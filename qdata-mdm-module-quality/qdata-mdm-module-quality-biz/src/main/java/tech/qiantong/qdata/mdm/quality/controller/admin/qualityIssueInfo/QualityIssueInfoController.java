@@ -62,7 +62,7 @@ public class QualityIssueInfoController extends BaseController {
     private IQualityIssueInfoService qualityIssueInfoService;
 
     @Operation(summary = "查询问题数据明细列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissueinfo:list')")
+    @PreAuthorize("@ss.hasPermi('quality:issueInfo:list')")
     @GetMapping("/list")
     public CommonResult<PageResult<QualityIssueInfoRespVO>> list(QualityIssueInfoPageReqVO qualityIssueInfo) {
         PageResult<QualityIssueInfoDO> page = qualityIssueInfoService.getQualityIssueInfoPage(qualityIssueInfo);
@@ -70,7 +70,7 @@ public class QualityIssueInfoController extends BaseController {
     }
 
     @Operation(summary = "导出问题数据明细列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissueinfo:export')")
+    @PreAuthorize("@ss.hasPermi('quality:issueInfo:export')")
     @Log(title = "问题数据明细", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, QualityIssueInfoPageReqVO exportReqVO) {
@@ -81,7 +81,7 @@ public class QualityIssueInfoController extends BaseController {
     }
 
     @Operation(summary = "导入问题数据明细列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissueinfo:import')")
+    @PreAuthorize("@ss.hasPermi('quality:issueInfo:import')")
     @Log(title = "问题数据明细", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
@@ -93,7 +93,7 @@ public class QualityIssueInfoController extends BaseController {
     }
 
     @Operation(summary = "获取问题数据明细详细信息")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissueinfo:query')")
+    @PreAuthorize("@ss.hasPermi('quality:issueInfo:query')")
     @GetMapping(value = "/{id}")
     public CommonResult<QualityIssueInfoRespVO> getInfo(@PathVariable("id") Long id) {
         QualityIssueInfoDO qualityIssueInfoDO = qualityIssueInfoService.getQualityIssueInfoById(id);
@@ -101,7 +101,7 @@ public class QualityIssueInfoController extends BaseController {
     }
 
     @Operation(summary = "新增问题数据明细")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissueinfo:add')")
+    @PreAuthorize("@ss.hasPermi('quality:issueInfo:add')")
     @Log(title = "问题数据明细", businessType = BusinessType.INSERT)
     @PostMapping
     public CommonResult<Long> add(@Valid @RequestBody QualityIssueInfoSaveReqVO qualityIssueInfo) {
@@ -112,7 +112,7 @@ public class QualityIssueInfoController extends BaseController {
     }
 
     @Operation(summary = "修改问题数据明细")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissueinfo:edit')")
+    @PreAuthorize("@ss.hasPermi('quality:issueInfo:edit')")
     @Log(title = "问题数据明细", businessType = BusinessType.UPDATE)
     @PutMapping
     public CommonResult<Integer> edit(@Valid @RequestBody QualityIssueInfoSaveReqVO qualityIssueInfo) {
@@ -123,7 +123,7 @@ public class QualityIssueInfoController extends BaseController {
     }
 
     @Operation(summary = "删除问题数据明细")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissueinfo:remove')")
+    @PreAuthorize("@ss.hasPermi('quality:issueInfo:remove')")
     @Log(title = "问题数据明细", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public CommonResult<Integer> remove(@PathVariable Long[] ids) {

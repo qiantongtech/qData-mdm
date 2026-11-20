@@ -23,6 +23,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
@@ -79,7 +80,7 @@ public class ModelEncodingItemServiceImpl extends ServiceImpl<ModelEncodingItemM
     public void saveModelEncodingItems(Long encodingVersionId, List<ModelEncodingItemSaveReqVO> items) {
         // 先确认父版本存在，避免生成无法归属任何编码版本的规则段。
         if (iModelEncodingVersionService.getModelEncodingVersionById(encodingVersionId) == null) {
-            throw new ServiceException("编码方案版本不存在");
+            throw new ServiceException("编码方案版本不存在", HttpStatus.WARN);
         }
 
         // 一次性加载当前版本原有规则并建立索引，用于校验更新归属和计算待删除数据。
@@ -107,10 +108,10 @@ public class ModelEncodingItemServiceImpl extends ServiceImpl<ModelEncodingItemM
             ModelEncodingItemDO existing = existingMap.get(item.getId());
             // 仅允许更新当前版本原有数据，同时阻止通过构造ID修改其他版本规则。
             if (existing == null) {
-                throw new ServiceException("规则段不存在或不属于当前编码版本，ID：" + item.getId());
+                throw new ServiceException("规则段不存在或不属于当前编码版本，ID：" + item.getId(), HttpStatus.WARN);
             }
             if (!retainedIds.add(item.getId())) {
-                throw new ServiceException("规则段ID重复：" + item.getId());
+                throw new ServiceException("规则段ID重复：" + item.getId(), HttpStatus.WARN);
             }
             ModelEncodingItemDO updateObj = BeanUtils.toBean(item, ModelEncodingItemDO.class);
             // 使用显式set让null/空值也写入数据库，切换规则类型时可清除旧类型专属字段。
@@ -146,31 +147,31 @@ public class ModelEncodingItemServiceImpl extends ServiceImpl<ModelEncodingItemM
      */
     private void validateRuleItem(ModelEncodingItemSaveReqVO item, int position) {
         if (item == null) {
-            throw new ServiceException("第 " + position + " 个规则段不能为空");
+            throw new ServiceException("第 " + position + " 个规则段不能为空", HttpStatus.WARN);
         }
         ModelEncodingItemTypeEnum type = ModelEncodingItemTypeEnum.getByValue(item.getType());
         if (type == null) {
-            throw new ServiceException("第 " + position + " 个规则段类型不正确");
+            throw new ServiceException("第 " + position + " 个规则段类型不正确", HttpStatus.WARN);
         }
         // 非流水号类型都通过fixedValue承载其核心值：固定内容、字段参数或日期格式。
         if (type != ModelEncodingItemTypeEnum.SERIAL_NUMBER
                 && (item.getFixedValue() == null || item.getFixedValue().trim().isEmpty())) {
-            throw new ServiceException("第 " + position + " 个规则段配置不能为空");
+            throw new ServiceException("第 " + position + " 个规则段配置不能为空", HttpStatus.WARN);
         }
         // 流水号不使用fixedValue，改为校验位数、起始值、步长和重置方式等专属字段。
         if (type == ModelEncodingItemTypeEnum.SERIAL_NUMBER) {
             if (item.getSequenceLength() == null
                     || item.getSequenceLength() < 1 || item.getSequenceLength() > 12) {
-                throw new ServiceException("第 " + position + " 个流水号规则位数必须为 1 至 12");
+                throw new ServiceException("第 " + position + " 个流水号规则位数必须为 1 至 12", HttpStatus.WARN);
             }
             if (item.getSequenceStart() == null || item.getSequenceStart() < 0) {
-                throw new ServiceException("第 " + position + " 个流水号规则起始值不能小于 0");
+                throw new ServiceException("第 " + position + " 个流水号规则起始值不能小于 0", HttpStatus.WARN);
             }
             if (item.getStepSize() == null || item.getStepSize() < 1) {
-                throw new ServiceException("第 " + position + " 个流水号规则步长必须大于 0");
+                throw new ServiceException("第 " + position + " 个流水号规则步长必须大于 0", HttpStatus.WARN);
             }
             if (item.getResetMethod() == null || item.getResetMethod().trim().isEmpty()) {
-                throw new ServiceException("第 " + position + " 个流水号规则重置方式不能为空");
+                throw new ServiceException("第 " + position + " 个流水号规则重置方式不能为空", HttpStatus.WARN);
             }
         }
     }
