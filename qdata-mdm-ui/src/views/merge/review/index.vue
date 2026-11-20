@@ -23,7 +23,7 @@
 
 <template>
   <div ref="appContainer" class="app-container">
-    <GuideTip tip-id="merge/review.list"/>
+    <guide-tip tip-id="merge/review.list"/>
     <el-container>
       <qt-tree
         ref="modelTreeRef"

@@ -20,7 +20,6 @@ package tech.qiantong.qdata.mdm.ingest.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,7 +34,10 @@ import javax.annotation.Resource;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
- * 执行使用有界线程池；日志归档、调度校正和运行续期独立调度。
+ * 接入任务执行线程池与后台维护调度配置。
+ * <p>
+ * 提供有界任务执行线程池，并在应用就绪后启动日志归档、Quartz 调度校正和运行实例心跳维护。
+ * 日志归档使用独立调度器，调度校正与心跳维护共用维护调度器。
  *
  * @author chentangwen
  */
@@ -44,29 +46,31 @@ import java.util.concurrent.ThreadPoolExecutor;
 public class IngestTaskScheduleConfig {
 
     /**
-     * 日志归档两轮之间的等待时间，单位毫秒。
+     * 日志归档完成至下一轮开始的等待时间，单位：毫秒。
      */
     private static final long LOG_FLUSH_INTERVAL_MILLIS = 2000L;
+
     /**
-     * 调度配置校正两轮之间的等待时间，单位毫秒。
+     * Quartz 调度校正完成至下一轮开始的等待时间，单位：毫秒。
      */
     private static final long RECONCILE_INTERVAL_MILLIS = 60000L;
+
     /**
-     * 本机实例续期及超时扫描的间隔，单位毫秒。
+     * 运行实例心跳维护完成至下一轮开始的等待时间，单位：毫秒。
      */
     private static final long HEARTBEAT_INTERVAL_MILLIS = 30000L;
 
     @Resource
     private IIngestTaskScheduleService scheduleService;
 
-    @Autowired
+    @Resource
     private ObjectProvider<IIngestTaskSubmitService> submitService;
 
     @Resource
     private IIngestRunLogService runLogService;
 
     /**
-     * 创建专用日志归档调度器，避免归档耗时阻塞心跳和调度校正。
+     * 创建独立的单线程日志归档调度器，避免日志归档占用维护调度器的线程。
      *
      * @return 单线程日志归档调度器
      */
@@ -79,8 +83,9 @@ public class IngestTaskScheduleConfig {
     }
 
     /**
-     * 创建有界执行线程池；饱和时拒绝提交，交由提交服务记录失败。
-     * 关闭时最多等待六十秒，未正常结束的实例由心跳恢复机制处理。
+     * 创建接入任务执行线程池，限制工作线程数及等待队列容量。
+     * <p>
+     * 线程和队列均满时拒绝新任务并抛出异常；应用关闭时等待已提交任务完成，最多等待 60 秒。
      *
      * @return 执行接入任务的线程池
      */
@@ -98,9 +103,9 @@ public class IngestTaskScheduleConfig {
     }
 
     /**
-     * 创建维护调度器，分别承担配置校正和运行实例续期。
+     * 创建双线程维护调度器，供 Quartz 调度校正和运行实例心跳维护使用。
      *
-     * @return 使用两个线程的维护调度器
+     * @return 任务调度与运行实例维护调度器
      */
     @Bean
     public ThreadPoolTaskScheduler ingestScheduleReconciler() {
@@ -111,49 +116,39 @@ public class IngestTaskScheduleConfig {
     }
 
     /**
-     * 应用就绪后启动日志归档、调度校正及心跳维护。
-     * 采用固定延迟，在本次调用结束后等待指定间隔再执行。
+     * 应用就绪后注册日志归档、Quartz 调度校正和运行实例心跳维护任务。
+     * <p>
+     * 各任务采用固定延迟调度，在本轮执行完成后等待对应间隔，再开始下一轮。
      */
     @EventListener(ApplicationReadyEvent.class)
-    public void restoreSchedules() {
-        ingestLogFlusher().scheduleWithFixedDelay(this::flushLogs, LOG_FLUSH_INTERVAL_MILLIS);
-        // 应用就绪后，以接入任务配置恢复和校正 Quartz 调度。
-        ingestScheduleReconciler().scheduleWithFixedDelay(this::reconcileSchedules, RECONCILE_INTERVAL_MILLIS);
-        ingestScheduleReconciler().scheduleWithFixedDelay(this::maintainRuns, HEARTBEAT_INTERVAL_MILLIS);
+    public void startBackgroundTasks() {
+        // 将待处理日志归档入库，异常时保留后续周期执行。
+        ingestLogFlusher().scheduleWithFixedDelay(() -> {
+            try {
+                runLogService.flush();
+            } catch (Exception ex) {
+                log.error("接入日志归档暂不可用，稍后重试", ex);
+            }
+        }, LOG_FLUSH_INTERVAL_MILLIS);
+
+        // 根据接入任务配置恢复和校正 Quartz 调度。
+        ingestScheduleReconciler().scheduleWithFixedDelay(() -> {
+            try {
+                scheduleService.reconcile();
+            } catch (Exception ex) {
+                log.error("接入调度校正失败，稍后重试", ex);
+            }
+        }, RECONCILE_INTERVAL_MILLIS);
+
+        // 为本进程运行实例续期，并回收失去心跳的实例。
+        ingestScheduleReconciler().scheduleWithFixedDelay(() -> {
+            try {
+                submitService.getObject().maintainRuns();
+            } catch (Exception ex) {
+                log.error("接入执行续期及恢复失败，稍后重试", ex);
+            }
+        }, HEARTBEAT_INTERVAL_MILLIS);
         log.info("接入后台调度已启动，logFlushInterval={}ms, reconcileInterval={}ms, heartbeatInterval={}ms",
                 LOG_FLUSH_INTERVAL_MILLIS, RECONCILE_INTERVAL_MILLIS, HEARTBEAT_INTERVAL_MILLIS);
-    }
-
-    /**
-     * 执行一轮日志归档；异常留在服务日志中，待下一轮重试。
-     */
-    private void flushLogs() {
-        try {
-            runLogService.flush();
-        } catch (Exception ex) {
-            log.error("接入日志归档暂不可用，稍后重试", ex);
-        }
-    }
-
-    /**
-     * 执行一轮配置校正；兜底捕获扫描异常，保证后续轮次仍可执行。
-     */
-    private void reconcileSchedules() {
-        try {
-            scheduleService.reconcile();
-        } catch (Exception ex) {
-            log.error("接入调度校正失败，稍后重试", ex);
-        }
-    }
-
-    /**
-     * 执行一轮续期和超时恢复；捕获异常以保留周期维护能力。
-     */
-    private void maintainRuns() {
-        try {
-            submitService.getObject().maintainRuns();
-        } catch (Exception ex) {
-            log.error("接入执行续期及恢复失败，稍后重试", ex);
-        }
     }
 }

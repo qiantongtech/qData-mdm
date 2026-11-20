@@ -21,6 +21,7 @@ package tech.qiantong.qdata.mdm.merge.service.review.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.merge.domain.source.MergeSourceRecordBO;
@@ -124,7 +125,7 @@ public class MergeReviewServiceImpl implements IMergeReviewService {
         MergeCandidateGroupDO group = activeReviewGroup(reqVO.getGroupId());
         List<MergeCandidateGroupMemberDO> members = members(group.getId());
         if (members.isEmpty()) {
-            throw new ServiceException("候选组没有可确认的来源记录");
+            throw new ServiceException("候选组没有可确认的来源记录", HttpStatus.WARN);
         }
         // 确认前再次检查是否已经生成待提交结果，避免重复确认产生多条结果。
         assertNoPending(group.getId());
@@ -207,7 +208,7 @@ public class MergeReviewServiceImpl implements IMergeReviewService {
     public void resume(MergeReviewActionReqVO reqVO, Long operatorId, String operatorName) {
         MergeCandidateGroupDO group = lockedGroupOrThrow(reqVO.getGroupId());
         if (!MergeCodes.GROUP_STATUS_SUSPEND.equals(group.getStatus())) {
-            throw new ServiceException("只有暂缓处理的候选组可以恢复");
+            throw new ServiceException("只有暂缓处理的候选组可以恢复", HttpStatus.WARN);
         }
         String before = statusSnapshot(group);
         group.setStatus(MergeCodes.GROUP_STATUS_REVIEW);
@@ -225,27 +226,27 @@ public class MergeReviewServiceImpl implements IMergeReviewService {
         MergeCandidateGroupDO group = lockedGroupOrThrow(reqVO.getGroupId());
         if (!MergeCodes.GROUP_STATUS_REVIEW.equals(group.getStatus())
                 && !MergeCodes.GROUP_STATUS_SUSPEND.equals(group.getStatus())) {
-            throw new ServiceException("只有待审核或暂缓处理的候选组可以补入");
+            throw new ServiceException("只有待审核或暂缓处理的候选组可以补入", HttpStatus.WARN);
         }
         // 统一先锁组再锁来源；持锁后检查当前版本、治理状态和有效组占用。
         MergeSourceRecordBO source = sourceTableService.lock(group.getModelId(), reqVO.getSourceRecordId());
         if (source == null || !group.getModelId().equals(source.getModelId())) {
-            throw new ServiceException("来源记录不存在或不属于当前模型");
+            throw new ServiceException("来源记录不存在或不属于当前模型", HttpStatus.WARN);
         }
         if (!MergeCodes.GOVERNANCE_PENDING.equals(source.getGovernanceStatus())
                 || source.getId() == null) {
-            throw new ServiceException("只能补入待治理且有当前版本的来源数据");
+            throw new ServiceException("只能补入待治理且有当前版本的来源数据", HttpStatus.WARN);
         }
         Long exists = mergeCandidateGroupMemberMapper.selectCount(new LambdaQueryWrapper<MergeCandidateGroupMemberDO>()
                 .eq(MergeCandidateGroupMemberDO::getGroupId, group.getId())
                 .eq(MergeCandidateGroupMemberDO::getSourceRecordId, source.getId())
                 .eq(MergeCandidateGroupMemberDO::getValidFlag, MergeCodes.YES));
         if (exists != null && exists.longValue() > 0L) {
-            throw new ServiceException("该来源记录已在当前候选组中");
+            throw new ServiceException("该来源记录已在当前候选组中", HttpStatus.WARN);
         }
         // 来源记录只能被一个有效治理流程占用，补入前必须再次检查占用状态。
         if (!scopeService.occupiedSourceIds(group.getModelId(), Collections.singletonList(source.getId())).isEmpty()) {
-            throw new ServiceException("该来源记录已被其他有效治理流程占用");
+            throw new ServiceException("该来源记录已被其他有效治理流程占用", HttpStatus.WARN);
         }
         MergeCandidateGroupMemberDO member = new MergeCandidateGroupMemberDO();
         member.setGroupId(group.getId());
@@ -270,7 +271,7 @@ public class MergeReviewServiceImpl implements IMergeReviewService {
         MergeCandidateGroupDO group = lockedGroupOrThrow(groupId);
         if (!MergeCodes.GROUP_STATUS_REVIEW.equals(group.getStatus())
                 && !MergeCodes.GROUP_STATUS_SUSPEND.equals(group.getStatus())) {
-            throw new ServiceException("只有待审核或暂缓处理的候选组可以删除");
+            throw new ServiceException("只有待审核或暂缓处理的候选组可以删除", HttpStatus.WARN);
         }
         assertNoPending(group.getId());
         List<MergeCandidateGroupMemberDO> members = members(group.getId());
@@ -377,7 +378,7 @@ public class MergeReviewServiceImpl implements IMergeReviewService {
         // 确认与拆分先锁原组，避免并发拆分按不同分区顺序持有来源锁。
         MergeCandidateGroupDO group = lockedGroupOrThrow(groupId);
         if (!MergeCodes.GROUP_STATUS_REVIEW.equals(group.getStatus())) {
-            throw new ServiceException("只有待审核候选组可以执行该操作");
+            throw new ServiceException("只有待审核候选组可以执行该操作", HttpStatus.WARN);
         }
         return group;
     }
@@ -386,7 +387,7 @@ public class MergeReviewServiceImpl implements IMergeReviewService {
     private MergeCandidateGroupDO lockedGroupOrThrow(Long groupId) {
         MergeCandidateGroupDO group = mergeCandidateGroupMapper.selectForUpdate(groupId);
         if (group == null || !MergeCodes.YES.equals(group.getValidFlag())) {
-            throw new ServiceException("候选组不存在或已失效");
+            throw new ServiceException("候选组不存在或已失效", HttpStatus.WARN);
         }
         return group;
     }
@@ -405,7 +406,7 @@ public class MergeReviewServiceImpl implements IMergeReviewService {
                 .eq(MergePendingMasterDO::getObjectGroupId, groupId)
                 .eq(MergePendingMasterDO::getValidFlag, MergeCodes.YES));
         if (count != null && count.longValue() > 0L) {
-            throw new ServiceException("候选组已经形成待提交结果");
+            throw new ServiceException("候选组已经形成待提交结果", HttpStatus.WARN);
         }
     }
 
@@ -413,28 +414,28 @@ public class MergeReviewServiceImpl implements IMergeReviewService {
     private List<List<Long>> normalizePartitions(List<List<Long>> sourceGroups,
             Map<Long, MergeCandidateGroupMemberDO> bySource) {
         if (sourceGroups == null || sourceGroups.size() < 2) {
-            throw new ServiceException("拆分至少形成两个对象");
+            throw new ServiceException("拆分至少形成两个对象", HttpStatus.WARN);
         }
         Set<Long> seen = new HashSet<>();
         List<List<Long>> partitions = new ArrayList<>();
         for (List<Long> sourceGroup : sourceGroups) {
             if (sourceGroup == null || sourceGroup.isEmpty()) {
-                throw new ServiceException("拆分对象不能为空");
+                throw new ServiceException("拆分对象不能为空", HttpStatus.WARN);
             }
             List<Long> partition = new ArrayList<>();
             for (Long sourceId : sourceGroup) {
                 if (sourceId == null || !bySource.containsKey(sourceId)) {
-                    throw new ServiceException("来源记录不属于当前候选组");
+                    throw new ServiceException("来源记录不属于当前候选组", HttpStatus.WARN);
                 }
                 if (!seen.add(sourceId)) {
-                    throw new ServiceException("来源记录不能重复分配");
+                    throw new ServiceException("来源记录不能重复分配", HttpStatus.WARN);
                 }
                 partition.add(sourceId);
             }
             partitions.add(partition);
         }
         if (seen.size() != bySource.size()) {
-            throw new ServiceException("还有来源记录未分配");
+            throw new ServiceException("还有来源记录未分配", HttpStatus.WARN);
         }
         return partitions;
     }

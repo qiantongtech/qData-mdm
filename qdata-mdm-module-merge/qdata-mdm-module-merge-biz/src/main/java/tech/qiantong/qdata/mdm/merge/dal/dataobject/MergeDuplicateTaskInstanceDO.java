@@ -62,6 +62,8 @@ public class MergeDuplicateTaskInstanceDO extends BaseEntity {
     private Date endTime;
     private Long operatorId;
     private String errorMessage;
+    /** 执行结束时从 Redis 归档的完整过程日志 JSON。 */
+    private String logContent;
     private String validFlag;
 
     @TableLogic(value = "0", delval = "1")

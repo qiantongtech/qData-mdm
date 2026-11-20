@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.merge.domain.source.MergeSourceRecordBO;
@@ -260,7 +261,7 @@ public class MergeDetectServiceImpl
         if (MergeCodes.YES.equals(status)) {
             if (!"ENABLED".equals(task.getEnableStatus())
                     || !MergeCodes.TRIGGER_SCHEDULED.equals(task.getTriggerType())) {
-                throw new ServiceException("仅已启用的定时任务可以启用调度");
+                throw new ServiceException("仅已启用的定时任务可以启用调度", HttpStatus.WARN);
             }
             MergeDetectScheduleServiceImpl.validateCron(task.getCronExpression());
         }
@@ -275,15 +276,15 @@ public class MergeDetectServiceImpl
 
     private void validateSwitchStatus(String status) {
         if (!MergeCodes.YES.equals(status) && !MergeCodes.NO.equals(status)) {
-            throw new ServiceException("状态只能为0或1");
+            throw new ServiceException("状态只能为0或1", HttpStatus.WARN);
         }
     }
 
-    /** 删除非运行中的重复检测任务。 */
+    /** 删除已停用且不在执行中的重复检测任务。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Integer deleteTask(Long taskId) {
-        editableTask(taskId, "删除");
+        validateTaskDeletion(taskId);
         int changed = mergeDuplicateTaskMapper.deleteById(taskId);
         scheduleService.syncAfterCommit(taskId);
         return changed;
@@ -300,7 +301,7 @@ public class MergeDetectServiceImpl
         // 同一批任务按固定顺序取锁，避免反向编号请求交叉持锁。
         ids.sort(Long::compareTo);
         for (Long taskId : ids) {
-            editableTask(taskId, "删除");
+            validateTaskDeletion(taskId);
         }
         int deleted = 0;
         for (Long taskId : ids) {
@@ -310,8 +311,16 @@ public class MergeDetectServiceImpl
         return deleted;
     }
 
+    /** 在任务锁内校验启停状态，防止删除仍可触发执行的任务。 */
+    private void validateTaskDeletion(Long taskId) {
+        MergeDuplicateTaskDO task = editableTask(taskId, "删除");
+        if (!"DISABLED".equals(task.getEnableStatus())) {
+            throw new ServiceException("请先停用重复检测任务再删除", HttpStatus.WARN);
+        }
+    }
+
     /**
-     * 创建并执行任务，使用同一份固定数据避免立即启动时重复加载范围。
+     * 创建任务并提交异步检测，复用同一份固定数据避免重复加载范围。
      *
      * @param reqVO 检测配置
      * @param operatorId 操作人编号
@@ -328,7 +337,7 @@ public class MergeDetectServiceImpl
         return executeService.executePrepared(task, context, operatorId, operatorName);
     }
 
-    /** 执行重复检测任务，生成候选组和匹配明细。 */
+    /** 提交重复检测任务，事务提交后异步生成候选组和匹配明细。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long execute(Long taskId, Long operatorId, String operatorName) {
@@ -345,7 +354,7 @@ public class MergeDetectServiceImpl
         // 同一任务先加行锁再校验状态，使并发请求串行处理。
         MergeDuplicateTaskDO task = mergeDuplicateTaskMapper.selectForUpdate(taskId);
         if (task == null || !MergeCodes.YES.equals(task.getValidFlag())) {
-            throw new ServiceException("重复检测任务不存在或已失效");
+            throw new ServiceException("重复检测任务不存在或已失效", HttpStatus.WARN);
         }
         // 已触发的 Quartz 作业也须读取持久化开关，避免暂停后继续执行。
         if (scheduled && (!"ENABLED".equals(task.getEnableStatus())
@@ -354,10 +363,10 @@ public class MergeDetectServiceImpl
             return null;
         }
         if (!"ENABLED".equals(task.getEnableStatus())) {
-            throw new ServiceException("任务已停用，不能执行");
+            throw new ServiceException("任务已停用，不能执行", HttpStatus.WARN);
         }
         if (MergeCodes.TASK_RUNNING.equals(task.getStatus())) {
-            throw new ServiceException("重复检测任务正在执行，请勿重复提交");
+            throw new ServiceException("重复检测任务正在执行，请勿重复提交", HttpStatus.WARN);
         }
         // 执行服务固定模型、规则、来源版本和范围，保证本次检测可追溯。
         return executeService.execute(task, operatorId, operatorName);
@@ -413,7 +422,7 @@ public class MergeDetectServiceImpl
         }
         if (!MergeCodes.TRIGGER_MANUAL.equals(triggerType)
                 && !MergeCodes.TRIGGER_SCHEDULED.equals(triggerType)) {
-            throw new ServiceException("执行方式不正确");
+            throw new ServiceException("执行方式不正确", HttpStatus.WARN);
         }
         if (MergeCodes.TRIGGER_SCHEDULED.equals(triggerType)) {
             MergeDetectScheduleServiceImpl.validateCron(reqVO.getCronExpression());
@@ -430,7 +439,7 @@ public class MergeDetectServiceImpl
             return "ENABLED";
         }
         if (!"ENABLED".equals(enableStatus) && !"DISABLED".equals(enableStatus)) {
-            throw new ServiceException("任务状态不正确");
+            throw new ServiceException("任务状态不正确", HttpStatus.WARN);
         }
         return enableStatus;
     }
@@ -439,10 +448,10 @@ public class MergeDetectServiceImpl
     private MergeDuplicateTaskDO editableTask(Long taskId, String action) {
         MergeDuplicateTaskDO task = mergeDuplicateTaskMapper.selectForUpdate(taskId);
         if (task == null || !MergeCodes.YES.equals(task.getValidFlag())) {
-            throw new ServiceException("重复检测任务不存在或已失效");
+            throw new ServiceException("重复检测任务不存在或已失效", HttpStatus.WARN);
         }
         if (MergeCodes.TASK_RUNNING.equals(task.getStatus())) {
-            throw new ServiceException("重复检测任务正在执行，不能" + action);
+            throw new ServiceException("重复检测任务正在执行，不能" + action, HttpStatus.WARN);
         }
         return task;
     }
@@ -467,7 +476,7 @@ public class MergeDetectServiceImpl
                     .in(MergePendingMasterDO::getObjectGroupId, groupIds)
                     .eq(MergePendingMasterDO::getValidFlag, MergeCodes.YES));
             if (pendingCount != null && pendingCount.longValue() > 0L) {
-                throw new ServiceException("候选组已进入结果处理，不能重新检测");
+                throw new ServiceException("候选组已进入结果处理，不能重新检测", HttpStatus.WARN);
             }
             mergeCandidateGroupMapper.update(null, new LambdaUpdateWrapper<MergeCandidateGroupDO>()
                     .set(MergeCandidateGroupDO::getValidFlag, MergeCodes.NO)
@@ -488,21 +497,21 @@ public class MergeDetectServiceImpl
         // 按候选组成员数分流：单成员直接生成结果，多成员进入匹配审核。
         List<Long> ids = MergeDetectConfigUtils.distinctIds(groupIds);
         if (ids.isEmpty()) {
-            throw new ServiceException("请选择需要转入的候选对象组");
+            throw new ServiceException("请选择需要转入的候选对象组", HttpStatus.WARN);
         }
         List<MergeCandidateGroupDO> groups =
                 mergeCandidateGroupMapper.selectList(new LambdaQueryWrapper<MergeCandidateGroupDO>()
                         .in(MergeCandidateGroupDO::getId, ids)
                         .eq(MergeCandidateGroupDO::getValidFlag, MergeCodes.YES));
         if (groups.size() != ids.size()) {
-            throw new ServiceException("候选对象组不存在或已失效，不能转入后续处理");
+            throw new ServiceException("候选对象组不存在或已失效，不能转入后续处理", HttpStatus.WARN);
         }
         Date now = new Date();
         int count = 0;
         // 单条组直接生成待确认结果，多条组进入匹配审核；两者都只能转入一次。
         for (MergeCandidateGroupDO group : groups) {
             if (!canTransfer(group)) {
-                throw new ServiceException("候选对象组已转入后续处理，不能重复转入");
+                throw new ServiceException("候选对象组已转入后续处理，不能重复转入", HttpStatus.WARN);
             }
             if (MergeCodes.GROUP_TYPE_SINGLE.equals(group.getType())) {
                 createSingleResult(group, operatorId, operatorName);
@@ -546,7 +555,7 @@ public class MergeDetectServiceImpl
                         .eq(MergeCandidateGroupMemberDO::getValidFlag, MergeCodes.YES)
                         .orderByAsc(MergeCandidateGroupMemberDO::getId));
         if (members.isEmpty()) {
-            throw new ServiceException("候选对象组没有可转入的来源数据");
+            throw new ServiceException("候选对象组没有可转入的来源数据", HttpStatus.WARN);
         }
         List<Long> sourceIds = new ArrayList<>();
         List<Long> versionIds = new ArrayList<>();

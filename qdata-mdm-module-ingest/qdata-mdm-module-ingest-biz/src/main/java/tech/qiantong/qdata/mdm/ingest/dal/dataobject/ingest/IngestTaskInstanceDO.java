@@ -26,70 +26,87 @@ import java.util.Date;
 import lombok.Data;
 
 /**
- * 接入任务运行实例，记录人工及定时执行结果。
+ * 接入任务运行实例实体，对应表 {@code INGEST_TASK_INSTANCE}。
+ *
+ * @author chentangwen
  */
 @Data
 @TableName("INGEST_TASK_INSTANCE")
 public class IngestTaskInstanceDO {
+
     /**
      * 运行实例 ID。
      */
     @TableId(type = IdType.AUTO)
     private Long id;
+
     /**
      * 所属接入任务 ID。
      */
     private Long taskId;
+
     /**
-     * 本次运行批次号。
+     * 本次运行的批次号。
      */
     private String batchNo;
+
     /**
-     * 本次实际触发方式：MANUAL 人工或 SCHEDULED 定时。
+     * 实际触发方式：MANUAL 表示人工执行，SCHEDULED 表示定时执行。
      */
     private String triggerType;
+
     /**
-     * 运行状态：1 运行中（含排队），2 失败，4 成功。
+     * 运行状态：1 表示运行中（含排队），2 表示失败，4 表示成功。
      */
     private String status;
+
     /**
-     * 受理时初始化，工作线程进入执行阶段时更新为执行开始时间。
+     * 运行开始时间，受理时初始化，进入执行阶段时更新。
      */
     private Date startTime;
+
     /**
-     * 终态时间；为空表示尚未记录结束。
+     * 运行结束时间。
      */
     private Date endTime;
+
     /**
-     * 累计处理总数，收尾时包含读取器跳过的空记录。
+     * 累计处理记录总数，包含读取器跳过的空记录。
      */
     private Long totalCount;
+
     /**
-     * 已提交到目标业务库的新增或更新记录数。
+     * 已成功提交至目标业务库的新增或更新记录数。
      */
     private Long successCount;
+
     /**
-     * 进入行处理后失败的记录数；读取或配置失败不计作行失败。
+     * 行处理失败的记录数。
      */
     private Long failureCount;
+
     /**
      * 读取器跳过的空记录数。
      */
     private Long skipCount;
+
     /**
-     * 数据库增量执行的起点，首次为配置起始值，后续为上次成功位置。
+     * 本次数据库增量读取的起始位置。
      */
     private String cursorBefore;
+
     /**
-     * 数据库增量执行后已保存的位置，失败或无新数据时保持原值。
+     * 本次数据库增量读取后保存的位置。
      */
     private String cursorAfter;
+
     /**
-     * 长度受限的运行错误摘要，完整事件通过运行日志查询。
+     * 运行错误摘要。
      */
     private String errorMessage;
+
     /**
-     * 逻辑删除标志：0 正常，1 删除。
+     * 逻辑删除标志：0 表示未删除，1 表示已删除。
      */
     @TableLogic(value = "0", delval = "1")
     private String delFlag;

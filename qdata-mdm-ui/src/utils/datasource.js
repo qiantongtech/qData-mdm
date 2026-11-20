@@ -54,8 +54,6 @@ const DATASOURCE_CONFIG = {
   SQL_SERVER: { icon: 'icons/datasource/db/type/icon-sql-server.svg' },
   SQL_SERVER2008: { icon: 'icons/datasource/db/type/icon-sql-server.svg' },
   DORIS: { icon: 'icons/datasource/db/type/icon-doris.svg' },
-  DB2: { icon: 'icons/datasource/db/type/icon-db2.svg', tagType: 'info' },
-  OSCAR: { icon: 'icons/datasource/db/type/icon-oscar.svg', tagType: 'info' },
   CLICKHOUSE: { icon: 'icons/datasource/db/type/icon-clickhouse.svg' },
   FLINK: { icon: 'icons/icon-flink-one.svg', tagType: 'success' },
   SPARK: { icon: 'icons/icon-spark-one.svg' },

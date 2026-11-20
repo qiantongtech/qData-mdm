@@ -23,7 +23,9 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 来源数据左侧主数据模型树节点。
+ * 来源数据页面的主数据域、模型目录和模型树节点响应对象。
+ *
+ * @author chentangwen
  */
 @Data
 public class SourceDataModelTreeRespVO {
@@ -54,7 +56,7 @@ public class SourceDataModelTreeRespVO {
     private Long modelId;
 
     /**
-     * 当前模型下的来源数据数量；非模型节点为空。
+     * 当前模型下未删除来源记录的最新版本数量；非模型节点为空。
      */
     private Long count;
 

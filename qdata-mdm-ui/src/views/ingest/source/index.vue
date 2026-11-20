@@ -44,7 +44,7 @@
             type="danger"
             plain
             icon="Delete"
-            :disabled="!store.rows.length"
+            :disabled="!store.rows.length || store.rows.some(row => String(row.validFlag) !== '0')"
             @click="handleDelete"
             v-hasPermi="['ingest:source:remove']"
         >
@@ -118,6 +118,7 @@
               link
               type="primary"
               icon="Edit"
+              :disabled="String(row.validFlag ?? '1') === '1'"
               @click="handleUpdate(row)"
               v-hasPermi="['ingest:source:edit']"
           >
@@ -149,6 +150,7 @@
                   link
                   type="danger"
                   icon="Delete"
+                  :disabled="String(row.validFlag) !== '0'"
                   @click="handleDelete(row)"
               >
                 删除
@@ -396,7 +398,7 @@ async function handleStatusChange(row, value) {
 }
 
 /**
- * 排除仍被任务引用的来源系统，确认后删除可删部分。
+ * 排除未停用或仍被任务引用的来源系统，确认后删除可删部分。
  * @param {Object} [row] 单条记录，未指定时使用表格多选记录。
  */
 function handleDelete(row) {
@@ -404,18 +406,18 @@ function handleDelete(row) {
   if (!selected.length) {
     return;
   }
-  const blocked = selected.filter((item) => (item.taskCount || 0) > 0);
-  const allowed = selected.filter((item) => (item.taskCount || 0) <= 0);
+  const canDelete = item => String(item.validFlag) === '0' && (item.taskCount || 0) <= 0;
+  const allowed = selected.filter(canDelete);
+  const blockedCount = selected.length - allowed.length;
   if (!allowed.length) {
-    const message =
-        blocked.length === 1
-            ? `该来源系统当前存在 ${blocked[0].taskCount} 个接入任务引用，请先解除业务引用后再删除`
-            : "所选来源系统均存在接入任务引用，无法删除";
-    proxy.$modal.msgError(message);
+    const message = selected.length === 1 && String(selected[0].validFlag) !== '0'
+        ? "来源系统已启用，请先停用后再删除"
+        : "请先停用来源系统并解除接入任务引用后再删除";
+    proxy.$modal.msgWarning(message);
     return;
   }
-  const message = blocked.length
-      ? `可删除${allowed.length}个，不可删除${blocked.length}个（存在接入任务引用），是否删除可删部分`
+  const message = blockedCount
+      ? `可删除${allowed.length}个，不可删除${blockedCount}个（未停用或存在接入任务引用），是否删除可删部分？`
       : row?.id
           ? `是否确认删除来源系统“${row.name}”？`
           : `是否确认删除选中的${allowed.length}条数据？`;

@@ -21,8 +21,21 @@ package tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo;
 import java.util.*;
 import lombok.Data;
 
+/**
+ * 接入任务来源数据预览响应对象。
+ *
+ * @author chentangwen
+ */
 @Data
 public class IngestTaskPreviewRespVO {
+
+    /**
+     * 预览数据的来源字段名称列表。
+     */
     private List<String> fields;
+
+    /**
+     * 预览记录列表，每条记录以来源字段名称为键。
+     */
     private List<Map<String, Object>> rows;
 }

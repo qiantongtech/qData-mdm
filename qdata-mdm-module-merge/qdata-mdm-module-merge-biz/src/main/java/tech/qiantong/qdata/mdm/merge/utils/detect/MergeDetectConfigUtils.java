@@ -110,7 +110,7 @@ public final class MergeDetectConfigUtils {
         return config;
     }
 
-    /** 保存参与检测的规则编号、名称、类型和原始配置。 */
+    /** 保存检测时的规则配置、分值、状态及创建信息，供历史实例展示。 */
     public static List<Map<String, Object>> ruleSnapshot(List<RuleMatchDO> rules) {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (RuleMatchDO rule : rules) {
@@ -118,7 +118,14 @@ public final class MergeDetectConfigUtils {
             row.put("id", rule.getId());
             row.put("ruleName", rule.getRuleName());
             row.put("ruleType", rule.getRuleType());
+            row.put("modelFieldId", rule.getModelFieldId());
             row.put("ruleConfig", rule.getRuleConfig());
+            row.put("ruleScore", rule.getRuleScore());
+            row.put("validFlag", rule.getValidFlag());
+            row.put("abnormalFlag", rule.getAbnormalFlag());
+            row.put("creatorId", rule.getCreatorId());
+            row.put("createBy", rule.getCreateBy());
+            row.put("createTime", rule.getCreateTime() == null ? null : rule.getCreateTime().getTime());
             rows.add(row);
         }
         return rows;

@@ -19,28 +19,30 @@
 package tech.qiantong.qdata.mdm.ingest.service.task;
 
 /**
- * 接入配置与 Quartz 调度同步。
+ * 根据接入任务配置维护 Quartz 调度。
  *
  * @author chentangwen
  */
 public interface IIngestTaskScheduleService {
 
     /**
-     * 等待当前配置事务提交后同步，避免 Quartz 读取到尚未提交的任务配置。
+     * 在配置事务成功提交后同步调度；未启用事务同步时立即执行。
+     * 批量同步时逐条处理，全部尝试后再报告失败，不回滚已提交的配置。
      *
-     * @param taskId 需要同步的接入任务 ID
+     * @param taskIds 待同步的接入任务 ID
      */
-    void syncAfterCommit(Long taskId);
+    void syncAfterCommit(Long... taskIds);
 
     /**
-     * 在独立事务内锁定任务，创建、更新、暂停或移除关联调度。
+     * 在独立事务中锁定任务记录，根据当前配置同步关联调度。
      *
-     * @param taskId 接入任务 ID，包含需要清理调度的已删除任务
+     * @param taskId 接入任务 ID，可以是需要清理调度的已删除任务 ID
      */
     void synchronize(Long taskId);
 
     /**
-     * 校正所有任务的调度状态，单个任务失败不阻断其他任务。
+     * 逐条校正任务调度，单条失败仅记录日志。
+     * 扫描范围包含已删除的任务，以清理残留调度。
      */
     void reconcile();
 }

@@ -18,17 +18,20 @@
 
 package tech.qiantong.qdata.mdm.rule.service.ruleMatch.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import tech.qiantong.qdata.mdm.common.core.domain.entity.SysUser;
+import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.system.service.ISysUserService;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.aliyun.oss.ServiceException;
 import lombok.extern.slf4j.Slf4j;
 import javax.annotation.Resource;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
@@ -110,10 +113,25 @@ public class RuleMatchServiceImpl  extends ServiceImpl<RuleMatchMapper,RuleMatch
                         .set(updateReqVO.isResponsibleUserSpecified() && updateReqVO.getResponsibleUserId() == null,
                                 RuleMatchDO::getResponsibleUserId, null));
     }
+    /** 锁定待删除规则，确认整批均已禁用后才逻辑删除。 */
     @Override
     public int removeRuleMatch(Collection<Long> idList) {
-        // 批量删除匹配规则
-        return ruleMatchMapper.deleteBatchIds(idList);
+        if (idList == null || idList.isEmpty()) {
+            return 0;
+        }
+        Set<Long> ids = new HashSet<>(idList);
+        List<RuleMatchDO> rules = ruleMatchMapper.selectList(new LambdaQueryWrapper<RuleMatchDO>()
+                .select(RuleMatchDO::getId, RuleMatchDO::getValidFlag)
+                .in(RuleMatchDO::getId, ids)
+                .orderByAsc(RuleMatchDO::getId)
+                .last("FOR UPDATE"));
+        if (rules.size() != ids.size()) {
+            throw new ServiceException("所选规则已不存在，请刷新列表后重试");
+        }
+        if (rules.stream().anyMatch(rule -> !Boolean.FALSE.equals(rule.getValidFlag()))) {
+            throw new ServiceException("请先禁用所选规则再删除");
+        }
+        return ruleMatchMapper.deleteBatchIds(ids);
     }
 
     @Override

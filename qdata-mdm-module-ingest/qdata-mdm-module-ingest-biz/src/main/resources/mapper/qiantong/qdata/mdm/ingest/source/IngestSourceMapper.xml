@@ -110,14 +110,21 @@
           AND DEL_FLAG = '0'
     </select>
 
-    <select id="selectTaskSourceIdsBySourceIds" resultType="java.lang.Long">
-        SELECT SOURCE_SYSTEM_ID
+    <resultMap id="IngestSourceTaskCountResult"
+               type="tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceTaskCountRow">
+        <id property="sourceId" column="SOURCE_SYSTEM_ID"/>
+        <result property="taskCount" column="TASK_COUNT"/>
+    </resultMap>
+
+    <select id="selectTaskCountsBySourceIds" resultMap="IngestSourceTaskCountResult">
+        SELECT SOURCE_SYSTEM_ID, COUNT(1) AS TASK_COUNT
         FROM INGEST_TASK
         WHERE DEL_FLAG = '0'
         AND SOURCE_SYSTEM_ID IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>
+        GROUP BY SOURCE_SYSTEM_ID
     </select>
 
     <select id="selectTaskListBySourceId" resultMap="IngestSourceTaskResult">

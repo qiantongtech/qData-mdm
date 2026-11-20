@@ -16,53 +16,23 @@
  * See the LICENSE file in the project root for full license information.
  */
 
-package tech.qiantong.qdata.mdm.ingest.api.datasource.dto;
+package tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo;
 
 import lombok.Data;
-import tech.qiantong.qdata.mdm.common.database.core.DbColumn;
+import tech.qiantong.qdata.mdm.merge.domain.detect.MergeDetectRunLogBO;
 
 import java.util.List;
 
+/**
+ * 重复检测日志增量查询结果。
+ *
+ * @author chentangwen
+ */
 @Data
-public class DatasourceCreaTeTableReqDTO {
-
-    /**
-     * 数据源类型
-     */
-    private String datasourceType;
-
-    /**
-     * 数据源配置(json字符串)
-     */
-    private String datasourceConfig;
-
-    /**
-     * IP
-     */
-    private String ip;
-
-    /**
-     * 端口号
-     */
-    private Long port;
-
-    /**
-     * 库名
-     */
-    private String dbname;
-
-    /**
-     * 表名
-     */
-    private String tableName;
-
-    /**
-     * 表注释
-     */
-    private String tableComment;
-
-    /**
-     * 表字段
-     */
-    private List<DbColumn> columnsList;
+public class MergeDetectRunLogRespVO {
+    private MergeInstanceRespVO run;
+    private List<MergeDetectRunLogBO> logs;
+    private long nextSeq;
+    private long lastSeq;
+    private boolean hasMore;
 }

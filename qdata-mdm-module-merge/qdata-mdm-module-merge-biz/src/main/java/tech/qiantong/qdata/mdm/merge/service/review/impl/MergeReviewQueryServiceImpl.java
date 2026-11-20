@@ -21,6 +21,7 @@ package tech.qiantong.qdata.mdm.merge.service.review.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.merge.domain.source.MergeSourceRecordBO;
@@ -558,7 +559,7 @@ public class MergeReviewQueryServiceImpl implements IMergeReviewQueryService {
     public MergeReviewDetailRespVO detail(Long groupId) {
         MergeCandidateGroupDO group = mergeCandidateGroupMapper.selectById(groupId);
         if (group == null) {
-            throw new ServiceException("候选组不存在或已失效");
+            throw new ServiceException("候选组不存在或已失效", HttpStatus.WARN);
         }
         List<MergeCandidateGroupMemberDO> members = members(groupId);
         Map<Long, SourceSnapshot> snapshots = sourceService.loadContext(group.getModelId(), members).getSnapshots();

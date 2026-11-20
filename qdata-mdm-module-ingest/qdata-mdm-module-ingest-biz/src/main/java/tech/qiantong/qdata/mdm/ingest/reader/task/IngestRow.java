@@ -18,33 +18,55 @@
 
 package tech.qiantong.qdata.mdm.ingest.reader.task;
 
+import cn.hutool.core.util.ObjectUtil;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 
 import java.util.Map;
 
 /**
  * 单条来源记录，定位信息独立于来源值，不参与字段映射。
  *
+ * <p>由 {@link IngestReadContext#emit} 封装后同步传给读取回调，仅承载原始数据及附带信息。
+ * 字段转换、唯一标识校验、来源记录 ID 计算和增量位置持久化由后续处理负责。</p>
+ *
+ * <p>原始数据保留来源 Map 引用，不复制字段值，调用方应按只读数据使用。</p>
+ *
  * @author chentangwen
  */
 @Getter
-@RequiredArgsConstructor
 public class IngestRow {
+
     /**
-     * 以来源字段名为键的原始数据。
+     * 以来源字段名为键的原始数据，不为 null，允许无字段或字段值为 null。
+     * API 嵌套对象及数组保留原始结构，本类不展开路径或转换字段值。
      */
     private final Map<String, Object> values;
     /**
-     * 错误定位信息，例如文件物理行号、API 页内序号或数据库读取序号。
+     * 来源位置描述，例如文件物理行号、API 页内序号或数据库读取序号，允许为 null。
+     * 仅供日志和错误提示使用，不作为来源记录唯一标识。
      */
     private final String location;
     /**
-     * 按任务唯一字段顺序提取的标识值，尚未计算来源记录 ID。
-     */
-    private final Map<String, Object> sourceId;
-    /**
-     * 数据库增量字段的当前值，非数据库增量读取时为空。
+     * 当前记录的数据库增量字段原值，保留来源类型；非增量读取或字段缺失、值为空时为 null。
+     * 该值不代表本条记录已入库，也不代表增量位置已经保存。
      */
     private final Object incrementValue;
+
+    /**
+     * 创建单条来源记录，校验容器引用后保留全部原始值，不复制或包装 Map。
+     *
+     * @param values 来源字段及原值，不可为 {@code null}
+     * @param location 来源位置描述，允许为 {@code null}
+     * @param incrementValue 当前记录的增量原值，允许为 {@code null}
+     * @throws ServiceException 来源数据 Map 为空引用
+     */
+    public IngestRow(Map<String, Object> values, String location, Object incrementValue) {
+        if (ObjectUtil.isNull(values)) {
+            throw new ServiceException("来源记录不能为空");
+        }
+        this.values = values;
+        this.location = location;
+        this.incrementValue = incrementValue;
+    }
 }

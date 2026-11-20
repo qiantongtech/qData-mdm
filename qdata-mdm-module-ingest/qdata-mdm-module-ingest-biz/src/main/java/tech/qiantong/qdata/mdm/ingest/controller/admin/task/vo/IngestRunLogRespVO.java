@@ -24,7 +24,9 @@ import tech.qiantong.qdata.mdm.ingest.dal.dataobject.ingest.IngestTaskInstanceLo
 import java.util.List;
 
 /**
- * 运行日志增量查询结果，游标只覆盖本次响应中已返回的事件。
+ * 接入任务运行日志增量查询响应对象。
+ *
+ * @author chentangwen
  */
 @Data
 public class IngestRunLogRespVO {

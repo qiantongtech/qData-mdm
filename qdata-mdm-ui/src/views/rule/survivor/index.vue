@@ -123,15 +123,7 @@
               </div>
             </template>
             <template #modelFieldId="{ row }">
-              <div class="field-cell">
-<!--                <span :class="['field-type-icon', row.fieldTypeClass]">
-                  {{ row.fieldTypeShort }}
-                </span>-->
-                <span class="field-cell-content">
-                  <span class="field-cell-name">{{ row.fieldName }}</span>
-                  <small>{{ row.fieldCode }}</small>
-                </span>
-              </div>
+              {{ row.fieldName }}
             </template>
             <template #fieldType="{ row }">
               <span class="type-label">{{ row.fieldType }}</span>
@@ -172,6 +164,7 @@
                     link
                     type="primary"
                     icon="Edit"
+                    :disabled="row.validFlag === true"
                     @click="handleUpdate(row)"
                     v-hasPermi="['rule:rulesurvivor:edit']"
                 >修改</el-button>
@@ -179,6 +172,7 @@
                   link
                   type="danger"
                   icon="Delete"
+                  :disabled="row.validFlag !== false"
                   @click="handleDelete(row)"
                   v-hasPermi="['rule:rulesurvivor:remove']"
                 >删除</el-button>
@@ -292,11 +286,11 @@
         </el-form-item>
 
         <div class="h2-title row-full">字段生存配置</div>
-            <el-form-item label="模型字段" prop="modelFieldId">
+            <el-form-item label="参与字段" prop="modelFieldId">
               <el-select
                 v-model="form.modelFieldId"
                 class="full-width-input"
-                :placeholder="form.modelId ? '请选择模型字段' : '请先选择主数据模型'"
+                :placeholder="form.modelId ? '请选择参与字段' : '请先选择主数据模型'"
                 :disabled="!form.modelId"
               >
                 <el-option
@@ -322,7 +316,12 @@
                 />
               </el-select>
             </qt-form-item>
-            <qt-form-item v-if="form.ruleType === 'SOURCE_PRIORITY'" label="来源优先级配置" tip="按选择顺序从左到右确定优先级，先选的优先级更高。"required>
+            <qt-form-item
+              v-if="form.ruleType === 'SOURCE_PRIORITY'"
+              label="来源优先级配置"
+              tip="按选择顺序从左到右确定优先级，先选的优先级更高。"
+              required
+            >
               <el-select v-model="sourcePrioritySelection" class="full-width-input" multiple
                 placeholder="请选择来源系统"
               >
@@ -370,8 +369,9 @@ const { responsibleUserList, getResponsibleName, getResponsiblePhone, loadRespon
   const open = ref(false);
   const tableRef = ref(null);
   const statusLoading = reactive({});
-  const ids = ref([]);
-  const multiple = ref(true);
+  const selectedRows = ref([]);
+  const ids = computed(() => selectedRows.value.map((row) => row.id));
+  const multiple = computed(() => !selectedRows.value.length || selectedRows.value.some(row => row.validFlag !== false));
   const title = ref("");
   const usersLoading = ref(false);
   const usersError = ref(false);
@@ -516,7 +516,7 @@ const { responsibleUserList, getResponsibleName, getResponsiblePhone, loadRespon
         },
       ],
       modelId: [{ required: true, message: "主数据模型不能为空", trigger: "change" }],
-      modelFieldId: [{ required: true, message: "模型字段不能为空", trigger: "change" }],
+      modelFieldId: [{ required: true, message: "参与字段不能为空", trigger: "change" }],
       ruleType: [{ required: true, message: "主要自动策略不能为空", trigger: "change" }],
       validFlag: [{
         validator: (_rule, value, callback) => {
@@ -605,7 +605,7 @@ const { responsibleUserList, getResponsibleName, getResponsiblePhone, loadRespon
       { label: "主数据模型", prop: "modelName", slot: "modelInfo", minWidth: 420, align: "left", showOverflowTooltip: { effect: "light" } },
       { label: "归属位置", prop: "projectName", slot: "location", minWidth: 210, align: "left" },
       {
-        label: "模型字段",
+        label: "参与字段",
         prop: "modelFieldId",
         slot: "modelFieldId",
         minWidth: 160,
@@ -792,7 +792,7 @@ const { responsibleUserList, getResponsibleName, getResponsiblePhone, loadRespon
     const fieldOption = getFieldOption(fieldId, modelId);
     if (!props.embedded && !loadedModelFields.has(String(modelId))) {
       return {
-        fieldName: fieldOption?.name || displayValue(fieldId),
+        fieldName: fieldOption?.name || "字段信息未获取",
         fieldCode: fieldOption?.code || displayValue(fieldId),
         fieldType: "-",
         fieldTypeShort: "",
@@ -948,7 +948,7 @@ const { responsibleUserList, getResponsibleName, getResponsiblePhone, loadRespon
     try {
       await loadModelFields(modelId);
     } catch {
-      proxy.$modal.msgError("主数据模型字段加载失败");
+      proxy.$modal.msgError("主数据参与字段加载失败");
     }
   }
 
@@ -1019,8 +1019,7 @@ const { responsibleUserList, getResponsibleName, getResponsiblePhone, loadRespon
 
   // 多选框选中数据
   function handleSelectionChange(selection) {
-    ids.value = selection.map((item) => item.id);
-    multiple.value = !selection.length;
+    selectedRows.value = selection;
   }
 
   /** 新增按钮操作 */
@@ -1126,8 +1125,13 @@ const { responsibleUserList, getResponsibleName, getResponsiblePhone, loadRespon
 
   /** 删除按钮操作 */
   function handleDelete(row) {
+    const rows = row?.id == null ? selectedRows.value : [row];
+    if (!rows.length) return;
+    if (rows.some((item) => item.validFlag !== false)) {
+      proxy.$modal.msgWarning("请先禁用所选规则再删除");
+      return;
+    }
     const targetIds = row?.id ?? ids.value;
-    if (!targetIds || (Array.isArray(targetIds) && !targetIds.length)) return;
     proxy.$modal.confirm('是否确认删除生存规则编号为"' + targetIds + '"的数据项？').then(function() {
       return delRulesurvivor(targetIds);
     }).then(() => {

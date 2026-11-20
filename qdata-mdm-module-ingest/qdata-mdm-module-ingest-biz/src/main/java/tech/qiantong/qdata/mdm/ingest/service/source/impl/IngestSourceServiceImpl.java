@@ -19,9 +19,13 @@
 package tech.qiantong.qdata.mdm.ingest.service.source.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import cn.hutool.core.util.ObjectUtil;
+import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.StringUtils;
@@ -37,6 +41,7 @@ import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceDO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceDatasourceRelDO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceModelNameRow;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceResponsibleUserRow;
+import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceTaskCountRow;
 import tech.qiantong.qdata.mdm.ingest.dal.mapper.datasource.IngestDatasourceMapper;
 import tech.qiantong.qdata.mdm.ingest.dal.mapper.source.IngestSourceDatasourceRelMapper;
 import tech.qiantong.qdata.mdm.ingest.dal.mapper.source.IngestSourceMapper;
@@ -49,22 +54,31 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 来源系统
+ * 来源系统管理服务，负责基础配置、连接关联和查询展示信息。
+ *
+ * <p>写操作在同一事务内处理主表与关联表；编码在创建时检查，修改时保持原编码。
+ * 连接关联按差异更新，已经被接入任务引用的来源系统和连接受到删除保护。</p>
  *
  * @author chentangwen
  * @date 2026-09-15
  */
 @Service
-public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, IngestSourceDO> implements IIngestSourceService {
+public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, IngestSourceDO>
+        implements IIngestSourceService {
+
+    /** 控制批量 IN 条件长度，避免大量编号超出数据库限制。 */
+    private static final int QUERY_BATCH_SIZE = 500;
 
     @Resource
     private IngestSourceMapper ingestSourceMapper;
@@ -86,8 +100,11 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
      */
     @Override
     public PageResult<IngestSourceRespVO> getIngestSourcePage(IngestSourcePageReqVO pageReqVO) {
+        if (ObjectUtil.isNull(pageReqVO)) {
+            throw new ServiceException("来源系统查询条件不能为空");
+        }
         // 责任人按姓名、账号或手机号筛选时，先解析为用户 ID，再交给来源系统分页条件查询。
-        if (StringUtils.isNotEmpty(pageReqVO.getResponsiblePerson())) {
+        if (StringUtils.isNotBlank(pageReqVO.getResponsiblePerson())) {
             pageReqVO.setResponsibleUserIds(ingestSourceMapper.selectResponsibleUserIdsByKeyword(
                     "%" + pageReqVO.getResponsiblePerson().trim() + "%"));
         }
@@ -100,18 +117,10 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
         List<IngestSourceRespVO> rows = BeanUtils.toBean(page.getRows(), IngestSourceRespVO.class);
         List<Long> sourceIds = rows.stream().map(IngestSourceRespVO::getId).filter(Objects::nonNull)
                 .collect(Collectors.toList());
-        // 任务数按批量结果统计，避免对分页中的每条来源系统逐条查询。
-        Map<Long, Long> taskCountMap = Collections.emptyMap();
-        if (!sourceIds.isEmpty()) {
-            List<Long> taskSourceIds = ingestSourceMapper.selectTaskSourceIdsBySourceIds(sourceIds);
-            if (taskSourceIds != null && !taskSourceIds.isEmpty()) {
-                taskCountMap = taskSourceIds.stream().collect(Collectors.groupingBy(id -> id, Collectors.counting()));
-            }
-        }
-        Map<Long, Long> finalTaskCountMap = taskCountMap;
+        // 数据库直接分组统计，只返回每个来源的数量，避免载入全部任务 ID。
+        Map<Long, Long> finalTaskCountMap = loadTaskCounts(sourceIds);
         rows.forEach(row -> row.setTaskCount(finalTaskCountMap.getOrDefault(row.getId(), 0L)));
-        fillResponsiblePersons(rows);
-        fillCreatorPhones(rows);
+        fillUsers(rows);
         fillModels(rows);
         fillDatasource(rows);
         return new PageResult<>(rows, page.getTotal());
@@ -125,25 +134,30 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
      */
     @Override
     public IngestSourceRespVO getIngestSource(Long id) {
+        if (ObjectUtil.isNull(id)) {
+            throw new ServiceException("来源系统ID不能为空", HttpStatus.WARN);
+        }
         IngestSourceDO source = ingestSourceMapper.selectById(id);
-        if (source == null) {
-            throw new ServiceException("来源系统不存在");
+        if (ObjectUtil.isNull(source)) {
+            throw new ServiceException("来源系统不存在", HttpStatus.WARN);
         }
         IngestSourceRespVO respVO = BeanUtils.toBean(source, IngestSourceRespVO.class);
-        fillResponsiblePersons(Collections.singletonList(respVO));
-        fillCreatorPhones(Collections.singletonList(respVO));
+        fillUsers(Collections.singletonList(respVO));
         Long taskCount = ingestSourceMapper.countTaskBySourceId(id);
-        respVO.setTaskCount(taskCount == null ? 0L : taskCount);
+        respVO.setTaskCount(ObjectUtil.isNull(taskCount) ? 0L : taskCount);
         fillDatasource(Collections.singletonList(respVO));
         List<Long> usedDatasourceIds = ingestSourceDatasourceRelMapper.selectUsedDatasourceIds(id);
-        respVO.setUsedDatasourceIds(usedDatasourceIds == null ? Collections.emptyList() : usedDatasourceIds);
+        respVO.setUsedDatasourceIds(ObjectUtil.isNull(usedDatasourceIds) ? Collections.emptyList() : usedDatasourceIds);
         List<IngestSourceTaskRespVO> taskList = ingestSourceMapper.selectTaskListBySourceId(id);
-        if (taskList != null && !taskList.isEmpty()) {
-            Map<Long, String> modelNames = modelBaseService.getModelBaseList().stream()
-                    .collect(Collectors.toMap(ModelBaseDO::getId, ModelBaseDO::getName));
+        if (CollectionUtils.isNotEmpty(taskList)) {
+            List<Long> modelIds = taskList.stream().map(IngestSourceTaskRespVO::getModelId)
+                    .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+            Map<Long, String> modelNames = CollectionUtils.isEmpty(modelIds) ? Collections.emptyMap()
+                    : modelBaseService.getModelBaseListByIds(modelIds).stream()
+                        .collect(Collectors.toMap(ModelBaseDO::getId, ModelBaseDO::getName));
             taskList.forEach(task -> task.setModelName(modelNames.get(task.getModelId())));
         }
-        respVO.setTaskList(taskList == null ? Collections.emptyList() : taskList);
+        respVO.setTaskList(ObjectUtil.isNull(taskList) ? Collections.emptyList() : taskList);
         fillModels(Collections.singletonList(respVO));
         return respVO;
     }
@@ -154,7 +168,9 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
      * @param rows 来源系统列表
      */
     private void fillModels(List<IngestSourceRespVO> rows) {
-        if (rows.isEmpty()) return;
+        if (CollectionUtils.isEmpty(rows)) {
+            return;
+        }
         List<Long> ids = rows.stream().map(IngestSourceRespVO::getId).collect(Collectors.toList());
         Map<Long, List<IngestSourceModelNameRow>> models = ingestSourceMapper.selectModelNamesBySourceIds(ids).stream()
                 .collect(Collectors.groupingBy(IngestSourceModelNameRow::getSourceId));
@@ -162,60 +178,66 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
             List<IngestSourceModelNameRow> list = models.getOrDefault(row.getId(), Collections.emptyList());
             row.setModelList(BeanUtils.toBean(list, IngestSourceModelRespVO.class));
             row.setModelNames(list.stream().map(IngestSourceModelNameRow::getModelName).collect(Collectors.toList()));
-            row.setDuplicateTaskCount(list.stream().mapToLong(item -> item.getDuplicateTaskCount() == null ? 0 : item.getDuplicateTaskCount()).sum());
-            row.setQualityTaskCount(list.stream().mapToLong(item -> item.getQualityTaskCount() == null ? 0 : item.getQualityTaskCount()).sum());
+            row.setDuplicateTaskCount(list.stream().mapToLong(item -> ObjectUtil.isNull(item.getDuplicateTaskCount())
+                    ? 0 : item.getDuplicateTaskCount()).sum());
+            row.setQualityTaskCount(list.stream().mapToLong(item -> ObjectUtil.isNull(item.getQualityTaskCount())
+                    ? 0 : item.getQualityTaskCount()).sum());
         });
     }
 
     /**
-     * 批量补充责任人姓名和联系电话。
-     */
-    private void fillResponsiblePersons(List<IngestSourceRespVO> rows) {
-        if (rows == null || rows.isEmpty()) {
-            return;
-        }
-        List<Long> userIds = rows.stream().map(IngestSourceRespVO::getResponsibleUserId)
-                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
-        if (userIds.isEmpty()) {
-            return;
-        }
-        Map<Long, IngestSourceResponsibleUserRow> usersById = ingestSourceMapper
-                .selectResponsibleUsersByIds(userIds).stream()
-                .collect(Collectors.toMap(IngestSourceResponsibleUserRow::getUserId,
-                        Function.identity(), (first, second) -> first));
-        rows.forEach(row -> {
-            IngestSourceResponsibleUserRow user = usersById.get(row.getResponsibleUserId());
-            if (user != null) {
-                row.setResponsiblePersonName(user.getName());
-                row.setResponsiblePersonPhone(user.getPhone());
-            }
-        });
-    }
-
-    /**
-     * 批量补充创建人联系电话。
+     * 合并责任人和创建人 ID，一次分批查询后回填姓名及联系电话。
      *
      * @param rows 来源系统列表
      */
-    private void fillCreatorPhones(List<IngestSourceRespVO> rows) {
-        if (rows == null || rows.isEmpty()) {
+    private void fillUsers(List<IngestSourceRespVO> rows) {
+        if (CollectionUtils.isEmpty(rows)) {
             return;
         }
-        List<Long> userIds = rows.stream().map(IngestSourceRespVO::getCreatorId)
-                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
-        if (userIds.isEmpty()) {
-            return;
-        }
-        Map<Long, IngestSourceResponsibleUserRow> usersById = ingestSourceMapper
-                .selectResponsibleUsersByIds(userIds).stream()
-                .collect(Collectors.toMap(IngestSourceResponsibleUserRow::getUserId,
-                        Function.identity(), (first, second) -> first));
+        Set<Long> userIds = new LinkedHashSet<>();
         rows.forEach(row -> {
-            IngestSourceResponsibleUserRow user = usersById.get(row.getCreatorId());
-            if (user != null) {
-                row.setCreatorPhone(user.getPhone());
+            if (ObjectUtil.isNotNull(row.getResponsibleUserId())) {
+                userIds.add(row.getResponsibleUserId());
+            }
+            if (ObjectUtil.isNotNull(row.getCreatorId())) {
+                userIds.add(row.getCreatorId());
             }
         });
+        List<Long> ids = new ArrayList<>(userIds);
+        Map<Long, IngestSourceResponsibleUserRow> usersById = new HashMap<>();
+        for (int start = 0; start < ids.size(); start += QUERY_BATCH_SIZE) {
+            ingestSourceMapper.selectResponsibleUsersByIds(
+                    ids.subList(start, Math.min(start + QUERY_BATCH_SIZE, ids.size())))
+                    .forEach(user -> usersById.putIfAbsent(user.getUserId(), user));
+        }
+        rows.forEach(row -> {
+            IngestSourceResponsibleUserRow responsible = usersById.get(row.getResponsibleUserId());
+            if (ObjectUtil.isNotNull(responsible)) {
+                row.setResponsiblePersonName(responsible.getName());
+                row.setResponsiblePersonPhone(responsible.getPhone());
+            }
+            IngestSourceResponsibleUserRow creator = usersById.get(row.getCreatorId());
+            if (ObjectUtil.isNotNull(creator)) {
+                row.setCreatorPhone(creator.getPhone());
+            }
+        });
+    }
+
+    /**
+     * 分批统计接入任务引用数量，未返回分组的来源按零条处理。
+     *
+     * @param sourceIds 已去重的来源系统 ID
+     * @return 来源系统 ID 到任务数的映射
+     */
+    private Map<Long, Long> loadTaskCounts(List<Long> sourceIds) {
+        Map<Long, Long> counts = new HashMap<>();
+        for (int start = 0; start < sourceIds.size(); start += QUERY_BATCH_SIZE) {
+            for (IngestSourceTaskCountRow row : ingestSourceMapper.selectTaskCountsBySourceIds(
+                    sourceIds.subList(start, Math.min(start + QUERY_BATCH_SIZE, sourceIds.size())))) {
+                counts.put(row.getSourceId(), row.getTaskCount());
+            }
+        }
+        return counts;
     }
 
     /**
@@ -227,21 +249,25 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createIngestSource(IngestSourceSaveReqVO createReqVO) {
-        // 编码保存前统一去空格校验重复。
+        if (ObjectUtil.isNull(createReqVO)) {
+            throw new ServiceException("来源系统配置不能为空");
+        }
+        // 编码先规范化再查重；跨请求的唯一性仍需数据库约束保证。
         String code = StringUtils.isEmpty(createReqVO.getCode()) ? createReqVO.getCode() : createReqVO.getCode().trim();
         if (StringUtils.isEmpty(code)) {
-            throw new ServiceException("来源系统编码不能为空");
+            throw new ServiceException("来源系统编码不能为空", HttpStatus.WARN);
         }
         Long codeCount = ingestSourceMapper.countByCode(code);
-        if (codeCount != null && codeCount > 0) {
-            throw new ServiceException("来源系统编码已存在");
+        if (ObjectUtil.isNotNull(codeCount) && codeCount > 0) {
+            throw new ServiceException("来源系统编码已存在", HttpStatus.WARN);
         }
         IngestSourceDO source = BeanUtils.toBean(createReqVO, IngestSourceDO.class);
         source.setId(null);
         source.setCode(code);
         source.setTrustScore(normalizeTrustScore(createReqVO.getTrustScore()));
         source.setUpdaterId(createReqVO.getUpdatorId());
-        source.setValidFlag(createReqVO.getValidFlag() == null ? IngestSourceDO.VALID_FLAG_YES : createReqVO.getValidFlag());
+        source.setValidFlag(ObjectUtil.isNull(createReqVO.getValidFlag())
+                ? IngestSourceDO.VALID_FLAG_YES : createReqVO.getValidFlag());
         ingestSourceMapper.insert(source);
         saveDatasourceRels(source.getId(), createReqVO.getDatasourceIds(), createReqVO.getCreateBy());
         return source.getId();
@@ -256,20 +282,23 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int updateIngestSource(IngestSourceSaveReqVO updateReqVO) {
-        if (updateReqVO.getId() == null) {
-            throw new ServiceException("来源系统ID不能为空");
+        if (ObjectUtil.isNull(updateReqVO)) {
+            throw new ServiceException("来源系统配置不能为空");
+        }
+        if (ObjectUtil.isNull(updateReqVO.getId())) {
+            throw new ServiceException("来源系统ID不能为空", HttpStatus.WARN);
         }
         IngestSourceDO dbSource = ingestSourceMapper.selectById(updateReqVO.getId());
-        if (dbSource == null) {
-            throw new ServiceException("来源系统不存在");
+        if (ObjectUtil.isNull(dbSource)) {
+            throw new ServiceException("来源系统不存在", HttpStatus.WARN);
         }
         // 接入任务已经使用的连接不能被删除
         List<Long> usedDatasourceIds = ingestSourceDatasourceRelMapper.selectUsedDatasourceIds(updateReqVO.getId());
-        if (CollUtil.isNotEmpty(usedDatasourceIds)) {
+        if (CollectionUtils.isNotEmpty(usedDatasourceIds)) {
             Set<Long> selectedIds = new LinkedHashSet<>(normalizeDatasourceIds(updateReqVO.getDatasourceIds()));
             for (Long usedDatasourceId : usedDatasourceIds) {
                 if (!selectedIds.contains(usedDatasourceId)) {
-                    throw new ServiceException("存在接入任务正在使用的数据库连接，不能取消关联");
+                    throw new ServiceException("存在接入任务正在使用的数据库连接，不能取消关联", HttpStatus.WARN);
                 }
             }
         }
@@ -284,7 +313,7 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
     }
 
     /**
-     * 删除来源系统，删除前校验是否存在接入任务引用。
+     * 删除已停用且未被接入任务引用的来源系统。
      *
      * @param idList 来源系统编号集合
      * @return 删除行数
@@ -292,43 +321,75 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int removeIngestSource(Collection<Long> idList) {
-        if (idList == null || idList.isEmpty()) {
+        if (CollectionUtils.isEmpty(idList)) {
             return 0;
         }
-        // 删除前逐项检查任务引用；只要有一项不能删除，整个批量操作回滚。
-        for (Long id : idList) {
-            IngestSourceDO source = ingestSourceMapper.selectById(id);
+        List<Long> ids = new ArrayList<>(new TreeSet<>(idList));
+        Map<Long, Long> taskCounts = loadTaskCounts(ids);
+        for (Long id : ids) {
+            IngestSourceDO source = ingestSourceMapper.selectOne(Wrappers.lambdaQuery(IngestSourceDO.class)
+                    .select(IngestSourceDO::getId, IngestSourceDO::getValidFlag)
+                    .eq(IngestSourceDO::getId, id)
+                    .last("FOR UPDATE"));
             if (source == null) {
-                throw new ServiceException("来源系统不存在");
+                throw new ServiceException("来源系统不存在", HttpStatus.WARN);
             }
-            Long taskCount = ingestSourceMapper.countTaskBySourceId(id);
+            if (!IngestSourceDO.VALID_FLAG_NO.equals(source.getValidFlag())) {
+                throw new ServiceException("来源系统已启用，请先停用后再删除", HttpStatus.WARN);
+            }
+            Long taskCount = taskCounts.getOrDefault(id, 0L);
             if (taskCount != null && taskCount > 0) {
-                throw new ServiceException("该来源系统当前存在 " + taskCount + " 个接入任务引用，请先解除业务引用后再删除");
+                throw new ServiceException("该来源系统当前存在 " + taskCount + " 个接入任务引用，请先解除业务引用后再删除", HttpStatus.WARN);
             }
         }
-        // 先删关联表，再删主表
-        ingestSourceDatasourceRelMapper.deleteBySourceIds(idList);
-        return ingestSourceMapper.deleteBatchIds(idList);
+        int removed = 0;
+        for (int start = 0; start < ids.size(); start += QUERY_BATCH_SIZE) {
+            List<Long> batch = ids.subList(start, Math.min(start + QUERY_BATCH_SIZE, ids.size()));
+            ingestSourceDatasourceRelMapper.deleteBySourceIds(batch);
+            removed += ingestSourceMapper.deleteBatchIds(batch);
+        }
+        return removed;
     }
 
     /**
-     * 校验并保存来源系统与数据源的关联关系。
+     * 校验连接存在性并按差异保存关联，保留未变化关联的主键和创建信息。
      *
      * @param sourceId      来源系统编号
      * @param datasourceIds 数据源编号集合
      * @param operator      操作人
      */
     private void saveDatasourceRels(Long sourceId, List<Long> datasourceIds, String operator) {
-        List<Long> normalizedIds = normalizeDatasourceIds(datasourceIds);
-        if (!normalizedIds.isEmpty()) {
-            List<IngestDatasourceDO> datasourceList = ingestDatasourceMapper.selectByIds(normalizedIds);
-            if (datasourceList == null || datasourceList.size() != normalizedIds.size()) {
-                throw new ServiceException("数据库连接不存在或已删除");
+        List<Long> ids = normalizeDatasourceIds(datasourceIds);
+        for (int start = 0; start < ids.size(); start += QUERY_BATCH_SIZE) {
+            List<Long> batch = ids.subList(start, Math.min(start + QUERY_BATCH_SIZE, ids.size()));
+            List<IngestDatasourceDO> datasourceList = ingestDatasourceMapper.selectByIds(batch);
+            if (datasourceList == null || datasourceList.size() != batch.size()) {
+                throw new ServiceException("数据库连接不存在或已删除", HttpStatus.WARN);
             }
         }
-        ingestSourceDatasourceRelMapper.deleteBySourceId(sourceId);
+        Set<Long> selected = new LinkedHashSet<>(ids);
+        Set<Long> retained = new LinkedHashSet<>();
+        List<Long> removedIds = new ArrayList<>();
+        for (IngestSourceDatasourceRelDO rel : ingestSourceDatasourceRelMapper
+                .selectBySourceIds(Collections.singletonList(sourceId))) {
+            // 保留每个连接的首条有效关联，其余移除或失效的关联沿用物理删除方式清理。
+            if (selected.contains(rel.getDatasourceId())
+                    && IngestSourceDatasourceRelDO.VALID_FLAG_YES.equals(rel.getValidFlag())
+                    && retained.add(rel.getDatasourceId())) {
+                continue;
+            }
+            removedIds.add(rel.getId());
+        }
+        for (int start = 0; start < removedIds.size(); start += QUERY_BATCH_SIZE) {
+            ingestSourceDatasourceRelMapper.deleteRelationsByIds(
+                    removedIds.subList(start, Math.min(start + QUERY_BATCH_SIZE, removedIds.size())));
+        }
         Date now = new Date();
-        for (Long datasourceId : normalizedIds) {
+        List<IngestSourceDatasourceRelDO> additions = new ArrayList<>();
+        for (Long datasourceId : ids) {
+            if (retained.contains(datasourceId)) {
+                continue;
+            }
             IngestSourceDatasourceRelDO rel = new IngestSourceDatasourceRelDO();
             rel.setSourceId(sourceId);
             rel.setDatasourceId(datasourceId);
@@ -336,7 +397,11 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
             rel.setCreateBy(operator);
             rel.setCreateTime(now);
             rel.setDelFlag("0");
-            ingestSourceDatasourceRelMapper.insert(rel);
+            additions.add(rel);
+        }
+        if (CollectionUtils.isNotEmpty(additions)
+                && !Boolean.TRUE.equals(ingestSourceDatasourceRelMapper.insertBatch(additions, QUERY_BATCH_SIZE))) {
+            throw new ServiceException("保存数据库连接关联失败");
         }
     }
 
@@ -346,11 +411,12 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
      * @param rows 来源系统列表
      */
     private void fillDatasource(List<IngestSourceRespVO> rows) {
-        if (rows == null || rows.isEmpty()) {
+        if (CollectionUtils.isEmpty(rows)) {
             return;
         }
-        List<Long> sourceIds = rows.stream().map(IngestSourceRespVO::getId).filter(Objects::nonNull).collect(Collectors.toList());
-        if (sourceIds.isEmpty()) {
+        List<Long> sourceIds = rows.stream().map(IngestSourceRespVO::getId)
+                .filter(Objects::nonNull).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(sourceIds)) {
             rows.forEach(row -> {
                 row.setDatasourceIds(Collections.emptyList());
                 row.setDatasourceList(Collections.emptyList());
@@ -359,14 +425,15 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
         }
         List<IngestSourceDatasourceRelDO> relList = ingestSourceDatasourceRelMapper.selectBySourceIds(sourceIds);
         Map<Long, List<Long>> sourceDatasourceMap = relList.stream()
-                .filter(rel -> rel.getDatasourceId() != null)
+                .filter(rel -> ObjectUtil.isNotNull(rel.getDatasourceId()))
                 .collect(Collectors.groupingBy(IngestSourceDatasourceRelDO::getSourceId,
                         Collectors.mapping(IngestSourceDatasourceRelDO::getDatasourceId, Collectors.toList())));
-        Set<Long> datasourceIds = sourceDatasourceMap.values().stream().flatMap(List::stream).collect(Collectors.toSet());
+        Set<Long> datasourceIds = sourceDatasourceMap.values().stream()
+                .flatMap(List::stream).collect(Collectors.toSet());
         Map<Long, IngestDatasourceSimpleVO> datasourceMap = Collections.emptyMap();
-        if (!datasourceIds.isEmpty()) {
-            datasourceMap = BeanUtils.toBean(ingestDatasourceMapper.selectByIds(datasourceIds), IngestDatasourceSimpleVO.class)
-                    .stream()
+        if (CollectionUtils.isNotEmpty(datasourceIds)) {
+            datasourceMap = BeanUtils.toBean(ingestDatasourceMapper.selectByIds(datasourceIds),
+                    IngestDatasourceSimpleVO.class).stream()
                     .collect(Collectors.toMap(IngestDatasourceSimpleVO::getId, Function.identity(), (a, b) -> a));
         }
         Map<Long, IngestDatasourceSimpleVO> finalDatasourceMap = datasourceMap;
@@ -375,11 +442,12 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
             List<IngestDatasourceSimpleVO> datasourceList = new ArrayList<>();
             for (Long datasourceId : ids) {
                 IngestDatasourceSimpleVO vo = finalDatasourceMap.get(datasourceId);
-                if (vo != null) {
+                if (ObjectUtil.isNotNull(vo)) {
                     datasourceList.add(vo);
                 }
             }
-            row.setDatasourceIds(datasourceList.stream().map(IngestDatasourceSimpleVO::getId).collect(Collectors.toList()));
+            row.setDatasourceIds(datasourceList.stream().map(IngestDatasourceSimpleVO::getId)
+                    .collect(Collectors.toList()));
             row.setDatasourceList(datasourceList);
         });
     }
@@ -409,7 +477,7 @@ public class IngestSourceServiceImpl extends ServiceImpl<IngestSourceMapper, Ing
             return IngestSourceDO.TRUST_SCORE_DEFAULT;
         }
         if (trustScore < IngestSourceDO.TRUST_SCORE_MIN || trustScore > IngestSourceDO.TRUST_SCORE_MAX) {
-            throw new ServiceException("来源可信度必须是 0～100 的整数");
+            throw new ServiceException("来源可信度必须是 0～100 的整数", HttpStatus.WARN);
         }
         return trustScore;
     }

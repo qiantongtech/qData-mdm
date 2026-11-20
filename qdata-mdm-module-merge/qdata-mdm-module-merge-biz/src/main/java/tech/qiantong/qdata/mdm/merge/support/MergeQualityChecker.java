@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 import java.math.BigDecimal;
 
 /**
- * 只执行能够识别的质量规则。没有任何可执行规则时由调用方禁止提交。
+ * 只执行能够识别的质量规则，并记录不支持或无法执行的规则。
  *
  * @author chentangwen
  * @date 2026-09-22

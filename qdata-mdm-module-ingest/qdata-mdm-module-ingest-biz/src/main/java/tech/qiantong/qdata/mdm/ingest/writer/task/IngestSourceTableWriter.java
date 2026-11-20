@@ -46,11 +46,12 @@ public class IngestSourceTableWriter {
 
     /**
      * 从模型成功发布的物化信息中选择启用的来源表，并按目标数据源选取公共方言。
-     * 将发布的 schema 与表名传入独立会话，物理字段校验、事务及逐行写入由会话处理。
+     * 将已发布的模式名与表名传入独立会话，由会话准备 SQL 并管理逐行写入事务。
      *
      * @param modelId 主数据模型编号
      * @param columns 模型的全部业务字段编码，未映射列写入 null
      * @return 由执行服务在运行结束后关闭的写入会话
+     * @throws ServiceException 模型缺少可用来源表，或写入会话初始化失败
      */
     public IngestSourceTableSession open(Long modelId, List<String> columns) {
         if (modelId == null) {

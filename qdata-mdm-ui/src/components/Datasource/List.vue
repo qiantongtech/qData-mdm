@@ -23,6 +23,14 @@
     :width="datasourcePopoverWidth"
     trigger="click"
     :disabled="props.disabled"
+    popper-class="datasource-list-popper"
+    :popper-options="{
+      strategy: 'fixed',
+      modifiers: [
+        { name: 'flip', enabled: false },
+        { name: 'preventOverflow', options: { boundary: 'viewport' } },
+      ],
+    }"
   >
     <div class="datasource-selector">
       <el-input
@@ -80,7 +88,7 @@
               :class="{ active: !selectedType, disabled: false }"
               @click="selectAllTypes"
             >
-              <el-radio :model-value="selectedType" value="" disabled />
+              <el-radio :model-value="selectedType" value="" />
               <span class="type-label">全部</span>
               <span class="category-count" v-if="!props.hideTypeCount">{{
                 typeDatasourceCount
@@ -148,9 +156,9 @@
               />
               <el-radio
                 v-else
-                :model-value="props.modelValue"
+                :model-value="isDatasourceSelected(source.id) ? source.id : props.modelValue"
                 :value="source.id"
-                disabled
+                :disabled="source.disabled"
               />
               <img
                 :src="getDatasourceIcon(source.datasourceType)"
@@ -177,7 +185,7 @@
         v-if="props.multipleTagDisplay && props.multiple"
         v-bind="$attrs"
         class="datasource-tag-input el-input__wrapper"
-        :class="{ 'is-disabled': props.disabled }"
+        :class="{ 'is-disabled': props.disabled, 'is-focus': visible && !props.disabled }"
         role="button"
         :tabindex="props.disabled ? -1 : 0"
         :aria-disabled="props.disabled"
@@ -361,7 +369,7 @@ const shouldShowDatasourceColumn = computed(() => {
  * @returns {number}
  */
 const datasourcePopoverWidth = computed(() => {
-  return shouldShowDatasourceColumn.value ? 780 : 480;
+  return shouldShowDatasourceColumn.value ? 780 : 500;
 });
 
 /**
@@ -1427,6 +1435,12 @@ $popover-shadow: 0 4px 17px rgba(0, 0, 0, 0.1);
         .type-label {
           margin-right: 8px;
         }
+
+        &.active:not(.disabled) .type-label {
+          color: $primary-color;
+          font-family: $font-family-medium;
+          font-weight: 500;
+        }
       }
 
       .datasource-item {
@@ -1442,12 +1456,8 @@ $popover-shadow: 0 4px 17px rgba(0, 0, 0, 0.1);
           font-size: 14px;
         }
 
-        &:hover .datasource-label,
-        &.active .datasource-label {
+        &.active:not(.disabled) .datasource-label {
           color: $primary-color;
-        }
-
-        &.active .datasource-label {
           font-family: $font-family-medium;
           font-weight: 500;
         }
@@ -1458,16 +1468,16 @@ $popover-shadow: 0 4px 17px rgba(0, 0, 0, 0.1);
         :deep(.el-radio),
         :deep(.el-checkbox) {
           flex-shrink: 0;
-          width: 16px;
-          height: 16px;
+          width: 14px;
+          height: 14px;
           margin-right: 10px;
 
           .el-radio__input,
           .el-radio__inner,
           .el-checkbox__input,
           .el-checkbox__inner {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
           }
 
           .el-radio__label,
@@ -1476,31 +1486,17 @@ $popover-shadow: 0 4px 17px rgba(0, 0, 0, 0.1);
           }
         }
 
-        :deep(.el-radio) {
-          .el-radio__inner {
-            border-color: rgba(51, 51, 51, 0.2);
-            background: $bg-white;
-          }
+        :deep(.el-checkbox) {
+          width: 16px;
+          height: 16px;
 
-          .el-radio__input.is-disabled {
-            .el-radio__inner {
-              border-color: rgba(51, 51, 51, 0.2);
-              background: $bg-white;
-
-              &::after {
-                width: 4px;
-                height: 4px;
-                background: $bg-white;
-                transform: translate(-50%, -50%) scale(1);
-              }
-            }
-
-            &.is-checked .el-radio__inner {
-              border-color: $primary-color;
-              background: $primary-color;
-            }
+          .el-checkbox__input,
+          .el-checkbox__inner {
+            width: 16px;
+            height: 16px;
           }
         }
+
       }
 
       .empty-state {
@@ -1536,9 +1532,15 @@ $popover-shadow: 0 4px 17px rgba(0, 0, 0, 0.1);
   min-height: 32px;
   cursor: pointer;
 
-  &:hover { box-shadow: 0 0 0 1px var(--el-input-hover-border-color) inset; }
-  &:focus-visible,
-  &:focus-within { box-shadow: 0 0 0 1px var(--el-input-focus-border-color) inset; }
+  &:not(.is-disabled):hover {
+    box-shadow: 0 0 0 1px var(--el-input-hover-border-color, var(--el-border-color-hover)) inset;
+  }
+
+  &:not(.is-disabled):focus-visible,
+  &:not(.is-disabled):focus-within,
+  &.is-focus {
+    box-shadow: 0 0 0 1px var(--el-input-focus-border-color, var(--el-color-primary)) inset;
+  }
   &.is-disabled { background: var(--el-disabled-bg-color); cursor: not-allowed; }
 
   :deep(.datasource-selected-tags) {

@@ -21,6 +21,7 @@ package tech.qiantong.qdata.mdm.merge.service.manage.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.merge.controller.admin.manage.vo.MergeFieldAdjustItemVO;
@@ -148,7 +149,7 @@ public class MergeManageServiceImpl implements IMergeManageService {
         // 结果调整会递增版本并使旧质量结论失效，后续提交必须基于新版本重新质检。
         MergePendingMasterDO pending = lockPendingOrThrow(reqVO.getPendingId());
         if (!adjustable(pending.getStatus())) {
-            throw new ServiceException("当前结果已进入审批或生效，不能修改");
+            throw new ServiceException("当前结果已进入审批或生效，不能修改", HttpStatus.WARN);
         }
         List<MergePendingMasterFieldDO> fields = fields(pending.getId());
         Map<Long, MergePendingMasterFieldDO> byId = new HashMap<>();
@@ -167,17 +168,17 @@ public class MergeManageServiceImpl implements IMergeManageService {
         // 首次处理允许直接选择其他值；重新处理时，偏离系统推荐值必须说明原因。
         for (MergeFieldAdjustItemVO item : reqVO.getFields()) {
             if (!seen.add(item.getFieldId())) {
-                throw new ServiceException("字段不能重复调整");
+                throw new ServiceException("字段不能重复调整", HttpStatus.WARN);
             }
             MergePendingMasterFieldDO field = byId.get(item.getFieldId());
             if (field == null) {
-                throw new ServiceException("字段不属于当前待提交结果");
+                throw new ServiceException("字段不属于当前待提交结果", HttpStatus.WARN);
             }
             String finalValue = MergeAudit.text(item.getFinalValue());
             ModelColumnDO column = columns.get(field.getModelColumnId());
             String valueError = MergeManageFieldUtils.valueError(column, finalValue);
             if (valueError != null) {
-                throw new ServiceException(column.getName() + "：" + valueError);
+                throw new ServiceException(column.getName() + "：" + valueError, HttpStatus.WARN);
             }
             boolean systemRecommended = isSystemRecommended(item, field, finalValue, column);
             boolean sameChoice = systemRecommended
@@ -191,7 +192,7 @@ public class MergeManageServiceImpl implements IMergeManageService {
                 continue;
             }
             if (!MergeManageFieldUtils.editable(column)) {
-                throw new ServiceException("字段不可人工修改：" + (column == null ? field.getFieldPath() : column.getName()));
+                throw new ServiceException("字段不可人工修改：" + (column == null ? field.getFieldPath() : column.getName()), HttpStatus.WARN);
             }
             applyFieldValue(field, column, item, finalValue, snapshots, processType, requireAdjustReason);
             boolean conflict = MergeCodes.YES.equals(field.getConflictFlag());
@@ -215,7 +216,7 @@ public class MergeManageServiceImpl implements IMergeManageService {
         boolean systemRecommended = isSystemRecommended(item, field, finalValue, column);
         if (systemRecommended) {
             if (!sameFieldValue(column, finalValue, recommended)) {
-                throw new ServiceException("系统推荐项与最终值不一致");
+                throw new ServiceException("系统推荐项与最终值不一致", HttpStatus.WARN);
             }
             field.setFinalValue(finalValue.isEmpty() ? null : finalValue);
             field.setValueSourceType(systemType(field, processType));
@@ -225,11 +226,11 @@ public class MergeManageServiceImpl implements IMergeManageService {
             return;
         }
         if (requireAdjustReason && MergeAudit.text(item.getAdjustReason()).isEmpty()) {
-            throw new ServiceException("覆盖默认结果必须填写调整原因");
+            throw new ServiceException("覆盖默认结果必须填写调整原因", HttpStatus.WARN);
         }
         if (MergeCodes.VALUE_PICK_SOURCE.equals(item.getValueSourceType())) {
             if (!matchesSource(snapshots, field.getFieldPath(), item.getSourceVersionId(), finalValue)) {
-                throw new ServiceException("选择的来源值与来源记录不一致");
+                throw new ServiceException("选择的来源值与来源记录不一致", HttpStatus.WARN);
             }
             field.setValueSourceType(MergeCodes.VALUE_PICK_SOURCE);
             field.setSourceVersionId(item.getSourceVersionId());
@@ -305,10 +306,10 @@ public class MergeManageServiceImpl implements IMergeManageService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void confirm(MergePendingActionReqVO reqVO, Long operatorId, String operatorName) {
-        // 确认只推进到待质量检测状态，质量规则全部通过后才能提交审批。
+        // 先进入待质量检测状态，再根据模型约束和适用规则的检测结果决定能否提交审批。
         MergePendingMasterDO pending = lockPendingOrThrow(reqVO.getPendingId());
         if (!adjustable(pending.getStatus())) {
-            throw new ServiceException("当前状态不允许确认合并");
+            throw new ServiceException("当前状态不允许确认合并", HttpStatus.WARN);
         }
         List<MergePendingMasterFieldDO> fields = fields(pending.getId());
         Map<Long, ModelColumnDO> columns = columns(pending.getModelId());
@@ -326,10 +327,10 @@ public class MergeManageServiceImpl implements IMergeManageService {
             ModelColumnDO column = columns.get(field.getModelColumnId());
             String valueError = MergeManageFieldUtils.valueError(column, field.getFinalValue());
             if (valueError != null) {
-                throw new ServiceException(column.getName() + "：" + valueError);
+                throw new ServiceException(column.getName() + "：" + valueError, HttpStatus.WARN);
             }
             if (!MergeCodes.YES.equals(field.getResolvedFlag())) {
-                throw new ServiceException("仍存在未解决的字段冲突");
+                throw new ServiceException("仍存在未解决的字段冲突", HttpStatus.WARN);
             }
         }
         String before = pending.getResultData();
@@ -357,7 +358,7 @@ public class MergeManageServiceImpl implements IMergeManageService {
                 && !MergeCodes.PENDING_REJECTED.equals(pending.getStatus())
                 && !MergeCodes.PENDING_WITHDRAWN.equals(pending.getStatus())
                 && !MergeCodes.PENDING_CANCELLED.equals(pending.getStatus())) {
-            throw new ServiceException("当前结果尚未确认或已进入审批生效流程，不能执行质量检测");
+            throw new ServiceException("当前结果尚未确认或已进入审批生效流程，不能执行质量检测", HttpStatus.WARN);
         }
         mergeManageQualityService.check(pending, fields(pending.getId()), columns(pending.getModelId()),
                 operatorId, operatorName);
@@ -374,7 +375,7 @@ public class MergeManageServiceImpl implements IMergeManageService {
         if (!Objects.equals(pending.getStatus(), MergeCodes.PENDING_WAIT_SUBMIT)
                 && !Objects.equals(pending.getStatus(), MergeCodes.PENDING_WITHDRAWN)
                 && !Objects.equals(pending.getStatus(), MergeCodes.PENDING_CANCELLED)) {
-            throw new ServiceException("质量未通过，不能提交审批");
+            throw new ServiceException("质量未通过，不能提交审批", HttpStatus.WARN);
         }
         MergeQualityLogDO qualityLog = pending.getQualityLogId() == null ? null
                 : mergeQualityLogMapper.selectById(pending.getQualityLogId());
@@ -382,12 +383,12 @@ public class MergeManageServiceImpl implements IMergeManageService {
                 || !MergeAudit.same(qualityLog.getDataSnapshot(), pending.getResultData())
                 || qualityLog.getResultVersionNo() == null
                 || !qualityLog.getResultVersionNo().equals(pending.getResultVersionNo())) {
-            throw new ServiceException("质量结果已失效，请重新检测");
+            throw new ServiceException("质量结果已失效，请重新检测", HttpStatus.WARN);
         }
         ModelPublishedRespDTO published = modelPublishedApi.getPublishedModel(pending.getModelId());
         if (published == null || published.getInstanceId() == null
                 || !Objects.equals(published.getVersionId(), pending.getModelVersionId())) {
-            throw new ServiceException("当前模型没有可用的成功发布版本，不能提交合并申请");
+            throw new ServiceException("当前模型没有可用的成功发布版本，不能提交合并申请", HttpStatus.WARN);
         }
         MasterChangeRequestSubmitReqDTO request = new MasterChangeRequestSubmitReqDTO();
         request.setInstanceId(published.getInstanceId());
@@ -435,7 +436,7 @@ public class MergeManageServiceImpl implements IMergeManageService {
         MergePendingMasterDO pending = lockPendingOrThrow(reqVO.getPendingId());
         if (!Objects.equals(pending.getStatus(), MergeCodes.PENDING_APPROVING)
                 && !Objects.equals(pending.getStatus(), MergeCodes.PENDING_WAIT_EFFECT)) {
-            throw new ServiceException("只有审批中或待生效结果可以撤回");
+            throw new ServiceException("只有审批中或待生效结果可以撤回", HttpStatus.WARN);
         }
         pending.setStatus(MergeCodes.PENDING_WITHDRAWN);
         MergeAudit.touch(pending, operatorId, operatorName);
@@ -454,7 +455,7 @@ public class MergeManageServiceImpl implements IMergeManageService {
         MergePendingMasterDO pending = lockPendingOrThrow(reqVO.getPendingId());
         if (!Objects.equals(pending.getStatus(), MergeCodes.PENDING_APPROVING)
                 && !Objects.equals(pending.getStatus(), MergeCodes.PENDING_WAIT_EFFECT)) {
-            throw new ServiceException("只有审批中或待生效结果可以取消");
+            throw new ServiceException("只有审批中或待生效结果可以取消", HttpStatus.WARN);
         }
         pending.setStatus(MergeCodes.PENDING_CANCELLED);
         MergeAudit.touch(pending, operatorId, operatorName);
@@ -549,7 +550,7 @@ public class MergeManageServiceImpl implements IMergeManageService {
                 || Objects.equals(status, MergeCodes.PENDING_WITHDRAWN)
                 || Objects.equals(status, MergeCodes.PENDING_CANCELLED);
         if (!mode.isEmpty() && !"start".equalsIgnoreCase(mode) && !"reprocess".equalsIgnoreCase(mode)) {
-            throw new ServiceException("字段调整处理模式无效");
+            throw new ServiceException("字段调整处理模式无效", HttpStatus.WARN);
         }
         return reprocessStatus || "reprocess".equalsIgnoreCase(mode);
     }
@@ -607,7 +608,7 @@ public class MergeManageServiceImpl implements IMergeManageService {
     private MergePendingMasterDO lockPendingOrThrow(Long pendingId) {
         MergePendingMasterDO pending = mergePendingMasterMapper.selectByIdForUpdate(pendingId);
         if (pending == null || !MergeCodes.YES.equals(pending.getValidFlag())) {
-            throw new ServiceException("待提交结果不存在");
+            throw new ServiceException("待提交结果不存在", HttpStatus.WARN);
         }
         return pending;
     }

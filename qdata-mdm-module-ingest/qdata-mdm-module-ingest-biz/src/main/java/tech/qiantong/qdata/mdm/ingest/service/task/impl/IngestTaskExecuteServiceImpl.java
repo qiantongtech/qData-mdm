@@ -23,10 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
-import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestModelFieldRespVO;
 import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestTaskRespVO;
-import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestTaskRunRespVO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.ingest.IngestTaskInstanceDO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.task.IngestTaskDO;
 import tech.qiantong.qdata.mdm.ingest.dal.mapper.task.IngestTaskScheduleMapper;
@@ -57,8 +55,8 @@ import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.RUN_
 import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.RUN_SUCCESS;
 
 /**
- * 接入任务执行服务，负责行处理、实体来源表写入和运行统计。
- * 提交入口负责互斥和配置校验，每条来源数据独立事务，避免读取期间长期持有数据库事务。
+ * 执行已取得占用的接入任务，逐条转换并写入实体来源表，同时发布运行日志和统计。
+ * 任务配置由提交服务在执行前校验。读取来源不使用整批写入事务，已提交的记录不会随本次运行失败而回滚。
  *
  * @author chentangwen
  */
@@ -71,7 +69,7 @@ public class IngestTaskExecuteServiceImpl implements IIngestTaskExecuteService {
      */
     private static final int MAX_ERROR_MESSAGE_LENGTH = 2000;
     /**
-     * 正常处理期间发布统计进度的记录数间隔；错误事件即时发布。
+     * 按来源回调记录数发布进度的间隔；跳过的空记录不计入发布间隔。
      */
     private static final long PROGRESS_RECORD_INTERVAL = 100L;
 
@@ -94,17 +92,15 @@ public class IngestTaskExecuteServiceImpl implements IIngestTaskExecuteService {
     private IngestTaskDbConfigMapper taskDbConfigMapper;
 
     /**
-     * 执行已提交实例；每行事务校验占用，防止失去心跳的旧线程继续写入。
+     * 执行已受理的运行实例，逐条读取、转换和写入来源数据。
+     * 写入前校验实例仍持有任务占用；运行成功且取得增量值时才推进采集位置。
      *
-     * @param task     已完成配置校验并锁定的接入任务
-     * @param fields   模型业务字段
-     * @param operator 操作人
-     * @param instance 已受理的运行实例
-     * @return 本次运行结果
+     * @param task     已通过执行前校验的任务配置
+     * @param fields   目标模型业务字段
+     * @param instance 已受理并取得任务占用的运行实例
      */
     @Override
-    public IngestTaskRunRespVO execute(IngestTaskRespVO task, List<IngestModelFieldRespVO> fields, String operator,
-                                       IngestTaskInstanceDO instance) {
+    public void execute(IngestTaskRespVO task, List<IngestModelFieldRespVO> fields, IngestTaskInstanceDO instance) {
         instance.setStartTime(new Date());
         boolean incremental = DATABASE.equals(task.getType()) && INCREMENTAL.equals(task.getIngestMode());
         if (incremental) {
@@ -114,7 +110,6 @@ public class IngestTaskExecuteServiceImpl implements IIngestTaskExecuteService {
         }
         publishOwned(instance, "INFO", "START", "开始执行接入任务，来源类型：" + task.getType());
         TransactionTemplate rowTransaction = new TransactionTemplate(transactionManager);
-        // 逐行累计统计，失败重试耗尽后按异常策略停止或继续。
         StringBuilder errors = new StringBuilder();
         IngestReadContext readContext = new IngestReadContext(task, READ_ALL_ROWS,
                 incremental ? task.getCurrentIncrementValue() : null);
@@ -127,33 +122,54 @@ public class IngestTaskExecuteServiceImpl implements IIngestTaskExecuteService {
             stage = "WRITE_PREPARE";
             List<String> targetColumns = fields.stream().map(IngestModelFieldRespVO::getColumnCode)
                     .sorted().collect(Collectors.toList());
-            publishOwned(instance, "INFO", stage, "开始连接并校验实体来源表");
+            publishOwned(instance, "INFO", stage, "开始连接实体来源表并准备写入");
             try (IngestSourceTableSession writer = sourceTableWriter.open(task.getModelId(), targetColumns)) {
                 publishOwned(instance, "INFO", stage, "实体来源表已就绪，映射数据及采集扩展字段将写入目标表");
                 stage = "READ";
                 publishOwned(instance, "INFO", stage, "开始读取来源数据，读取、转换和写入按记录依次执行");
+                // 只有尚未回调任何记录且未跳过空记录时，才允许从头重试读取。
                 IngestRunPolicy.retry(() -> taskReadService.readRows(readContext, row -> {
                             instance.setTotalCount(instance.getTotalCount() + 1);
                             String rowError = null;
+                            AtomicBoolean rollbackFailed = new AtomicBoolean(false);
                             try {
                                 if (incremental && row.getIncrementValue() == null) {
                                     throw new ServiceException("来源记录缺少增量字段值");
                                 }
+                                // 数据准备不涉及写入，校验失败直接按行错误策略处理，不重试。
+                                Map<String, Object> identityValues = buildIdentityValues(task.getUniqueFields(),
+                                        row.getValues(), plan);
+                                Map<String, Object> modelData = plan.apply(row.getValues());
+                                String nullStrategy = task.getNullStrategy();
+                                boolean hasNull = !"IGNORE".equals(nullStrategy) && modelData.containsValue(null);
+                                if (hasNull && "FAIL".equals(nullStrategy)) {
+                                    throw new ServiceException("映射字段存在空值");
+                                }
+                                boolean warnOnNull = hasNull && "WARN".equals(nullStrategy);
+                                IngestTaskExecutionUtils.normalizeModelDates(modelData, fields);
+                                String recordKey = writer.prepareRecordId(identityValues);
                                 AtomicBoolean commitStarted = new AtomicBoolean(false);
                                 IngestRunPolicy.retry(() -> {
                                             try {
-                                                processInTransaction(rowTransaction, task, instance, row.getValues(), plan, fields, writer, commitStarted);
+                                                processInTransaction(rowTransaction, task, instance, recordKey,
+                                                        modelData, warnOnNull, writer, commitStarted);
                                             } catch (RuntimeException failure) {
-                                                writer.rollbackRow();
+                                                try {
+                                                    writer.rollbackRow();
+                                                } catch (RuntimeException rollbackFailure) {
+                                                    rollbackFailed.set(true);
+                                                    failure.addSuppressed(rollbackFailure);
+                                                }
                                                 throw failure;
                                             }
-                                        }, task.getRetryCount(), task.getRetryIntervalSeconds(), () -> !commitStarted.get(),
+                                        }, task.getRetryCount(), task.getRetryIntervalSeconds(),
+                                        () -> !commitStarted.get() && !rollbackFailed.get(),
                                         attempt -> publishOwned(instance, "WARN", "RETRY", row.getLocation()
                                                 + "：第" + attempt + "次重试，等待" + task.getRetryIntervalSeconds() + "秒"));
                                 instance.setSuccessCount(instance.getSuccessCount() + 1);
                             } catch (Exception ex) {
-                                writer.rollbackRow();
-                                if (ex instanceof CancellationException) {
+                                // 回滚失败后连接状态未知，不再重试或继续处理下一条记录。
+                                if (rollbackFailed.get() || ex instanceof CancellationException) {
                                     throw ex;
                                 }
                                 log.error("接入记录处理失败，taskId={}, runId={}, location={}",
@@ -179,6 +195,7 @@ public class IngestTaskExecuteServiceImpl implements IIngestTaskExecuteService {
                 publishOwned(instance, "INFO", "READ_COMPLETE", "来源读取完成，读取阶段跳过空记录 "
                         + readContext.getSkipCount() + " 条；" + progressMessage(instance));
             }
+            // 即使行错误按策略继续处理，本次运行仍判定为失败，不推进增量位置。
             instance.setStatus(resolveRunStatus(instance));
             if (incremental && RUN_SUCCESS.equals(instance.getStatus()) && readContext.getLastIncrementValue() != null) {
                 stage = "CHECKPOINT";
@@ -195,6 +212,7 @@ public class IngestTaskExecuteServiceImpl implements IIngestTaskExecuteService {
             // 独立保留致命错误，避免被前面的行错误挤出长度受限的错误汇总。
             publishOwned(instance, "ERROR", stage, location + "：" + failureMessage(ex));
         } finally {
+            // 空记录不会进入逐条处理回调，结束时统一计入总数和跳过数。
             instance.setTotalCount(instance.getTotalCount() + readContext.getSkipCount());
             instance.setSkipCount(instance.getSkipCount() + readContext.getSkipCount());
             // 最终统计和过程日志统一先写 Redis，归档成功后再移除待入库事件。
@@ -207,13 +225,17 @@ public class IngestTaskExecuteServiceImpl implements IIngestTaskExecuteService {
                     task.getId(), instance.getId(), instance.getStatus(), instance.getTotalCount(),
                     instance.getSuccessCount(), instance.getFailureCount(), instance.getSkipCount());
         }
-        IngestTaskRunRespVO result = BeanUtils.toBean(instance, IngestTaskRunRespVO.class);
-        result.setDurationMillis(instance.getEndTime().getTime() - instance.getStartTime().getTime());
-        return result;
     }
 
     /**
-     * 完整读取且全部写入成功后才推进位置，失败或空结果保持原位置。
+     * 锁定任务并确认仍由当前实例占用后，保存本次成功运行的增量位置。
+     * 数据库更新成功后，才在实例结果中记录新位置。
+     *
+     * @param task     本次执行的任务配置
+     * @param instance 当前运行实例
+     * @param cursor   最后一条已处理记录的增量值文本
+     * @throws CancellationException 当前实例不再持有任务占用
+     * @throws ServiceException 未能更新指定任务的增量配置
      */
     private void saveIncrementValue(IngestTaskRespVO task, IngestTaskInstanceDO instance, String cursor) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
@@ -229,8 +251,8 @@ public class IngestTaskExecuteServiceImpl implements IIngestTaskExecuteService {
     }
 
     /**
-     * 持有任务行锁时写入阶段日志，确保失效的执行线程不能覆盖终态。
-     * Redis 操作失败会向外传播，由执行收尾和超时恢复流程处理。
+     * 持有任务行锁并确认实例占用有效后，将阶段日志和进度暂存到 Redis。
+     * 失效实例不得继续发布；暂存失败则将异常交给调用方处理。
      *
      * @param instance 当前运行实例及进度
      * @param level    日志级别
@@ -260,27 +282,33 @@ public class IngestTaskExecuteServiceImpl implements IIngestTaskExecuteService {
     }
 
     /**
-     * 平台事务只锁定任务以校验执行占用；实体来源行在目标业务库事务内提交。
-     * 持有任务锁直至业务库提交完成，防止旧执行线程失去占用后继续写入。
+     * 校验当前实例仍持有任务占用，然后写入已完成校验和转换的来源记录。
+     * 平台事务持有任务行锁，目标业务库通过写入会话单独提交该行，两者不是同一事务。
+     *
+     * @param transaction 平台事务模板，用于加锁和校验任务占用
+     * @param task        本次执行的任务配置
+     * @param instance    当前运行实例
+     * @param recordKey   已校验的来源记录标识
+     * @param modelData   已转换的目标字段值
+     * @param warnOnNull  是否按空值策略发布警告
+     * @param writer      目标业务库的来源表写入会话
+     * @param commitStarted 目标库是否已开始提交，用于判断该行是否还能重试
+     * @throws CancellationException 当前实例不再持有任务占用
      */
     private void processInTransaction(TransactionTemplate transaction, IngestTaskRespVO task,
-                                      IngestTaskInstanceDO instance, Map<String, Object> row,
-                                      FieldMappingPlan plan, List<IngestModelFieldRespVO> fields,
+                                      IngestTaskInstanceDO instance, String recordKey,
+                                      Map<String, Object> modelData, boolean warnOnNull,
                                       IngestSourceTableSession writer, AtomicBoolean commitStarted) {
         transaction.executeWithoutResult(status -> {
             IngestTaskDO current = scheduleMapper.lockScheduleTask(task.getId());
             if (current == null || !instance.getId().equals(current.getActiveRunId())) {
                 throw new CancellationException("任务执行占用已失效");
             }
-            Map<String, Object> identityValues = buildIdentityValues(task.getUniqueFields(), row, plan);
-            Map<String, Object> mappedValues = plan.apply(row);
-            boolean hasNull = IngestRunPolicy.checkNulls(mappedValues, task.getNullStrategy());
-            if (hasNull && "WARN".equals(task.getNullStrategy())) {
+            if (warnOnNull) {
                 runLogService.publish(instance, "WARN", "NULL_VALUE", "映射字段存在空值，按空值策略继续执行");
             }
-            Map<String, Object> modelData = IngestTaskExecutionUtils.normalizeModelData(mappedValues, fields);
-            writer.writeRecord(task, instance, identityValues, modelData);
-            // 提交异常可能是结果未知，禁止重试，避免实际已提交的数据被再次追加。
+            writer.writeRecord(task, instance, recordKey, modelData);
+            // 提交开始后若发生异常，结果可能未知，不重试以免重复追加已提交的记录。
             commitStarted.set(true);
             writer.commitRow();
         });
