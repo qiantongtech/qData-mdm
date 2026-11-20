@@ -199,8 +199,10 @@
                   >
                     <el-option v-for="field in modelFields" :key="field.id" :label="field.name" :value="field.id"/>
                   </el-select>
-                  <div v-if="filterErrors[row.key]?.modelColumnId" class="filter-error">
-                    {{ filterErrors[row.key].modelColumnId }}
+                  <div class="filter-error-space">
+                    <div v-if="filterErrors[row.key]?.modelColumnId" class="filter-error">
+                      {{ filterErrors[row.key].modelColumnId }}
+                    </div>
                   </div>
                 </template>
                 <template #operator="{ row }">
@@ -211,9 +213,10 @@
                                :value="item.value"
                     />
                   </el-select>
-                  <div v-if="filterErrors[row.key]?.operator" class="filter-error">{{
-                      filterErrors[row.key].operator
-                    }}
+                  <div class="filter-error-space">
+                    <div v-if="filterErrors[row.key]?.operator" class="filter-error">
+                      {{ filterErrors[row.key].operator }}
+                    </div>
                   </div>
                 </template>
                 <template #value="{ row }">
@@ -238,9 +241,10 @@
                             placeholder="请输入比较值"
                             @input="clearFilterError(row)"
                   />
-                  <div v-if="filterErrors[row.key]?.value" class="filter-error">{{
-                      filterErrors[row.key].value
-                    }}
+                  <div class="filter-error-space">
+                    <div v-if="filterErrors[row.key]?.value" class="filter-error">
+                      {{ filterErrors[row.key].value }}
+                    </div>
                   </div>
                 </template>
                 <template #action="{ row, $index }">
@@ -1386,7 +1390,9 @@ function handleLayerChange() {
 .condition-table :deep(.el-date-editor) {
   width: 100%;
 }
-
+.filter-error-space {
+    min-height: 18px;
+}
 .filter-error,
 .section-error {
   color: var(--qt-status-danger);
