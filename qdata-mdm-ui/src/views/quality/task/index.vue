@@ -124,7 +124,7 @@
             <template #runControl="{ row }">
               <div class="flex-column task-controls">
                 <div class="task-control">
-                  <span class="black-label">任务</span>
+                  <span class="black-label">任务状态:</span>
                   <el-switch v-model="row.status"
                              active-value="1"
                              inactive-value="2"
@@ -135,7 +135,7 @@
                   />
                 </div>
                 <div class="task-control">
-                  <span class="black-label">调度</span>
+                  <span class="black-label">调度状态:</span>
                   <el-switch v-model="row.scheduleFlag"
                              active-value="1"
                              inactive-value="0"
