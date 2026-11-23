@@ -23,7 +23,7 @@
 
 Start with suppliers, materials, or equipment. Maintain records in one place and apply shared reference values and code generation rules to reduce duplicate records and inconsistent codes. Share the same master records with purchasing, inventory, and finance systems through REST APIs or scheduled distribution. Developers can extend the modules and reuse the built-in data management and access controls.
 
-✨✨✨**Documentation**✨✨✨ <a href="https://docs.qdata.tech/en/" target="_blank">https://docs.qdata.tech/en/</a> (MDM guides are in preparation)
+✨✨✨**Documentation**✨✨✨ <a href="https://docs.qdata.tech/en/" target="_blank">https://docs.qdata.tech/en/</a>
 
 ✨✨✨**Open-Source Edition demo**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a> (username `qData`, password `qData123`)
 
@@ -82,7 +82,7 @@ With the appropriate permissions, try publishing a query API. Select a published
 
 ![qData-mdm open-source edition architecture showing modeling, data standards, ingestion, governance, APIs, distribution, and access controls](images/en-US/architecture.png)
 
-## Screenshots (Chinese UI)
+## Screenshots
 
 ![Sign-in screen](images/zh-CN/system/login.png)
 

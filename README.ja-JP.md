@@ -23,7 +23,7 @@
 
 まずは仕入先、品目、設備など、一つの業務領域から始められます。参照データや採番ルールを統一して、二重登録やコード・項目値の不整合を減らします。購買・在庫・会計システムには、照会 API や定期配信を通じて同じマスターデータを提供できます。開発チームは、データ管理や権限制御の仕組みを活用しながら、要件に合わせて機能を拡張できます。
 
-✨✨✨**ドキュメント**✨✨✨ <a href="https://docs.qdata.tech/ja/" target="_blank">https://docs.qdata.tech/ja/</a>（MDM のドキュメントは準備中）
+✨✨✨**ドキュメント**✨✨✨ <a href="https://docs.qdata.tech/ja/" target="_blank">https://docs.qdata.tech/ja/</a>
 
 ✨✨✨**オープンソース版デモ**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a>（ユーザー名 `qData`、パスワード `qData123`）
 
@@ -82,7 +82,7 @@ Java、Spring Boot、Vue 3 を採用し、モデリング、マスターデー�
 
 ![qData-mdm オープンソース版の機能構成図。モデリング、データ標準化、取り込み、品質管理、API、配信、権限制御](images/ja-JP/architecture.png)
 
-## 画面イメージ（中国語）
+## 画面イメージ
 
 ![ログイン画面](images/zh-CN/system/login.png)
 
