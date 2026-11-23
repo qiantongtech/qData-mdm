@@ -15,51 +15,51 @@
   <a href="README.zh-CN.md">📖简体中文</a> | 📖English | <a href="README.ja-JP.md">📖日本語</a>
 </p>
 
-## Overview
+## Platform overview
 
 **Keep master data consistent across business systems.**
 
-**qData-mdm** is open-source master data management (MDM) software for centralizing the definition, maintenance, and sharing of core business data. It combines model-driven configuration, data standards, data quality workflows, and APIs to reduce duplicate records and inconsistent codes and values.
+**qData-mdm** is open-source master data management (MDM) software for teams that maintain core business data across multiple systems. Define data models and standards, maintain master records, run quality checks, and share the results through APIs.
 
-Start with a single domain, such as suppliers, materials, or equipment. Give teams one place to maintain records and agree on reference values and ID generation rules. Then share the same records with purchasing, warehouse, and finance systems through REST APIs or scheduled data distribution. Developers can extend the source code and reuse the built-in data management and access controls.
+Start with suppliers, materials, or equipment. Maintain records in one place and apply shared reference values and code generation rules to reduce duplicate records and inconsistent codes. Share the same master records with purchasing, inventory, and finance systems through REST APIs or scheduled distribution. Developers can extend the modules and reuse the built-in data management and access controls.
 
-✨✨✨**Documentation**✨✨✨ <a href="https://qdata.qiantong.tech" target="_blank">https://qdata.qiantong.tech</a>
+✨✨✨**Documentation**✨✨✨ <a href="https://docs.qdata.tech/en/" target="_blank">https://docs.qdata.tech/en/</a> (MDM guides are in preparation)
 
-✨✨✨**Open-source edition demo**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a> (username `qData`, password `qData123`)
+✨✨✨**Open-Source Edition demo**✨✨✨ <a href="https://demo-mdm.qdata.tech" target="_blank">https://demo-mdm.qdata.tech</a> (username `qData`, password `qData123`)
 
-✨✨✨**Professional edition demo**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a>. [Contact the team for a demo account](https://docs.qdata.tech/business/policy.html).
+✨✨✨**Professional Edition demo**✨✨✨ <a href="https://pro-demo-mdm.qdata.tech" target="_blank">https://pro-demo-mdm.qdata.tech</a> · [Request a demo account](https://docs.qdata.tech/en/business/policy.html)
 
-> If qData-mdm is useful to you, give the repository a **star ⭐️** to support its development! 🚀
+> If qData-mdm is useful to you, give the repository a **star ⭐️**! 🚀
 
-qData-mdm is available under **Apache License 2.0 with additional project terms**. See the [license](LICENSE) and [commercial licensing information](#license-and-services).
+qData-mdm is available under **Apache License 2.0 with additional project terms**. See [LICENSE](LICENSE) and [commercial licensing](#license-and-services).
 
-## Highlights
+## Key features
 
-### Model-driven configuration
+### Define master data models once and reuse them
 
 Define models and fields for entities such as customers, suppliers, materials, and equipment. Group models by domain and in a model catalog. Use the same model for record maintenance and API queries to avoid rebuilding forms, code generation logic, and lookup endpoints for every entity.
 
-### Reference data and code generation
+### Keep reference values and codes consistent
 
 Manage classifications, allowed values, and identifier formats in one place. Build codes from literal text, business fields, reference data mappings, timestamps, and sequence numbers.
 
-### Data quality and remediation
+### Find and fix data quality issues
 
 Run on-demand or scheduled checks on master records to identify the affected records, fields, and validation failures. Assign remediation tasks, track progress, and rerun checks after corrections.
 
-### REST APIs and data distribution
+### Share master records through REST APIs and data distribution
 
 Publish **read-only REST APIs** from approved, published models. Configure filters, response fields, and access grants for individual record lookups and paginated queries. Map master data fields to target API requests and push full or incremental datasets on demand or on a schedule.
 
-### Extensible source code
+### Extend the software for your workflows
 
 The Java, Spring Boot, and Vue 3 codebase is organized by capability, including modeling, master records, data quality, ingestion, and distribution. Extend validation rules or customize workflows while reusing existing data management and authorization.
 
 ## Quick start
 
-### Try the online demo
+### Try the live demo
 
-Open the [open-source edition demo](https://demo-mdm.qdata.tech) to try qData-mdm in your browser.
+Open the [qData-mdm Open-Source Edition demo](https://demo-mdm.qdata.tech) to explore the software in your browser.
 
 **Username `qData` Password `qData123`**
 
@@ -72,17 +72,17 @@ Pick an existing master data model and explore how its records are defined, main
 
 With the appropriate permissions, try publishing a query API. Select a published model, choose filters and response fields, publish the service, and grant access. Use the URL on the publishing page to retrieve one record or a page of results.
 
-### Deployment options
+### Choose a deployment method
 
-- **Local Docker deployment.** Use the Docker Compose configuration in `deploy/docker/` to start the full environment locally.
+- **Docker Compose.** Use the configuration in `deploy/docker/` to start the full environment locally.
 - **Run from source.** Start the backend `qdata-mdm-server` and frontend `qdata-mdm-ui` separately for development and integration testing.
-- **Self-managed deployment.** Install and configure each service for production or a customized environment.
+- **Manual deployment.** Install and configure each service for production or a customized environment.
 
 ## Product architecture
 
 ![qData-mdm open-source edition architecture showing modeling, data standards, ingestion, governance, APIs, distribution, and access controls](images/en-US/architecture.png)
 
-## System screenshots (Chinese UI)
+## Screenshots (Chinese UI)
 
 ![Sign-in screen](images/zh-CN/system/login.png)
 
@@ -136,7 +136,7 @@ With the appropriate permissions, try publishing a query API. Select a published
 
 ![Audit log](images/zh-CN/system/operation_log.png)
 
-## Core capabilities
+## Capabilities overview
 
 qData-mdm covers the master data lifecycle from modeling and ingestion through record consolidation, governance, and delivery to downstream systems.
 
@@ -152,7 +152,7 @@ qData-mdm covers the master data lifecycle from modeling and ingestion through r
 
 💡 Have feedback or a feature request? [Open an issue](https://gitee.com/qiantongtech/qData-mdm/issues).
 
-## Development and extensibility
+## Development and extensions
 
 qData-mdm separates the frontend and backend and organizes the code into modules so teams can integrate it with other systems and extend features as needed.
 
@@ -166,7 +166,7 @@ qData-mdm separates the frontend and backend and organizes the code into modules
 
 ## QQ community
 
-Get the latest qData updates, technical support, and community discussion. 👉 <a href="https://docs.qdata.tech/discuss.html">Join the official qData QQ group</a>
+Follow project updates, ask technical questions, and talk with other users. 👉 <a href="https://docs.qdata.tech/en/discuss.html">Join the official qData QQ group</a>
 
 <a id="license-and-services"></a>
 
@@ -174,7 +174,7 @@ Get the latest qData updates, technical support, and community discussion. 👉 
 
 qData-mdm is available for commercial use under **Apache License 2.0 with additional project terms**. Follow the [LICENSE](LICENSE), including its requirements for logos, copyright notices, license notices, and attribution.
 
-A commercial license is required to remove or modify project branding, white-label the software, offer it as an OEM product, or repackage it as another product. For custom branding, the Professional Edition, or technical services, see the [commercial licensing information](https://docs.qdata.tech/business/policy.html).
+Obtain separate commercial authorization to remove or modify required project branding, white-label the software, offer it as an OEM product, or repackage it as another product. For custom branding, the Professional Edition, or technical services, see [commercial licensing and support](https://docs.qdata.tech/en/business/policy.html).
 
 ## Our mission and vision
 
