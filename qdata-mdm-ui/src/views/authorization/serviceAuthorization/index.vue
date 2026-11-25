@@ -239,9 +239,9 @@
             >
               <el-select v-model="grantForm.serviceId" placeholder="请选择数据服务" filterable>
                 <el-option
-                  v-for="service in serviceOptions"
+                  v-for="service in grantServiceOptions"
                   :key="service.id"
-                  :label="`${service.name}（${service.code} · ${service.version}）`"
+                  :label="`${service.name}（${service.code}）`"
                   :value="service.id"
                 />
               </el-select>
@@ -538,6 +538,7 @@ const grantForm = reactive({
   scopeGroups: createScopeGroups(), fieldPermissions: createFieldPermissions(), startDate: '', endDate: '', longTerm: true
 })
 const serviceOptions = ref(SERVICE_AUTHORIZATION_SERVICES.map(service => ({ ...service })))
+const grantServiceOptions = ref([])
 const filteredSubjectOptions = computed(() => subjectOptions.value.filter(item => item.type === grantForm.subjectType))
 const scopeColumns = [
   { label: '编号', type: 'index', width: 70, minWidth: 70 },
@@ -955,6 +956,7 @@ async function loadReferences() {
     listAllServices()
   ])
   treeServiceOptions.value = services.status === 'fulfilled' ? services.value : []
+  grantServiceOptions.value = services.status === 'fulfilled' ? services.value : []
   if (services.status === 'rejected') proxy.$modal.msgError('数据服务加载失败，请刷新后重试')
   if ([projects, layers, models].every(result => result.status === 'fulfilled')) {
     modelTreeData.value = buildAuthorizationModelTree(
