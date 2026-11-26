@@ -104,27 +104,16 @@
               </div>
             </template>
             <template #lastExecution="{ row }">
-              <div class="flex-column flex-column-gap overflow-hidden">
-                <div>
-                  <el-tag v-if="row.lastRunStatus"
-                          :type="resultType(row.lastRunStatus)"
-                          size="small"
-                          effect="plain"
-                  >
-                    {{ resultLabel(row.lastRunStatus) }}
-                  </el-tag>
-                  <span v-else class="muted">尚未执行</span>
-                </div>
-                <span class="desc-text">{{
-                  row.lastRunTime ? proxy.parseTime(row.lastRunTime, '{y}-{m}-{d} {h}:{i}:{s}') : '-'
-                }}</span>
-                <span class="desc-text">耗时：{{ durationText(row.lastRunDurationMs) }}</span>
+              <StatusTag size="small" :status="row.lastRunStatus" />
+              <div class="flex-center fz14 black-label">
+                <span class="text-ellipsis">{{ row.lastRunTime ? timeAgo(row.lastRunTime) : '-' }}</span>
+                <span class="ml10 text-ellipsis">{{ durationText(row.lastRunDurationMs) }}</span>
               </div>
             </template>
             <template #runControl="{ row }">
               <div class="flex-column task-controls">
                 <div class="task-control">
-                  <span class="black-label">任务</span>
+                  <span class="black-label">任务状态:</span>
                   <el-switch v-model="row.status"
                              active-value="1"
                              inactive-value="2"
@@ -135,7 +124,7 @@
                   />
                 </div>
                 <div class="task-control">
-                  <span class="black-label">调度</span>
+                  <span class="black-label">调度状态:</span>
                   <el-switch v-model="row.scheduleFlag"
                              active-value="1"
                              inactive-value="0"
@@ -603,12 +592,14 @@ import {ref, reactive, computed, getCurrentInstance, nextTick, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router';
 import Crontab from '@/components/Crontab/index.vue';
 import QtTree from '@/components/QtTree/index.vue';
+import StatusTag from '@/components/StatusTag/index.vue';
 import RunHistoryDialog from '@/views/quality/taskInstance/RunHistoryDialog.vue';
 import {executeQualitytask} from '@/api/quality/taskInstance/taskInstance';
 import {cronToZh} from '@/utils/cronUtils';
 import {Clock} from '@element-plus/icons-vue';
 import {getModelIcon, getProjectIcon} from '@/utils/imageUrl';
 import {useDict} from '@/utils/dict';
+import {timeAgo} from '@/utils/time';
 
 const {model_type, model_status} = useDict('model_type', 'model_status');
 import {useUserDirectory} from '@/store/system/userDirectory';
@@ -1082,22 +1073,11 @@ function scheduleText(row) {
   return [6, 7].includes(fieldCount) ? cronToZh(expression) : expression;
 }
 
-function resultLabel(value) {
-  return ({0: '尚未执行', 1: '执行中', 2: '执行失败', 3: '部分成功', 4: '执行成功'})[value] || '未知状态';
-}
-
 function durationText(value) {
-  if (value == null || value === '' || !Number.isFinite(Number(value)) || Number(value) < 0) return '-';
+  if (value == null || value === '') return '-';
   const milliseconds = Number(value);
-  if (milliseconds < 1000) return `${milliseconds} 毫秒`;
-  if (milliseconds < 60000) return `${Number((milliseconds / 1000).toFixed(1))} 秒`;
-  const seconds = Math.floor(milliseconds / 1000);
-  const minutes = Math.floor(seconds / 60);
-  return minutes < 60 ? `${minutes} 分 ${seconds % 60} 秒` : `${Math.floor(minutes / 60)} 时 ${minutes % 60} 分 ${seconds % 60} 秒`;
-}
-
-function resultType(value) {
-  return ({1: 'primary', 2: 'danger', 3: 'warning', 4: 'success', 0: ''})[value] || 'info';
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return '-';
+  return milliseconds < 1000 ? `${milliseconds} 毫秒` : `${(milliseconds / 1000).toFixed(1)} 秒`;
 }
 
 function fieldLabel(row) {
