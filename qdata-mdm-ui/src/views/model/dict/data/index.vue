@@ -52,6 +52,7 @@
           type="info"
           plain
           icon="Upload"
+          :disabled="!typeCode"
           @click="handleImport"
           @mousedown="(e) => e.preventDefault()"
         >
@@ -62,6 +63,7 @@
           type="warning"
           plain
           icon="Download"
+          :disabled="!typeCode"
           @click="handleExport"
           @mousedown="(e) => e.preventDefault()"
         >
@@ -129,7 +131,7 @@
       @submit="submitForm"
     />
 
-    <!-- 用户导入对话框 -->
+    <!-- 参考数据导入对话框 -->
     <el-dialog
       v-model="upload.open"
       :title="upload.title"
@@ -144,9 +146,11 @@
         accept=".xlsx, .xls"
         :headers="upload.headers"
         :action="upload.url + '?updateSupport=' + upload.updateSupport"
+        :data="{typeCode}"
         :disabled="upload.isUploading"
         :on-progress="handleFileUploadProgress"
         :on-success="handleFileSuccess"
+        :on-error="handleFileError"
         :auto-upload="false"
         drag
       >
@@ -158,7 +162,7 @@
           <div class="el-upload__tip text-center">
             <div class="el-upload__tip">
               <el-checkbox v-model="upload.updateSupport" />
-              是否更新已经存在的参考数据项数据
+              是否更新已经存在的参考数据项
             </div>
             <span>仅允许导入xls、xlsx格式文件。</span>
             <el-link
@@ -202,6 +206,10 @@ const props = defineProps({
     type: [String, Number],
     default: undefined,
   },
+  typeCode: {
+    type: String,
+    default: "",
+  },
 });
 const emit = defineEmits(["itemsChange"]);
 
@@ -221,7 +229,7 @@ const upload = reactive({
   // 是否禁用上传
   isUploading: false,
   // 是否更新已经存在的业务数据
-  updateSupport: 0,
+  updateSupport: false,
   // 设置上传的请求头部
   headers: { Authorization: "Bearer " + getToken() },
   // 上传的地址
@@ -362,6 +370,7 @@ function refreshList() {
 watch(
   currentTypeId,
   value => {
+    upload.open = false;
     queryParams.value.typeId = value;
     if (form.value) {
       form.value.typeId = value;
@@ -489,20 +498,22 @@ function handleDelete(row) {
 
 /** 导出按钮操作 */
 function handleExport() {
-  proxy.download('model/dict/data/export', {
-    ...queryParams.value
-  }, `data_${new Date().getTime()}.xlsx`);
+  if (!props.typeCode) return;
+  const params = {...queryParams.value, typeCode: props.typeCode};
+  delete params.typeId;
+  proxy.download('model/dict/data/export', params, `data_${new Date().getTime()}.xlsx`);
 }
 
 /** 导入按钮操作 */
 function handleImport() {
+  if (!props.typeCode) return;
   upload.title = "参考数据项导入";
   upload.open = true;
 }
 
 /** 下载模板操作 */
 function importTemplate() {
-  proxy.download("system/user/importTemplate", {}, `data_template_${new Date().getTime()}.xlsx`);
+  proxy.download("model/dict/data/importTemplate", {}, `data_template_${new Date().getTime()}.xlsx`);
 }
 
 /** 提交上传文件 */
@@ -515,14 +526,24 @@ const handleFileUploadProgress = () => {
   upload.isUploading = true;
 };
 
-/** 文件上传成功处理 */
-const handleFileSuccess = (response, file) => {
-  upload.open = false;
+/** 处理导入接口返回的业务结果。 */
+function handleFileSuccess(response) {
   upload.isUploading = false;
-  proxy.$refs["uploadRef"].handleRemove(file);
-  proxy.$alert("<div class='dict-data-import-result'>" + response.msg + "</div>", "导入结果", { dangerouslyUseHTMLString: true });
+  proxy.$refs.uploadRef?.clearFiles();
+  if (response?.code !== 200) {
+    proxy.$modal.msgWarning(response?.msg || "导入失败");
+    return;
+  }
+  upload.open = false;
+  proxy.$modal.msgSuccess(response.msg || "导入成功");
   refreshList();
-};
+}
+
+function handleFileError() {
+  upload.isUploading = false;
+  proxy.$refs.uploadRef?.clearFiles();
+  proxy.$modal.msgError("导入失败，请重新上传文件");
+}
 
 </script>
 
@@ -532,10 +553,4 @@ const handleFileSuccess = (response, file) => {
   vertical-align: baseline;
 }
 
-:global(.dict-data-import-result) {
-  max-height: var(--qt-import-result-max-height);
-  padding: var(--qt-import-result-padding);
-  overflow: auto;
-  overflow-x: hidden;
-}
 </style>

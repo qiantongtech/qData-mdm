@@ -1,3 +1,4 @@
+
 /*
  * Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
  *
@@ -27,7 +28,8 @@ export default function createSvgIcon(isBuild) {
             path.resolve(process.cwd(), 'src/assets/modules/model/icons/encoding'),
             path.resolve(process.cwd(), 'src/assets/modules/master'),
             path.resolve(process.cwd(), 'src/assets/modules/merge/icons'),
-            path.resolve(process.cwd(), 'src/assets/modules/quality/icons')
+            path.resolve(process.cwd(), 'src/assets/modules/quality/icons'),
+            path.resolve(process.cwd(), 'src/assets/modules/dist/icons')
         ],
         symbolId: 'icon-[dir]-[name]',
         svgoOptions: isBuild

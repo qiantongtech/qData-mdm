@@ -29,6 +29,9 @@ import tech.qiantong.qdata.mdm.master.controller.admin.data.vo.MasterMaintenance
 import tech.qiantong.qdata.mdm.master.controller.admin.data.vo.MasterColumnRespVO;
 import tech.qiantong.qdata.mdm.master.controller.admin.data.vo.MasterDataMetadataRespVO;
 import tech.qiantong.qdata.mdm.master.controller.admin.data.vo.MasterMaintenanceFormConfigRespVO;
+import tech.qiantong.qdata.mdm.master.api.instance.dto.MasterModelRespDTO;
+import tech.qiantong.qdata.mdm.master.dal.repository.data.MasterDataQueryRepository;
+import tech.qiantong.qdata.mdm.master.service.change.maintenance.MaintenanceData;
 import tech.qiantong.qdata.mdm.master.service.data.IMasterDataMetadataService;
 import tech.qiantong.qdata.mdm.master.service.data.navigation.MasterClassificationNavigationService;
 import tech.qiantong.qdata.mdm.model.base.dto.ModelPublishedRespDTO;
@@ -52,6 +55,7 @@ public class MasterReferenceService {
     private final IMasterDataMetadataService metadataService;
     private final MasterClassificationNavigationService classifications;
     private final ModelPublishedApi publishedApi;
+    private final MasterDataQueryRepository repository;
 
     /** 显示映射只附在列定义上，列表和导入预览直接共用，不包装或替换业务行。 */
     public void enrich(MasterDataMetadataRespVO metadata) {
@@ -104,7 +108,9 @@ public class MasterReferenceService {
         Map<String, ReferenceValues> result = new LinkedHashMap<>();
         for (MasterMaintenanceColumnRespVO column : columns) {
             if (fields != null && !fields.contains(column.getProp())) continue;
-            if (!"CLASS".equalsIgnoreCase(column.getColumnCategory()) && column.getDictTypeId() == null) continue;
+            if (!"CLASS".equalsIgnoreCase(column.getColumnCategory())
+                    && !"RELATION".equalsIgnoreCase(column.getColumnCategory())
+                    && column.getDictTypeId() == null) continue;
             try {
                 result.put(column.getProp(), choices(column));
             } catch (ServiceException error) {
@@ -129,6 +135,8 @@ public class MasterReferenceService {
             request.setNodeRule(column.getNodeRule());
             request.setDisplayMode("FULL_PATH");
             collect(classifications.options(target.getInstanceId(), request).getNodes(), labels, selectable);
+        } else if ("RELATION".equalsIgnoreCase(column.getColumnCategory())) {
+            return relationChoices(column);
         } else {
             for (MasterMaintenanceColumnRespVO.ReferenceOption option : column.getReferenceOptions()) {
                 put(labels, option.getValue(), option.getLabel());
@@ -137,6 +145,43 @@ public class MasterReferenceService {
         }
         if (labels.size() > MAX_OPTIONS) throw new ServiceException("下拉选项超过" + MAX_OPTIONS + "项：" + column.getLabel());
         return new ReferenceValues(labels, selectable);
+    }
+
+    private ReferenceValues relationChoices(MasterMaintenanceColumnRespVO column) {
+        if (column.getRelatedModelId() == null || column.getRelatedCode() == null || column.getDisplayCode() == null)
+            throw new ServiceException("关联字段配置不完整：" + column.getLabel());
+        ModelPublishedRespDTO target = publishedApi.getPublishedModel(column.getRelatedModelId());
+        if (target == null || target.getInstanceId() == null || target.getVersionId() == null)
+            throw new ServiceException("关联模型未成功发布：" + column.getLabel());
+        MasterModelRespDTO model = metadataService.getModel(target.getInstanceId(), target.getId());
+        if (!target.getVersionId().equals(model.getModelVersionId()))
+            throw new ServiceException("关联模型已重新发布，请刷新后重试：" + column.getLabel());
+        List<Map<String, Object>> rows = repository.selectReferenceOptions(model.getDatasourceId(),
+                MaintenanceData.table(model), model.getColumnMappings(), column.getRelatedCode(),
+                column.getDisplayCode(), MAX_OPTIONS);
+        if (rows.size() > MAX_OPTIONS)
+            throw new ServiceException("关联选项超过" + MAX_OPTIONS + "项：" + column.getLabel());
+        Map<String, String> labels = new LinkedHashMap<>();
+        Set<String> selectable = new HashSet<>();
+        for (Map<String, Object> row : rows) {
+            String value = fieldValue(row, column.getRelatedCode());
+            String label = fieldValue(row, column.getDisplayCode());
+            if (value == null || label == null || labels.putIfAbsent(value, label) != null)
+                throw new ServiceException("关联键为空或重复，无法生成下拉选项：" + column.getLabel());
+            selectable.add(value);
+        }
+        return new ReferenceValues(labels, selectable);
+    }
+
+    private String fieldValue(Map<String, Object> row, String code) {
+        if (row == null) return null;
+        for (Map.Entry<String, Object> entry : row.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(code)) {
+                Object value = entry.getValue();
+                return value == null ? null : String.valueOf(value);
+            }
+        }
+        return null;
     }
 
     /** 分类显示保留完整路径，只有可分配节点进入下拉和导入选项。 */

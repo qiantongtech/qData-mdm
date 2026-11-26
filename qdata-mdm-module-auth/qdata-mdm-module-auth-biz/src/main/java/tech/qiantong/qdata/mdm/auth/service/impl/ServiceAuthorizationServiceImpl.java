@@ -42,6 +42,7 @@ import tech.qiantong.qdata.mdm.auth.support.AuthorizationJsonCodec;
 import tech.qiantong.qdata.mdm.auth.support.DataScopeValidator;
 import tech.qiantong.qdata.mdm.common.core.page.PageParam;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.mybatis.core.query.LambdaQueryWrapperX;
 
@@ -92,7 +93,7 @@ public class ServiceAuthorizationServiceImpl implements ServiceAuthorizationServ
             if (findCurrentAccesses(request, subjectIds.get(0), new Date()).stream()
                     .anyMatch(item -> !request.getId().equals(item.getId()))) {
                 throw new ServiceException(subjectDisplayName(request.getSubjectType(), subjectIds.get(0))
-                        + "对该数据服务已有其他授权，请勿重复配置");
+                        + "对该数据服务已有其他授权，请勿重复配置", HttpStatus.WARN);
             }
             AuthServiceAccessDO access = buildAccess(request, request.getId(), subjectIds.get(0));
             if (AuthorizationStatus.REVOKED.matches(previous.getStatus()) && access.getExpireTime() != null
@@ -108,7 +109,7 @@ public class ServiceAuthorizationServiceImpl implements ServiceAuthorizationServ
         for (Long subjectId : subjectIds) {
             if (!findCurrentAccesses(request, subjectId, new Date()).isEmpty()) {
                 throw new ServiceException(subjectDisplayName(request.getSubjectType(), subjectId)
-                        + "对该数据服务已有授权，请使用修改授权或批量授权");
+                        + "对该数据服务已有授权，请使用修改授权或批量授权", HttpStatus.WARN);
             }
             AuthServiceAccessDO access = buildAccess(request, null, subjectId);
             serviceAccessMapper.insert(access);
@@ -134,7 +135,7 @@ public class ServiceAuthorizationServiceImpl implements ServiceAuthorizationServ
             List<AuthServiceAccessDO> matches = findCurrentAccesses(request, subjectId, now);
             if (matches.size() > 1) {
                 throw new ServiceException(subjectDisplayName(request.getSubjectType(), subjectId)
-                        + "对该服务存在多条可用授权，请先单独处理重复记录");
+                        + "对该服务存在多条可用授权，请先单独处理重复记录", HttpStatus.WARN);
             }
             if (matches.isEmpty()) {
                 AuthServiceAccessDO access = buildAccess(request, null, subjectId);
@@ -645,7 +646,7 @@ public class ServiceAuthorizationServiceImpl implements ServiceAuthorizationServ
     private AuthServiceAccessDO requireAccess(Long id) {
         AuthServiceAccessDO access = serviceAccessMapper.selectById(id);
         if (access == null) {
-            throw new ServiceException("服务授权不存在或已删除");
+            throw new ServiceException("服务授权不存在或已删除", HttpStatus.WARN);
         }
         return access;
     }

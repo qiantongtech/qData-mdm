@@ -69,7 +69,7 @@
           <el-button link type="primary" icon="Edit" @click="handleUpdate(row)"
                      v-hasPermi="['dist:target:edit']"
 >修改</el-button>
-          <el-button link type="danger" icon="Delete" :disabled="String(row.status) !== '2'"
+          <el-button link type="danger" icon="Delete"
                      @click="handleDelete(row)"
                      v-hasPermi="['dist:target:remove']"
 >删除</el-button>
@@ -434,20 +434,16 @@ const userDirectoryStore = useUserDirectoryStore();
     });
   }
 
-  /** 与来源系统一致：批量选择允许混选，只删除其中已禁用的目标系统。 */
+  /** 删除前提交所有选中记录，由后端统一校验状态和关联任务。 */
   function handleDelete(row) {
     const isSingle = Boolean(row?.id);
     const rows = isSingle ? [row] : selectedRows.value;
-    const deletableRows = rows.filter(item => String(item.status) === "2");
-    if (!deletableRows.length) {
-      proxy.$modal.msgError("只能删除禁用状态的目标系统，请先禁用");
-      return;
-    }
+    if (!rows.length) return;
     const message = isSingle
       ? `是否确认删除目标系统“${row.name || row.code}”？`
-      : `可删除${deletableRows.length}个，不可删除${rows.length - deletableRows.length}个，是否删除可删部分？`;
+      : `是否确认删除选中的 ${rows.length} 个目标系统？`;
     proxy.$modal.confirm(message).then(() => {
-      return delTargetSystem(deletableRows.map(item => item.id).join(","));
+      return delTargetSystem(rows.map(item => item.id).join(","));
     }).then(() => {
       getList();
       proxy.$modal.msgSuccess("删除成功");

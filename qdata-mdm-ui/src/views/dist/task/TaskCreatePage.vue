@@ -18,13 +18,16 @@
 
 <template>
   <!-- 步骤条、表单内容区和底部操作区沿用模型表单页结构。 -->
-  <div ref="app-container" class="app-container dist-task-create-page">
+  <div
+          ref="app-container"
+          v-loading="initializing"
+          class="app-container dist-task-create-page">
     <div class="wizard-steps mb15">
       <Steps :steps="stepItems" :active-step="step" :clickable="false"/>
     </div>
     <div class="pagecont-top">
       <div class="infotop">
-        <div ref="wizardBodyRef" v-loading="initializing" class="main">
+        <div ref="wizardBodyRef" class="main">
           <!-- 第一步：任务定义及分发类型；QtFormItem 统一字段标签与输入区域结构。 -->
           <template v-if="step === 0">
             <el-form ref="basicFormRef" :model="draft" :rules="basicRules" label-width="110px"
@@ -196,8 +199,10 @@
                   >
                     <el-option v-for="field in modelFields" :key="field.id" :label="field.name" :value="field.id"/>
                   </el-select>
-                  <div v-if="filterErrors[row.key]?.modelColumnId" class="filter-error">
-                    {{ filterErrors[row.key].modelColumnId }}
+                  <div class="filter-error-space">
+                    <div v-if="filterErrors[row.key]?.modelColumnId" class="filter-error">
+                      {{ filterErrors[row.key].modelColumnId }}
+                    </div>
                   </div>
                 </template>
                 <template #operator="{ row }">
@@ -208,9 +213,10 @@
                                :value="item.value"
                     />
                   </el-select>
-                  <div v-if="filterErrors[row.key]?.operator" class="filter-error">{{
-                      filterErrors[row.key].operator
-                    }}
+                  <div class="filter-error-space">
+                    <div v-if="filterErrors[row.key]?.operator" class="filter-error">
+                      {{ filterErrors[row.key].operator }}
+                    </div>
                   </div>
                 </template>
                 <template #value="{ row }">
@@ -235,9 +241,10 @@
                             placeholder="请输入比较值"
                             @input="clearFilterError(row)"
                   />
-                  <div v-if="filterErrors[row.key]?.value" class="filter-error">{{
-                      filterErrors[row.key].value
-                    }}
+                  <div class="filter-error-space">
+                    <div v-if="filterErrors[row.key]?.value" class="filter-error">
+                      {{ filterErrors[row.key].value }}
+                    </div>
                   </div>
                 </template>
                 <template #action="{ row, $index }">
@@ -325,7 +332,7 @@
                   />
                 </qt-form-item>
               </template>
-              <el-form-item label="自定义请求头" class="row-full">
+              <el-form-item label="自定义请求头" >
                 <div class="header-editor">
                   <div v-for="(header, index) in draft.headers" :key="header.id" class="header-row">
                     <div v-for="field in headerFields" :key="field.key" class="header-field">
@@ -338,9 +345,17 @@
                       <span v-if="headerErrors[header.id]?.[field.key]" :id="`header-${header.id}-${field.key}-error`"
                             class="filter-error">{{ headerErrors[header.id][field.key] }}</span>
                     </div>
-                    <el-button text circle icon="Delete" class="header-remove"
-                               :aria-label="`删除第 ${index + 1} 个请求头`" title="删除请求头"
-                               @click="removeHeader(index)"/>
+                    <el-button
+                            link
+                            type="danger"
+                            icon="Delete"
+                            class="header-remove"
+                            :aria-label="`删除第 ${index + 1} 个请求头`"
+                            title="删除请求头"
+                            @click="removeHeader(index)"
+                    >
+                      删除
+                    </el-button>
                   </div>
                   <div class="header-actions">
                     <el-button link type="primary" icon="Plus" @click="addHeader">添加请求头</el-button>
@@ -443,7 +458,7 @@
       </div>
       <!-- 底部操作区沿用模型表单页结构。 -->
       <div class="button-style">
-        <el-button @click="goBack">返回列表</el-button>
+        <el-button :disabled="initializing" @click="goBack">返回列表</el-button>
         <el-button v-if="step > 0" type="primary" plain @click="step--">上一步</el-button>
         <el-button v-if="step < 3" type="primary" :loading="stepValidating" :disabled="initializing"
                    @click="handleNext"
@@ -1375,7 +1390,9 @@ function handleLayerChange() {
 .condition-table :deep(.el-date-editor) {
   width: 100%;
 }
-
+.filter-error-space {
+    min-height: 18px;
+}
 .filter-error,
 .section-error {
   color: var(--qt-status-danger);
@@ -1409,13 +1426,11 @@ function handleLayerChange() {
 }
 
 .header-remove {
-  color: var(--qt-text-secondary);
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
 }
 
-.header-remove:hover,
-.header-remove:focus-visible {
-  color: var(--qt-status-danger);
-}
 
 .header-actions {
   display: flex;

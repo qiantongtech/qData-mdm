@@ -22,6 +22,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tech.qiantong.qdata.mdm.common.core.domain.BaseEntity;
 
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Pattern;
+import javax.validation.Valid;
+import javax.validation.groups.ConvertGroup;
 import javax.validation.constraints.Size;
 import java.util.List;
 
@@ -40,12 +44,16 @@ public class ModelBaseSaveReqVO extends BaseEntity {
     @Schema(description = "ID")
     private Long id;
 
-    @Schema(description = "模型编码，例如MDM_SUPPLIER；业务上要求系统内唯一", example = "")
-    @Size(max = 512, message = "模型编码，例如MDM_SUPPLIER；业务上要求系统内唯一长度不能超过512个字符")
+    @Schema(description = "模型编码", example = "")
+    @NotBlank(message = "模型编码不能为空")
+    @Size(max = 64, message = "模型编码长度不能超过64个字符")
+    @Pattern(regexp = "[A-Za-z0-9_]*", message = "模型编码支持英文字母、数字和下划线")
     private String code;
 
     @Schema(description = "模型名称", example = "")
-    @Size(max = 512, message = "模型名称长度不能超过512个字符")
+    @NotBlank(message = "模型名称不能为空")
+    @Size(max = 64, message = "模型名称长度不能超过64个字符")
+    @Pattern(regexp = "[\u4e00-\u9fa5A-Za-z0-9_-]*", message = "模型名称支持中文、英文字符、数字、下划线和短横线")
     private String name;
 
     /**
@@ -58,33 +66,43 @@ public class ModelBaseSaveReqVO extends BaseEntity {
      */
     private Long responsibleUserId;
 
-    @Schema(description = "所属主数据域ID，关联MODEL_PROJECT.ID", example = "")
+    @Schema(description = "所属主数据域", example = "")
     private Long projectId;
 
-    @Schema(description = "所属模型目录ID，关联MODEL_LAYER.ID；目录必须属于PROJECT_ID对应的主数据域", example = "")
+    @Schema(description = "所属模型目录", example = "")
     private Long layerId;
 
-    @Schema(description = "模型类型；0：普通模型，1：分类模型", example = "")
-    @Size(max = 512, message = "模型类型；0：普通模型，1：分类模型长度不能超过512个字符")
+    @Schema(description = "模型类型", example = "")
+    @Size(max = 512, message = "模型类型长度不能超过512个字符")
     private String type;
 
     @Schema(description = "版本id", example = "")
     private Long versionId;
 
     @Schema(description = "模型业务说明", example = "")
-    @Size(max = 512, message = "模型业务说明长度不能超过512个字符")
+    @Size(max = 256, message = "描述长度不能超过256个字符")
     private String description;
 
-    @Schema(description = "上级模型ID；0表示主模型", example = "")
+    @Schema(description = "上级模型", example = "")
     private Long parentId;
 
-    @Schema(description = "逻辑删除标志；0：未删除，1：已删除", example = "")
+    @Schema(description = "逻辑删除标志", example = "")
     private Boolean delFlag;
 
     @Schema(description = "模型字段")
+    @Valid
+    @ConvertGroup(to = ModelColumnSaveReqVO.Required.class)
     private List<ModelColumnSaveReqVO> fields;
 
     @Schema(description = "子模型")
+    @Valid
     private List<ModelBaseSaveReqVO> subModels;
 
+    public void setCode(String code) {
+        this.code = code == null ? null : code.trim();
+    }
+
+    public void setName(String name) {
+        this.name = name == null ? null : name.trim();
+    }
 }

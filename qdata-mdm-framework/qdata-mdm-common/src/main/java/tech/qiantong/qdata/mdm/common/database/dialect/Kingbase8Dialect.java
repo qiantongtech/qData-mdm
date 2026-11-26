@@ -26,6 +26,7 @@ import tech.qiantong.qdata.mdm.common.database.core.DbColumn;
 import tech.qiantong.qdata.mdm.common.database.core.DbName;
 import tech.qiantong.qdata.mdm.common.database.core.DbTable;
 import tech.qiantong.qdata.mdm.common.database.utils.DatabaseUtil;
+import tech.qiantong.qdata.mdm.common.enums.KingbaseColumnTypeEnum;
 import tech.qiantong.qdata.mdm.common.utils.MessageUtils;
 
 import java.sql.ResultSet;
@@ -41,6 +42,86 @@ import java.util.stream.Collectors;
  * @date 2024-02-08
  */
 public class Kingbase8Dialect extends AbstractDbDialect {
+
+    // pg_get_expr 会将时间戳字面量还原为带完整类型名称的转换表达式。
+    private static final String COLUMN_DEFAULT_SQL = "regexp_replace(pg_get_expr(d.adbin, d.adrelid), "
+            + "'(::((timestamp|time) (with|without) time zone|[a-zA-Z0-9_]+( [a-zA-Z0-9_]+)?))+$', '') AS DATADEFAULT,";
+
+    private static void appendDefaultClause(StringBuilder sql, String dataType, String defaultValue) {
+        if (StringUtils.isBlank(defaultValue)) {
+            return;
+        }
+        sql.append(" DEFAULT ").append(defaultExpression(dataType, defaultValue));
+    }
+
+    private static String defaultExpression(String dataType, String defaultValue) {
+        String def = normalizeDefaultValue(defaultValue);
+        if (StringUtils.isBlank(def)
+                || isQuotedDefault(def)
+                || isNumericDefault(def)
+                || isKeywordOrFunctionDefault(def)) {
+            return def;
+        }
+        if (isStringOrTemporalType(dataType)) {
+            return "'" + DatabaseUtil.escapeSingleQuotes(def) + "'";
+        }
+        return def;
+    }
+
+    private static String normalizeDefaultValue(String defaultValue) {
+        String def = defaultValue == null ? "" : defaultValue.trim();
+        while (def.length() >= 2 && def.startsWith("(") && def.endsWith(")")) {
+            def = def.substring(1, def.length() - 1).trim();
+        }
+        return def;
+    }
+
+    private static boolean isQuotedDefault(String defaultValue) {
+        return defaultValue.length() >= 2 && defaultValue.startsWith("'") && defaultValue.endsWith("'");
+    }
+
+    private static boolean isNumericDefault(String defaultValue) {
+        return defaultValue.matches("^-?\\d+(\\.\\d+)?$");
+    }
+
+    private static boolean isKeywordOrFunctionDefault(String defaultValue) {
+        String def = defaultValue.trim().toUpperCase(Locale.ROOT);
+        return "CURRENT_TIMESTAMP".equals(def)
+                || "CURRENT_DATE".equals(def)
+                || "CURRENT_TIME".equals(def)
+                || "LOCALTIME".equals(def)
+                || "LOCALTIMESTAMP".equals(def)
+                || "NOW()".equals(def)
+                || "UUID()".equals(def)
+                || "NULL".equals(def)
+                || "TRUE".equals(def)
+                || "FALSE".equals(def)
+                || (def.endsWith(")") && def.contains("("));
+    }
+
+    private static boolean isStringOrTemporalType(String dataType) {
+        String type = dataType == null ? "" : dataType.trim().toUpperCase(Locale.ROOT);
+        return type.contains("CHAR")
+                || type.contains("TEXT")
+                || type.contains("CLOB")
+                || type.contains("STRING")
+                || type.contains("DATE")
+                || type.contains("TIME");
+    }
+
+    @Override
+    public String getColumnType(DbColumn column) {
+        return column == null ? null : column.getDataType();
+    }
+
+    @Override
+    public DbColumn toStandardColumn(DbColumn column) {
+        String type = normalizeTypeName(column == null ? null : column.getDataType());
+        if ("TIMESTAMP".equals(type) || "TIMESTAMP WITHOUT TIME ZONE".equals(type) || "DATETIME".equals(type)) {
+            return toStandardColumn(column, "DATETIME");
+        }
+        return toStandardColumn(column, KingbaseColumnTypeEnum.convertToDmType(type));
+    }
 
     @Override
     public String columns(String dbName, String tableName) {
@@ -61,7 +142,7 @@ public class Kingbase8Dialect extends AbstractDbDialect {
                 "CASE WHEN t.typname IN ('numeric', 'decimal', 'float4', 'float8') THEN (a.atttypmod - 4) & 65535 ELSE NULL END AS DATASCALE, " +
                 "CASE WHEN con.contype = 'p' THEN TRUE ELSE FALSE END AS COLKEY, " +
                 "NOT a.attnotnull AS NULLABLE, a.attnum AS COLPOSITION, " +
-                "regexp_replace(pg_get_expr(d.adbin, d.adrelid), '(::[a-zA-Z0-9_]+)+$', '') AS DATADEFAULT" +
+                COLUMN_DEFAULT_SQL +
                 "col_description(a.attrelid, a.attnum) AS COLCOMMENT " +
                 "FROM pg_attribute a " +
                 "JOIN pg_class c ON a.attrelid = c.oid " +
@@ -94,7 +175,7 @@ public class Kingbase8Dialect extends AbstractDbDialect {
                 "CASE WHEN t.typname IN ('numeric', 'decimal', 'float4', 'float8') THEN (a.atttypmod - 4) & 65535 ELSE NULL END AS DATASCALE, " +
                 "CASE WHEN con.contype = 'p' THEN TRUE ELSE FALSE END AS COLKEY, " +
                 "NOT a.attnotnull AS NULLABLE, a.attnum AS COLPOSITION, " +
-                "regexp_replace(pg_get_expr(d.adbin, d.adrelid), '(::[a-zA-Z0-9_]+)+$', '') AS DATADEFAULT," +
+                COLUMN_DEFAULT_SQL +
                 "col_description(a.attrelid, a.attnum) AS COLCOMMENT " +
                 "FROM pg_attribute a " +
                 "JOIN pg_class c ON a.attrelid = c.oid " +
@@ -139,7 +220,7 @@ public class Kingbase8Dialect extends AbstractDbDialect {
                 "CASE WHEN con.contype = 'p' THEN TRUE ELSE FALSE END AS COLKEY, " +
                 "NOT a.attnotnull AS NULLABLE, " +
                 "a.attnum AS COLPOSITION, " +
-                "regexp_replace(pg_get_expr(d.adbin, d.adrelid), '(::[a-zA-Z0-9_]+)+$', '') AS DATADEFAULT, " +
+                COLUMN_DEFAULT_SQL +
                 "col_description(a.attrelid, a.attnum) AS COLCOMMENT " +
                 "FROM pg_attribute a " +
                 "JOIN pg_class c ON a.attrelid = c.oid " +
@@ -173,16 +254,7 @@ public class Kingbase8Dialect extends AbstractDbDialect {
 
     @Override
     public List<String> someInternalSqlGenerator(DbQueryProperty dbQueryProperty, String tableName, String tableComment, List<DbColumn> dbColumnList) {
-        String dbName = dbQueryProperty.getDbName();
-        String sid = dbQueryProperty.getSid();
-
-        if (StringUtils.isNotEmpty(sid)) {
-            tableName = sid + "." + tableName;
-        }
-
-        List<String> sqlList = generateKingbaseCreateSql(tableName, tableComment, dbColumnList);
-
-        return sqlList;
+        return generateKingbaseCreateSql(getTableName(dbQueryProperty, tableName), tableComment, dbColumnList);
     }
 
     @Override
@@ -197,7 +269,7 @@ public class Kingbase8Dialect extends AbstractDbDialect {
         createSql.append("CREATE TABLE ").append(tableName).append(" (");
         List<String> pkList = new ArrayList<>();
         for (DbColumn col : columns) {
-            createSql.append("\n  ").append(col.getColName()).append(" ");
+            createSql.append("\n  ").append(quoteIdentifier(col.getColName())).append(" ");
             createSql.append(mapKingbaseColumnType(col));
 
             createSql.append(identityColumnClause(col));
@@ -206,13 +278,7 @@ public class Kingbase8Dialect extends AbstractDbDialect {
                 createSql.append(" NOT NULL");
             }
             if (StringUtils.isNotEmpty(col.getDataDefault())) {
-                createSql.append(" DEFAULT ").append(col.getDataDefault());
-//                String columnType = col.getDataType();
-//                if (isStringTypeSwitchDEFAULT(columnType)) {
-//                    createSql.append(" DEFAULT '").append(DatabaseUtil.escapeSingleQuotes(col.getDataDefault())).append("'");
-//                } else {
-//                    createSql.append(" DEFAULT ").append(col.getDataDefault());
-//                }
+                appendDefaultClause(createSql, col.getDataType(), col.getDataDefault());
             }
             if (col.getColKey()) {
                 pkList.add(col.getColName());
@@ -225,7 +291,7 @@ public class Kingbase8Dialect extends AbstractDbDialect {
         if (!pkList.isEmpty()) {
             createSql.append(",\n  PRIMARY KEY(");
             for (String pk : pkList) {
-                createSql.append(pk).append(",");
+                createSql.append(quoteIdentifier(pk)).append(",");
             }
             createSql.deleteCharAt(createSql.length() - 1);
             createSql.append(")");
@@ -239,25 +305,12 @@ public class Kingbase8Dialect extends AbstractDbDialect {
         }
         for (DbColumn col : columns) {
             if (StringUtils.isNotEmpty(col.getColComment())) {
-                String colCmt = "COMMENT ON COLUMN " + tableName + "." + col.getColName()
+                String colCmt = "COMMENT ON COLUMN " + tableName + "." + quoteIdentifier(col.getColName())
                         + " IS '" + DatabaseUtil.escapeSingleQuotes(col.getColComment()) + "'";
                 sqlList.add(colCmt);
             }
         }
         return sqlList;
-    }
-
-    private static boolean isStringTypeSwitchDEFAULT(String columnType) {
-        switch (columnType) {
-            case "VARCHAR":
-            case "VARCHAR2":
-            case "CHAR":
-            case "CLOB":
-            case "TEXT":
-                return true;
-            default:
-                return false;
-        }
     }
 
     private static String mapKingbaseColumnType(DbColumn col) {
@@ -498,8 +551,13 @@ public class Kingbase8Dialect extends AbstractDbDialect {
     }
 
     @Override
+    public String getSchemaName(DbQueryProperty property) {
+        return StringUtils.defaultIfBlank(property.getSid(), "public");
+    }
+
+    @Override
     public String getTableName(DbQueryProperty property, String tableName) {
-        return property.getDbName() + "." + property.getSid() + "." + tableName;
+        return quoteIdentifier(getSchemaName(property)) + "." + quoteIdentifier(tableName);
     }
 
     @Override
@@ -537,41 +595,44 @@ public class Kingbase8Dialect extends AbstractDbDialect {
     @Override
     public String dropColumn(DbQueryProperty dbQueryProperty, String tableName, String colName) {
         String fullTableName = getTableName(dbQueryProperty, tableName);
-        return "ALTER TABLE " + fullTableName + " DROP COLUMN " + colName;
+        return "ALTER TABLE " + fullTableName + " DROP COLUMN " + quoteIdentifier(colName);
     }
 
     @Override
     public List<String> modifyColumn(DbQueryProperty dbQueryProperty, String tableName, DbColumn column) {
         List<String> sqlList = new ArrayList<>();
         String fullTableName = getTableName(dbQueryProperty, tableName);
+        String quotedColumnName = quoteIdentifier(column.getColName());
 
         if (Boolean.TRUE.equals(column.getColKey())) {
             StringBuilder sql = new StringBuilder();
-            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT PK_").append(tableName).append("_").append(column.getColName());
-            sql.append(" PRIMARY KEY (").append(column.getColName()).append(")");
+            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT ")
+                    .append(quoteIdentifier("PK_" + tableName + "_" + column.getColName()));
+            sql.append(" PRIMARY KEY (").append(quotedColumnName).append(")");
             sqlList.add(sql.toString());
         } else {
             StringBuilder sql = new StringBuilder();
             sql.append("ALTER TABLE ").append(fullTableName).append(" ALTER COLUMN ");
-            sql.append(column.getColName()).append(" TYPE ");
+            sql.append(quotedColumnName).append(" TYPE ");
             sql.append(mapKingbaseColumnType(column));
             sqlList.add(sql.toString());
 
             if (!column.getNullable()) {
-                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + column.getColName() + " SET NOT NULL");
+                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quotedColumnName + " SET NOT NULL");
             } else {
-                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + column.getColName() + " DROP NOT NULL");
+                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quotedColumnName + " DROP NOT NULL");
             }
 
             if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + column.getColName() + " SET DEFAULT " + column.getDataDefault());
+                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quotedColumnName
+                        + " SET DEFAULT " + defaultExpression(column.getDataType(), column.getDataDefault()));
             } else {
-                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + column.getColName() + " DROP DEFAULT");
+                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quotedColumnName + " DROP DEFAULT");
             }
         }
 
         if (StringUtils.isNotEmpty(column.getColComment())) {
-            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + column.getColName()
+            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + quotedColumnName
                     + " IS '" + DatabaseUtil.escapeSingleQuotes(column.getColComment()) + "'");
         }
 
@@ -582,11 +643,12 @@ public class Kingbase8Dialect extends AbstractDbDialect {
     public List<String> addColumn(DbQueryProperty dbQueryProperty, String tableName, DbColumn column) {
         List<String> sqlList = new ArrayList<>();
         String fullTableName = getTableName(dbQueryProperty, tableName);
+        String quotedColumnName = quoteIdentifier(column.getColName());
 
         if (Boolean.TRUE.equals(column.getColKey())) {
             StringBuilder sql = new StringBuilder();
             sql.append("ALTER TABLE ").append(fullTableName).append(" ADD COLUMN ");
-            sql.append(column.getColName()).append(" ");
+            sql.append(quotedColumnName).append(" ");
             sql.append(mapKingbaseColumnType(column));
 
             sql.append(identityColumnClause(column));
@@ -596,19 +658,20 @@ public class Kingbase8Dialect extends AbstractDbDialect {
             }
 
             if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                sql.append(" DEFAULT ").append(column.getDataDefault());
+                appendDefaultClause(sql, column.getDataType(), column.getDataDefault());
             }
 
             sqlList.add(sql.toString());
 
             sql = new StringBuilder();
-            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT PK_").append(tableName).append("_").append(column.getColName());
-            sql.append(" PRIMARY KEY (").append(column.getColName()).append(")");
+            sql.append("ALTER TABLE ").append(fullTableName).append(" ADD CONSTRAINT ")
+                    .append(quoteIdentifier("PK_" + tableName + "_" + column.getColName()));
+            sql.append(" PRIMARY KEY (").append(quotedColumnName).append(")");
             sqlList.add(sql.toString());
         } else {
             StringBuilder sql = new StringBuilder();
             sql.append("ALTER TABLE ").append(fullTableName).append(" ADD COLUMN ");
-            sql.append(column.getColName()).append(" ");
+            sql.append(quotedColumnName).append(" ");
             sql.append(mapKingbaseColumnType(column));
 
             sql.append(identityColumnClause(column));
@@ -618,14 +681,14 @@ public class Kingbase8Dialect extends AbstractDbDialect {
             }
 
             if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                sql.append(" DEFAULT ").append(column.getDataDefault());
+                appendDefaultClause(sql, column.getDataType(), column.getDataDefault());
             }
 
             sqlList.add(sql.toString());
         }
 
         if (StringUtils.isNotEmpty(column.getColComment())) {
-            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + column.getColName()
+            sqlList.add("COMMENT ON COLUMN " + fullTableName + "." + quotedColumnName
                     + " IS '" + DatabaseUtil.escapeSingleQuotes(column.getColComment()) + "'");
         }
 

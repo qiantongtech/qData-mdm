@@ -18,7 +18,9 @@
 
 package tech.qiantong.qdata.mdm.model.util;
 
+import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.model.controller.admin.base.vo.ModelBasePublishRespVO;
 import tech.qiantong.qdata.mdm.model.domain.ModelPublishContext;
 import tech.qiantong.qdata.mdm.model.domain.ModelPublishRemainingEffect;
@@ -26,8 +28,12 @@ import tech.qiantong.qdata.mdm.model.domain.ModelSqlExecutionStep;
 import tech.qiantong.qdata.mdm.model.enums.materialization.ModelPublishStatus;
 import tech.qiantong.qdata.mdm.model.enums.materialization.ModelSqlStepStatus;
 
+import java.sql.Clob;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * 发布流程的无状态工具：读取模型配置、判断标记，并把已有执行结果整理成接口响应。
@@ -130,6 +136,44 @@ public final class ModelPublishUtils {
             return false;
         }
         return null;
+    }
+
+    /**
+     * 把数据库查询结果转成独立JSON：大写下划线列名转成驼峰命名，Clob（大文本）读成字符串。DO里暂时没有的配置列也保留。
+     *
+     * @param rows 原始查询结果，不能以null表示读取失败
+     * @return 独立JSON记录列表
+     */
+    public static List<JSONObject> configObjects(List<Map<String, Object>> rows) {
+        if (rows == null) {
+            throw new ServiceException("发布配置读取结果无效");
+        }
+        List<JSONObject> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            JSONObject object = new JSONObject();
+            for (Map.Entry<String, Object> entry : row.entrySet()) {
+                // 例如MODEL_VERSION_ID先拆成model、version、id，再拼成modelVersionId，方便后面按Java属性名读取。
+                String[] parts = entry.getKey().toLowerCase(Locale.ROOT).split("_");
+                StringBuilder key = new StringBuilder(parts[0]);
+                for (int i = 1; i < parts.length; i++) {
+                    key.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
+                }
+                Object value = entry.getValue();
+                if (value instanceof Clob) {
+                    try {
+                        Clob clob = (Clob) value;
+                        // Clob是数据库的大文本对象，趁连接还有效时读成普通字符串；它的读取位置从1开始。
+                        value = clob.getSubString(1, Math.toIntExact(clob.length()));
+                    } catch (SQLException ex) {
+                        throw new ServiceException("发布配置大文本读取失败");
+                    }
+                }
+                object.put(key.toString(), value);
+            }
+            // 通过JSON转换再复制一份，避免快照继续引用查询结果中的可变对象。
+            result.add(JSON.parseObject(JSON.toJSONString(object)));
+        }
+        return result;
     }
 
     /** 使用当前已经取得的执行证据生成响应，不额外查库，也不修改实例状态。 */

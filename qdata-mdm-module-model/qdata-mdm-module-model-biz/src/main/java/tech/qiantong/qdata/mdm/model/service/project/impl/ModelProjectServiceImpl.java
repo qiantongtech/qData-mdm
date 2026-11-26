@@ -38,6 +38,8 @@ import tech.qiantong.qdata.mdm.model.service.project.IModelProjectService;
 import tech.qiantong.qdata.mdm.rule.api.rule.dto.RuleModelRulesRespDTO;
 import tech.qiantong.qdata.mdm.rule.api.service.rule.RuleModelApi;
 
+import tech.qiantong.qdata.mdm.model.util.ModelCodeGuard;
+
 import javax.annotation.Resource;
 
 import java.util.*;
@@ -130,27 +132,28 @@ public class ModelProjectServiceImpl extends ServiceImpl<ModelProjectMapper, Mod
 
     @Override
     public Long createModelProject(ModelProjectSaveReqVO createReqVO) {
+        ModelCodeGuard.PROJECT.lockTransaction();
+        validateUniqueCode(createReqVO.getCode(), null);
         ModelProjectDO dictType = BeanUtils.toBean(createReqVO, ModelProjectDO.class);
-        modelProjectMapper.insert(dictType);
+        ModelCodeGuard.PROJECT.write(dictType.getCode(), () -> modelProjectMapper.insert(dictType));
         return dictType.getId();
     }
 
     @Override
     public int updateModelProject(ModelProjectSaveReqVO updateReqVO) {
-        // 相关校验
-
-        // 更新主数据域
+        ModelCodeGuard.PROJECT.lockTransaction();
+        validateUniqueCode(updateReqVO.getCode(), updateReqVO.getId());
         ModelProjectDO updateObj = BeanUtils.toBean(updateReqVO, ModelProjectDO.class);
         // 显式写入空值，支持清空负责人；状态修改仍使用独立的 updateById。
-        return modelProjectMapper.update(updateObj, new UpdateWrapper<ModelProjectDO>().eq("id", updateReqVO.getId()).set(updateReqVO.getResponsibleUserId() == null, "responsible_user_id", null));
+        return ModelCodeGuard.PROJECT.write(updateObj.getCode(), () -> modelProjectMapper.update(updateObj, new UpdateWrapper<ModelProjectDO>()
+                .eq("id", updateReqVO.getId()).set(updateReqVO.getResponsibleUserId() == null, "responsible_user_id", null)));
     }
 
-    @Override
-    public boolean checkCodeUnique(String code, Long id) {
-        QueryWrapper<ModelProjectDO> wrapper = new QueryWrapper<>();
-        wrapper.eq("code", code);
-        if (id != null) wrapper.ne("id", id);
-        return modelProjectMapper.selectCount(wrapper) == 0;
+    private void validateUniqueCode(String code, Long id) {
+        QueryWrapper<ModelProjectDO> query = new QueryWrapper<ModelProjectDO>()
+                .apply("LOWER(TRIM(code)) = {0}", code.toLowerCase(Locale.ROOT))
+                .ne(id != null, "id", id);
+        if (modelProjectMapper.selectCount(query) > 0) throw ModelCodeGuard.PROJECT.duplicateCode(code);
     }
 
     @Override

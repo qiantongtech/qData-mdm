@@ -67,7 +67,7 @@ public class QualityIssueTaskController extends BaseController {
     private IQualityIssueTaskService qualityIssueTaskService;
 
     @Operation(summary = "查询问题整改任务列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:list')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:list')")
     @GetMapping("/list")
     public CommonResult<PageResult<QualityIssueTaskRespVO>> list(@Valid QualityIssueTaskPageReqVO qualityIssueTask) {
         PageResult<QualityIssueTaskDO> page = qualityIssueTaskService.getQualityIssueTaskPage(qualityIssueTask);
@@ -75,14 +75,14 @@ public class QualityIssueTaskController extends BaseController {
     }
 
     @Operation(summary = "查询整改任务状态数量")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:list')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:list')")
     @GetMapping("/statusCount")
     public CommonResult<QualityIssueTaskStatusCountRespVO> statusCount(@Valid QualityIssueTaskPageReqVO request) {
         return CommonResult.success(qualityIssueTaskService.getQualityIssueTaskStatusCount(request));
     }
 
     @Operation(summary = "导出问题整改任务列表")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:export')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:export')")
     @Log(title = "问题整改任务", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, QualityIssueTaskPageReqVO exportReqVO) {
@@ -93,7 +93,7 @@ public class QualityIssueTaskController extends BaseController {
     }
 
     @Operation(summary = "获取问题整改任务详细信息")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:query')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:query')")
     @GetMapping(value = "/{id}")
     public CommonResult<QualityIssueTaskRespVO> getInfo(@PathVariable("id") Long id) {
         QualityIssueTaskDO taskDO = qualityIssueTaskService.getQualityIssueTaskDetail(id);
@@ -101,7 +101,7 @@ public class QualityIssueTaskController extends BaseController {
     }
 
     @Operation(summary = "从问题项下发整改任务")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:add')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:add')")
     @Log(title = "问题整改任务", businessType = BusinessType.INSERT)
     @PostMapping
     public CommonResult<Long> add(@Validated(QualityIssueTaskSaveReqVO.Create.class) @RequestBody QualityIssueTaskSaveReqVO qualityIssueTask) {
@@ -112,7 +112,7 @@ public class QualityIssueTaskController extends BaseController {
     }
 
     @Operation(summary = "批量删除尚未开始整改的任务")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:remove')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:remove')")
     @Log(title = "问题整改任务", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public CommonResult<Integer> remove(@PathVariable("ids") List<Long> ids) {
@@ -120,7 +120,7 @@ public class QualityIssueTaskController extends BaseController {
     }
 
     @Operation(summary = "开始或完成单个问题项整改")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:edit')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:edit')")
     @Log(title = "问题整改任务", businessType = BusinessType.UPDATE)
     @PutMapping
     public CommonResult<Integer> updateStatus(@Valid @RequestBody QualityIssueTaskInfoSaveReqVO request) {
@@ -131,7 +131,7 @@ public class QualityIssueTaskController extends BaseController {
     }
 
     @Operation(summary = "提交整改任务审批（仅更新状态）")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:edit')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:edit')")
     @Log(title = "问题整改任务", businessType = BusinessType.UPDATE)
     @PutMapping("/{id}/submitApproval")
     public CommonResult<Integer> submitApproval(@PathVariable("id") Long id) {
@@ -139,7 +139,7 @@ public class QualityIssueTaskController extends BaseController {
     }
 
     @Operation(summary = "撤回整改任务审批（仅更新状态）")
-    @PreAuthorize("@ss.hasPermi('quality:qualityissuetask:edit')")
+    @PreAuthorize("@ss.hasPermi('quality:issueTask:edit')")
     @Log(title = "问题整改任务", businessType = BusinessType.UPDATE)
     @PutMapping("/{id}/withdrawApproval")
     public CommonResult<Integer> withdrawApproval(@PathVariable("id") Long id) {

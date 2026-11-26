@@ -123,7 +123,7 @@
       @submit="submitForm"
     />
 
-    <!-- 用户导入对话框 -->
+    <!-- 参考数据导入对话框 -->
     <el-dialog
       v-model="upload.open"
       :title="upload.title"
@@ -141,6 +141,7 @@
         :disabled="upload.isUploading"
         :on-progress="handleFileUploadProgress"
         :on-success="handleFileSuccess"
+        :on-error="handleFileError"
         :auto-upload="false"
         drag
       >
@@ -152,7 +153,7 @@
           <div class="el-upload__tip text-center">
             <div class="el-upload__tip">
               <el-checkbox v-model="upload.updateSupport" />
-              是否更新已经存在的参考数据数据
+              是否更新已经存在的参考数据
             </div>
             <span>仅允许导入xls、xlsx格式文件。</span>
             <el-link
@@ -209,7 +210,7 @@ const upload = reactive({
   // 是否禁用上传
   isUploading: false,
   // 是否更新已经存在的业务数据
-  updateSupport: 0,
+  updateSupport: false,
   // 设置上传的请求头部
   headers: { Authorization: "Bearer " + getToken() },
   // 上传的地址
@@ -489,7 +490,7 @@ function handleImport() {
 
 /** 下载模板操作 */
 function importTemplate() {
-  proxy.download("system/user/importTemplate", {}, `type_template_${new Date().getTime()}.xlsx`);
+  proxy.download("model/dict/type/importTemplate", {}, `type_template_${new Date().getTime()}.xlsx`);
 }
 
 /** 提交上传文件 */
@@ -502,14 +503,24 @@ const handleFileUploadProgress = () => {
   upload.isUploading = true;
 };
 
-/** 文件上传成功处理 */
-const handleFileSuccess = (response, file) => {
-  upload.open = false;
+/** 处理导入接口返回的业务结果。 */
+function handleFileSuccess(response) {
   upload.isUploading = false;
-  proxy.$refs["uploadRef"].handleRemove(file);
-  proxy.$alert("<div class='dict-type-import-result'>" + response.msg + "</div>", "导入结果", { dangerouslyUseHTMLString: true });
+  proxy.$refs.uploadRef?.clearFiles();
+  if (response?.code !== 200) {
+    proxy.$modal.msgWarning(response?.msg || "导入失败");
+    return;
+  }
+  upload.open = false;
+  proxy.$modal.msgSuccess(response.msg || "导入成功");
   refreshList();
-};
+}
+
+function handleFileError() {
+  upload.isUploading = false;
+  proxy.$refs.uploadRef?.clearFiles();
+  proxy.$modal.msgError("导入失败，请重新上传文件");
+}
 
 </script>
 
@@ -519,10 +530,4 @@ const handleFileSuccess = (response, file) => {
   vertical-align: baseline;
 }
 
-:global(.dict-type-import-result) {
-  max-height: var(--qt-import-result-max-height);
-  padding: var(--qt-import-result-padding);
-  overflow: auto;
-  overflow-x: hidden;
-}
 </style>

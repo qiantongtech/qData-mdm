@@ -24,6 +24,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
@@ -35,6 +36,8 @@ import tech.qiantong.qdata.mdm.model.dal.mapper.base.ModelBaseMapper;
 import tech.qiantong.qdata.mdm.model.dal.mapper.layer.ModelLayerMapper;
 import tech.qiantong.qdata.mdm.model.service.layer.IModelLayerService;
 
+import tech.qiantong.qdata.mdm.model.util.ModelCodeGuard;
+
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,6 +45,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -104,33 +108,34 @@ public class ModelLayerServiceImpl extends ServiceImpl<ModelLayerMapper, ModelLa
 
     @Override
     public Long createModelLayer(ModelLayerSaveReqVO createReqVO) {
+        ModelCodeGuard.LAYER.lockTransaction();
+        validateUniqueCode(createReqVO.getCode(), null);
         validateHierarchy(createReqVO, null);
         ModelLayerDO dictType = BeanUtils.toBean(createReqVO, ModelLayerDO.class);
-        modelLayerMapper.insert(dictType);
+        ModelCodeGuard.LAYER.write(dictType.getCode(), () -> modelLayerMapper.insert(dictType));
         return dictType.getId();
     }
 
     @Override
     public int updateModelLayer(ModelLayerSaveReqVO updateReqVO) {
+        ModelCodeGuard.LAYER.lockTransaction();
+        validateUniqueCode(updateReqVO.getCode(), updateReqVO.getId());
         ModelLayerDO existing = modelLayerMapper.selectById(updateReqVO.getId());
-        if (existing == null) throw new ServiceException("模型目录不存在");
+        if (existing == null) throw new ServiceException("模型目录不存在", HttpStatus.WARN);
         if (updateReqVO.getProjectId() == null) updateReqVO.setProjectId(existing.getProjectId());
         if (updateReqVO.getParentId() == null) updateReqVO.setParentId(existing.getParentId());
-        if (!Objects.equals(existing.getProjectId(), updateReqVO.getProjectId())) {
-            throw new ServiceException("模型目录不能跨主数据域移动");
-        }
         validateHierarchy(updateReqVO, existing.getId());
 
         // 更新模型目录层级
         ModelLayerDO updateObj = BeanUtils.toBean(updateReqVO, ModelLayerDO.class);
-        return modelLayerMapper.update(updateObj, new UpdateWrapper<ModelLayerDO>()
+        return ModelCodeGuard.LAYER.write(updateObj.getCode(), () -> modelLayerMapper.update(updateObj, new UpdateWrapper<ModelLayerDO>()
                 .eq("id", updateReqVO.getId())
-                .set(updateReqVO.getResponsibleUserId() == null, "responsible_user_id", null));
+                .set(updateReqVO.getResponsibleUserId() == null, "responsible_user_id", null)));
     }
 
     /** 顶级节点不计层数；移动目录时连同其所有后代一起校验。 */
     private void validateHierarchy(ModelLayerSaveReqVO request, Long editingId) {
-        if (request.getProjectId() == null) throw new ServiceException("所属主数据域不能为空");
+        if (request.getProjectId() == null) throw new ServiceException("所属主数据域不能为空", HttpStatus.WARN);
         if (request.getParentId() == null) request.setParentId(0L);
         List<ModelLayerDO> layers = modelLayerMapper.selectList(new QueryWrapper<ModelLayerDO>()
                 .select("id", "parent_id", "project_id").eq("project_id", request.getProjectId()));
@@ -145,31 +150,30 @@ public class ModelLayerServiceImpl extends ServiceImpl<ModelLayerMapper, ModelLa
         Set<Long> visited = new HashSet<>();
         if (editingId != null) visited.add(editingId);
         while (parentId != null && parentId != 0L) {
-            if (!visited.add(parentId)) throw new ServiceException("上级模型目录不能为自身或子目录，且不能存在循环关系");
+            if (!visited.add(parentId)) throw new ServiceException("上级模型目录不能为自身或子目录，且不能存在循环关系", HttpStatus.WARN);
             ModelLayerDO parent = byId.get(parentId);
-            if (parent == null) throw new ServiceException("上级模型目录不存在或不属于当前主数据域");
+            if (parent == null) throw new ServiceException("上级模型目录不存在或不属于当前主数据域", HttpStatus.WARN);
             parentDepth++;
-            if (parentDepth >= MAX_LAYER_DEPTH) throw new ServiceException("模型目录最多支持 5 级");
+            if (parentDepth >= MAX_LAYER_DEPTH) throw new ServiceException("模型目录最多支持 5 级", HttpStatus.WARN);
             parentId = parent.getParentId();
         }
         validateSubtreeDepth(editingId, parentDepth + 1, children, new HashSet<>());
     }
 
     private void validateSubtreeDepth(Long id, int depth, Map<Long, List<Long>> children, Set<Long> visited) {
-        if (depth > MAX_LAYER_DEPTH) throw new ServiceException("模型目录最多支持 5 级，含子目录的层级不能超过 5 级");
+        if (depth > MAX_LAYER_DEPTH) throw new ServiceException("模型目录最多支持 5 级，含子目录的层级不能超过 5 级", HttpStatus.WARN);
         if (id == null) return;
-        if (!visited.add(id)) throw new ServiceException("模型目录不能存在循环关系");
+        if (!visited.add(id)) throw new ServiceException("模型目录不能存在循环关系", HttpStatus.WARN);
         for (Long childId : children.getOrDefault(id, Collections.emptyList())) {
             validateSubtreeDepth(childId, depth + 1, children, visited);
         }
     }
 
-    @Override
-    public boolean checkCodeUnique(String code, Long id) {
-        QueryWrapper<ModelLayerDO> wrapper = new QueryWrapper<>();
-        wrapper.eq("code", code);
-        if (id != null) wrapper.ne("id", id);
-        return modelLayerMapper.selectCount(wrapper) == 0;
+    private void validateUniqueCode(String code, Long id) {
+        QueryWrapper<ModelLayerDO> query = new QueryWrapper<ModelLayerDO>()
+                .apply("LOWER(TRIM(code)) = {0}", code.toLowerCase(Locale.ROOT))
+                .ne(id != null, "id", id);
+        if (modelLayerMapper.selectCount(query) > 0) throw ModelCodeGuard.LAYER.duplicateCode(code);
     }
 
     /**

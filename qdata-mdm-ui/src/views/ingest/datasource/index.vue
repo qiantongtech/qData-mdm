@@ -98,6 +98,7 @@
                   link
                   type="primary"
                   icon="Edit"
+                  :disabled="row.validFlag === true"
                   @click="handleUpdate(row)"
                   v-hasPermi="['ingest:datasource:edit']"
               >修改连接

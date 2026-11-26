@@ -18,7 +18,8 @@
 
 package tech.qiantong.qdata.mdm.quality.service.qualityIssue.impl;
 
-import com.aliyun.oss.ServiceException;
+import tech.qiantong.qdata.mdm.common.exception.ServiceException;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -278,7 +279,7 @@ public class QualityIssueServiceImpl extends ServiceImpl<QualityIssueMapper, Qua
         @Override
         public String importQualityIssue(List<QualityIssueRespVO> importExcelList, boolean isUpdateSupport, String operName) {
             if (StringUtils.isNull(importExcelList) || importExcelList.size() == 0) {
-                throw new ServiceException("导入数据不能为空！");
+                throw new ServiceException("导入数据不能为空！", HttpStatus.WARN);
             }
 
             int successNum = 0;

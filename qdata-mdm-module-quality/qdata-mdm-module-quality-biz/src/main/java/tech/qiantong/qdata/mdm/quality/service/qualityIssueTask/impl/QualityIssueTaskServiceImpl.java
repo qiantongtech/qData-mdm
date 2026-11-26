@@ -42,6 +42,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.domain.entity.SysUser;
 import tech.qiantong.qdata.mdm.common.core.page.PageParam;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
@@ -336,21 +337,28 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
         }
     }
 
-    /** 解析模型下「编码字段」「名称字段」对应的快照 JSON 字段 code。 */
+    /** 获取主数据名称和自动编码的字段编码。 */
     private String[] resolveMasterFieldCodes(List<ModelPublishedColumnRespDTO> columns) {
-        String nameField = columns.stream()
+        List<ModelPublishedColumnRespDTO> activeFields = columns.stream()
+                .filter(Objects::nonNull)
+                .filter(column -> !Boolean.TRUE.equals(column.getDelFlag())
+                        && !Boolean.TRUE.equals(column.getPrimaryKeyFlag()))
+                .filter(column -> column.getCode() != null && !column.getCode().trim().isEmpty())
+                .collect(Collectors.toList());
+        List<String> names = activeFields.stream()
                 .filter(column -> Boolean.TRUE.equals(column.getNameFlag()))
                 .map(ModelPublishedColumnRespDTO::getCode)
-                .findFirst().orElse(null);
-        // 编码字段：老模型为自动编码(AUTOMATIC)；新模型为手动编码，退回按字段 code 以 _CODE 结尾识别。
-        String codeField = columns.stream()
-                .filter(column -> "AUTOMATIC".equals(column.getEncodingMode()))
+                .collect(Collectors.toList());
+        String nameField = names.size() == 1 ? names.get(0) : null;
+        List<String> automaticCodeFields = activeFields.stream()
+                .filter(column -> column.getColumnCategory() == null
+                        || "BUSINESS".equalsIgnoreCase(column.getColumnCategory()))
+                .filter(column -> "AUTOMATIC".equalsIgnoreCase(column.getEncodingMode())
+                        && column.getEncodingVersionId() != null)
                 .map(ModelPublishedColumnRespDTO::getCode)
-                .findFirst()
-                .orElseGet(() -> columns.stream()
-                        .filter(column -> column.getCode() != null && column.getCode().toUpperCase().endsWith("_CODE"))
-                        .map(ModelPublishedColumnRespDTO::getCode)
-                        .findFirst().orElse(null));
+                .collect(Collectors.toList());
+        // 多个自动编码字段时不展示编码。
+        String codeField = automaticCodeFields.size() == 1 ? automaticCodeFields.get(0) : null;
         return new String[]{codeField, nameField};
     }
 
@@ -414,10 +422,10 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
     public Long createQualityIssueTask(QualityIssueTaskSaveReqVO request) {
         String taskName = request.getTaskName();
         if (taskName == null || taskName.trim().isEmpty() || taskName.length() > 128) {
-            throw new ServiceException("请填写128个字符以内的整改任务名称");
+            throw new ServiceException("请填写128个字符以内的整改任务名称", HttpStatus.WARN);
         }
         if (request.getAssigneeId() == null || request.getAssigneeId() <= 0) {
-            throw new ServiceException("请选择整改负责人");
+            throw new ServiceException("请选择整改负责人", HttpStatus.WARN);
         }
         List<QualityIssueInfoDO> selected = resolveDispatchItems(request);
         Map<Long, QualityIssueDO> issues = new LinkedHashMap<>();
@@ -425,7 +433,7 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
         for (Long issueId : selected.stream().map(QualityIssueInfoDO::getIssueId).distinct().sorted().collect(Collectors.toList())) {
             QualityIssueDO issue = qualityIssueTaskMapper.lockIssue(issueId);
             if (issue == null || "3".equals(issue.getStatus()) || Boolean.FALSE.equals(issue.getValidFlag())) {
-                throw new ServiceException("所选问题不存在、已失效或已关闭，未下发任何任务");
+                throw new ServiceException("所选问题不存在、已失效或已关闭，未下发任何任务", HttpStatus.WARN);
             }
             if (issue.getModelId() == null || issue.getMasterRecordId() == null) {
                 throw new ServiceException("问题关联的模型或主数据记录信息缺失，不能下发");
@@ -434,24 +442,24 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
         }
         Long modelId = issues.values().iterator().next().getModelId();
         if (issues.values().stream().anyMatch(issue -> !modelId.equals(issue.getModelId()))) {
-            throw new ServiceException("同一整改任务请选择同一主数据模型的问题");
+            throw new ServiceException("同一整改任务请选择同一主数据模型的问题", HttpStatus.WARN);
         }
         ModelPublishedStructureRespDTO structure = findPublishedStructure(modelId);
         if (structure == null) {
-            throw new ServiceException("问题关联的模型不存在或未发布，不能下发");
+            throw new ServiceException("问题关联的模型不存在或未发布，不能下发", HttpStatus.WARN);
         }
         SysUser assignee = sysUserService.selectUserById(request.getAssigneeId());
         if (assignee == null || !"0".equals(assignee.getDelFlag()) || !"0".equals(assignee.getStatus())) {
-            throw new ServiceException("整改负责人不存在或已停用");
+            throw new ServiceException("整改负责人不存在或已停用", HttpStatus.WARN);
         }
         List<QualityIssueInfoDO> items = new ArrayList<>();
         for (QualityIssueInfoDO candidate : selected) {
             QualityIssueInfoDO item = qualityIssueTaskMapper.lockIssueItem(candidate.getId());
             if (item == null || !Objects.equals(item.getIssueId(), candidate.getIssueId())) {
-                throw new ServiceException("所选问题项已变化，请刷新后重新下发");
+                throw new ServiceException("所选问题项已变化，请刷新后重新下发", HttpStatus.WARN);
             }
             if (!"1".equals(item.getStatus()) || Boolean.FALSE.equals(item.getValidFlag()) || item.getQualityRuleId() == null) {
-                throw new ServiceException("所选问题项已解决、失效或缺少规则，未下发任何任务");
+                throw new ServiceException("所选问题项已解决、失效或缺少规则，未下发任何任务", HttpStatus.WARN);
             }
             items.add(item);
         }
@@ -523,24 +531,24 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
         if (request.getIssueInfoIds() != null) {
             List<Long> ids = request.getIssueInfoIds();
             if (request.getIssueId() != null || request.getQualityRuleId() != null) {
-                throw new ServiceException("问题项集合与旧版单项参数不能同时传入");
+                throw new ServiceException("问题项集合与旧版单项参数不能同时传入", HttpStatus.WARN);
             }
             if (ids.isEmpty() || ids.size() > 500 || ids.stream().anyMatch(id -> id == null || id <= 0)) {
-                throw new ServiceException("一次请选择1至500个有效问题项");
+                throw new ServiceException("一次请选择1至500个有效问题项", HttpStatus.WARN);
             }
             ids = ids.stream().distinct().sorted().collect(Collectors.toList());
             items = qualityIssueTaskMapper.selectIssueItemsByIds(ids);
             if (items.size() != ids.size()) {
-                throw new ServiceException("部分问题项不存在或已删除，请刷新后重新选择");
+                throw new ServiceException("部分问题项不存在或已删除，请刷新后重新选择", HttpStatus.WARN);
             }
         } else {
             if (request.getIssueId() == null || request.getIssueId() <= 0
                     || request.getQualityRuleId() == null || request.getQualityRuleId() <= 0) {
-                throw new ServiceException("请选择具体问题项");
+                throw new ServiceException("请选择具体问题项", HttpStatus.WARN);
             }
             // 旧入口也先锁父问题，保持与新版相同的锁顺序。
             if (qualityIssueTaskMapper.lockIssue(request.getIssueId()) == null) {
-                throw new ServiceException("问题不存在，不能下发");
+                throw new ServiceException("问题不存在，不能下发", HttpStatus.WARN);
             }
             items = qualityIssueTaskMapper.selectIssueItemsForUpdate(request.getIssueId(), request.getQualityRuleId());
             if (items.size() != 1) {
@@ -558,7 +566,7 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
             List<QualityIssueTaskInfoDO> previous) {
         if (previous.stream().anyMatch(info -> info.getQualityRuleId() == null
                 || Arrays.asList(INFO_STATUS_PENDING, INFO_STATUS_PROCESSING).contains(info.getStatus()))) {
-            throw new ServiceException("同一问题项存在未完成任务，或旧任务关联不明确，不能重复下发");
+            throw new ServiceException("同一问题项存在未完成任务，或旧任务关联不明确，不能重复下发", HttpStatus.WARN);
         }
         Date completed = previous.stream().filter(info -> INFO_STATUS_COMPLETED.equals(info.getStatus()))
                 .map(QualityIssueTaskInfoDO::getRectificationTime).filter(Objects::nonNull).max(Date::compareTo).orElse(null);
@@ -573,7 +581,7 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
                     || !check.getStartTime().after(completed) || check.getEndTime() == null
                     || item.getLastFoundTime() == null || item.getLastFoundTime().before(check.getStartTime())
                     || item.getLastFoundTime().after(check.getEndTime()) || Boolean.FALSE.equals(check.getValidFlag())) {
-                throw new ServiceException("尚无任务完成后再次检测仍失败的有效结果");
+                throw new ServiceException("尚无任务完成后再次检测仍失败的有效结果", HttpStatus.WARN);
             }
         }
     }
@@ -581,7 +589,7 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
     @Override
     public int deleteQualityIssueTasks(List<Long> ids, Long userId, String userName) {
         if (ids == null || ids.isEmpty() || ids.size() > 500 || ids.stream().anyMatch(id -> id == null || id <= 0)) {
-            throw new ServiceException("一次请选择1至500条有效整改任务");
+            throw new ServiceException("一次请选择1至500条有效整改任务", HttpStatus.WARN);
         }
 
         List<Long> taskIds = ids.stream().distinct().sorted().collect(Collectors.toList());
@@ -589,12 +597,12 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
         for (Long taskId : taskIds) {
             QualityIssueTaskDO task = qualityIssueTaskMapper.lockTask(taskId);
             if (task == null) {
-                throw new ServiceException("部分整改任务不存在或已删除，请刷新后重试");
+                throw new ServiceException("部分整改任务不存在或已删除，请刷新后重试", HttpStatus.WARN);
             }
             List<QualityIssueTaskInfoDO> taskItems = qualityIssueTaskInfoService.listByTaskId(taskId);
             if (!TASK_STATUS_RECTIFYING.equals(task.getStatus())
                     || taskItems.stream().anyMatch(item -> !INFO_STATUS_PENDING.equals(item.getStatus()))) {
-                throw new ServiceException("仅可删除尚未开始整改的任务，本次未删除任何任务");
+                throw new ServiceException("仅可删除尚未开始整改的任务", HttpStatus.WARN);
             }
             items.addAll(taskItems);
         }
@@ -623,24 +631,24 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
     @Override
     public int updateQualityIssueTaskStatus(QualityIssueTaskInfoSaveReqVO request) {
         if (request.getId() == null || !Arrays.asList(INFO_STATUS_PROCESSING, INFO_STATUS_COMPLETED).contains(request.getStatus())) {
-            throw new ServiceException("仅支持开始整改和完成整改");
+            throw new ServiceException("仅支持开始整改和完成整改", HttpStatus.WARN);
         }
         // 统一先锁主任务，再锁明细，避免与提交审批同时修改问题项。
         QualityIssueTaskInfoDO candidate = qualityIssueTaskInfoService.getById(request.getId());
         if (candidate == null) {
-            throw new ServiceException("整改问题项不存在");
+            throw new ServiceException("整改问题项不存在", HttpStatus.WARN);
         }
         QualityIssueTaskDO task = qualityIssueTaskMapper.lockTask(candidate.getTaskId());
         QualityIssueTaskInfoDO info = qualityIssueTaskInfoService.lockInfo(request.getId());
         if (task == null || info == null || !Objects.equals(info.getTaskId(), task.getId())
                 || Boolean.FALSE.equals(task.getValidFlag()) || Boolean.FALSE.equals(info.getValidFlag())) {
-            throw new ServiceException("整改任务或问题项不存在、已失效");
+            throw new ServiceException("整改任务或问题项不存在、已失效", HttpStatus.WARN);
         }
         if (TASK_STATUS_COMPLETED.equals(task.getStatus()) || TASK_STATUS_CANCELLED.equals(task.getStatus())) {
-            throw new ServiceException("整改任务已经结束");
+            throw new ServiceException("整改任务已经结束", HttpStatus.WARN);
         }
         if (!Objects.equals(task.getAssigneeId(), SecurityUtils.getUserId())) {
-            throw new ServiceException("仅负责人可以处理本人任务");
+            throw new ServiceException("仅负责人可以处理本人任务", HttpStatus.WARN);
         }
         String targetStatus = request.getStatus();
         String currentStatus = info.getStatus();
@@ -649,10 +657,10 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
                 ? INFO_STATUS_PENDING.equals(currentStatus) || INFO_STATUS_COMPLETED.equals(currentStatus)
                 : INFO_STATUS_PROCESSING.equals(currentStatus);
         if (!validTransition) {
-            throw new ServiceException("问题项状态已变化，请刷新后重试");
+            throw new ServiceException("问题项状态已变化，请刷新后重试", HttpStatus.WARN);
         }
         if (request.getRequirement() != null && request.getRequirement().length() > NOTE_MAX_LENGTH) {
-            throw new ServiceException("整改说明长度不能超过512个字符");
+            throw new ServiceException("整改说明长度不能超过512个字符", HttpStatus.WARN);
         }
         Date now = request.getUpdateTime() == null ? new Date() : request.getUpdateTime();
         int rows = qualityIssueTaskInfoService.updateInfoStatus(info.getId(), currentStatus,
@@ -660,14 +668,14 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
                 INFO_STATUS_COMPLETED.equals(targetStatus) ? now : null,
                 request.getUpdatorId(), request.getUpdateBy(), now);
         if (rows != 1) {
-            throw new ServiceException("问题项状态已变化，请刷新后重试");
+            throw new ServiceException("问题项状态已变化，请刷新后重试", HttpStatus.WARN);
         }
         if (INFO_STATUS_COMPLETED.equals(targetStatus) && TASK_STATUS_RECTIFYING.equals(task.getStatus())) {
             List<QualityIssueTaskInfoDO> items = qualityIssueTaskInfoService.listByTaskId(task.getId());
             if (!items.isEmpty() && items.stream().allMatch(item -> INFO_STATUS_COMPLETED.equals(item.getStatus()))
                     && qualityIssueTaskMapper.markReadyForApproval(task.getId(), request.getUpdatorId(),
                     request.getUpdateBy(), now) != 1) {
-                throw new ServiceException("整改任务状态已变化，请刷新后重试");
+                throw new ServiceException("整改任务状态已变化，请刷新后重试", HttpStatus.WARN);
             }
         }
         // 已整改回退为整改中时，将待审批/审批中的任务回退为处理中。
@@ -676,7 +684,7 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
                 || TASK_STATUS_IN_APPROVAL.equals(task.getStatus()))) {
             if (qualityIssueTaskMapper.revertToRectifying(task.getId(), request.getUpdatorId(),
                     request.getUpdateBy(), now) != 1) {
-                throw new ServiceException("整改任务状态已变化，请刷新后重试");
+                throw new ServiceException("整改任务状态已变化，请刷新后重试", HttpStatus.WARN);
             }
         }
         // 已整改回退为整改中时记录「修改结果」，其余沿用开始/完成整改语义。
@@ -701,23 +709,23 @@ public class QualityIssueTaskServiceImpl extends ServiceImpl<QualityIssueTaskMap
     public int updateApprovalStatus(Long id, boolean submit, Long updaterId, String updateBy) {
         QualityIssueTaskDO task = qualityIssueTaskMapper.lockTask(id);
         if (task == null || Boolean.FALSE.equals(task.getValidFlag())) {
-            throw new ServiceException("整改任务不存在或已失效");
+            throw new ServiceException("整改任务不存在或已失效", HttpStatus.WARN);
         }
         String expectedStatus = submit ? TASK_STATUS_PENDING_APPROVAL : TASK_STATUS_IN_APPROVAL;
         String targetStatus = submit ? TASK_STATUS_IN_APPROVAL : TASK_STATUS_PENDING_APPROVAL;
         if (!expectedStatus.equals(task.getStatus())) {
-            throw new ServiceException("整改任务状态已变化，请刷新后重试");
+            throw new ServiceException("整改任务状态已变化，请刷新后重试", HttpStatus.WARN);
         }
         if (submit) {
             List<QualityIssueTaskInfoDO> items = qualityIssueTaskInfoService.listByTaskId(id);
             if (items.isEmpty() || items.stream().anyMatch(item -> !INFO_STATUS_COMPLETED.equals(item.getStatus()))) {
-                throw new ServiceException("所有问题项完成整改后才能提交审批");
+                throw new ServiceException("所有问题项完成整改后才能提交审批", HttpStatus.WARN);
             }
         }
         int rows = qualityIssueTaskMapper.updateApprovalStatus(id, expectedStatus, targetStatus,
                 updaterId, updateBy, new Date());
         if (rows != 1) {
-            throw new ServiceException("整改任务状态已变化，请刷新后重试");
+            throw new ServiceException("整改任务状态已变化，请刷新后重试", HttpStatus.WARN);
         }
         return rows;
     }

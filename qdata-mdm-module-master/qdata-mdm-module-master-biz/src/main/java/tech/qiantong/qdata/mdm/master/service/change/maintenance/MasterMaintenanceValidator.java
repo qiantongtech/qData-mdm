@@ -106,6 +106,7 @@ public class MasterMaintenanceValidator {
             case "BATCH_IMPORT":
                 required = "master:instance:import";
                 break;
+            case "STATUS_CHANGE":
             case "BATCH_STATUS":
             case "FREEZE":
             case "UNFREEZE":

@@ -23,6 +23,7 @@ import com.alibaba.fastjson2.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.database.core.DbColumn;
 import tech.qiantong.qdata.mdm.common.database.core.DbIndex;
 import tech.qiantong.qdata.mdm.common.database.dialect.DM8Dialect;
@@ -279,7 +280,8 @@ public class ModelDdlPlanServiceImpl implements IModelDdlPlanService {
                     return session.getDialect().modifyColumn(session.getProperty(), table, expanded);
                 case ALTER_DEFAULT:
                     ModelMaterializedColumnDefinition changedDefault = action.getAfterDefinition().to(ModelMaterializedColumnDefinition.class);
-                    if (changedDefault.getModelFieldId() == null) throw new ServiceException("系统字段默认值不能修改");
+                    if (changedDefault.getModelFieldId() == null)
+                        throw new ServiceException("系统字段默认值不能修改", HttpStatus.WARN);
                     try (java.sql.Connection connection = session.getQuery().getConnection()) {
                         return session.getDialect().alterColumnDefault(session.getProperty(), table,
                                 ModelMaterializationDbUtils.logicalColumn(changedDefault), connection);

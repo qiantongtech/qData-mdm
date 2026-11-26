@@ -31,7 +31,7 @@ import masterRouter from './master/index.js';
 import ruleRouter from './rule/index.js';
 import ingestPublicRouter from './ingest/public/index.js';
 import mergePublicRouter from './merge/public/index.js';
-import qualityRouter from './quality/qualityTask/index.js';
+import qualityRouter from './quality/task/index.js';
 import auditRouter from './audit/public/index.js'
 /* 数据分发*/
 import distPublicRouter from './dist/public/index.js';

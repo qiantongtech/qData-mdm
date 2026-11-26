@@ -58,10 +58,6 @@ public interface IModelProjectService extends IService<ModelProjectDO> {
      */
     int updateModelProject(ModelProjectSaveReqVO updateReqVO);
 
-    /**
-     * 校验编码类型称是否唯一
-     */
-    boolean checkCodeUnique(String code, Long id);
 
     /**
      * 更新主数据域状态

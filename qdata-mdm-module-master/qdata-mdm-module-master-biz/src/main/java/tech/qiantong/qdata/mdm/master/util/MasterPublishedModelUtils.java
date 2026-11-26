@@ -18,6 +18,7 @@
 
 package tech.qiantong.qdata.mdm.master.util;
 
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.model.base.dto.ModelPublishedMaterializationRespDTO;
 import tech.qiantong.qdata.mdm.model.base.dto.ModelPublishedMaterializedTableRespDTO;
@@ -46,7 +47,7 @@ public final class MasterPublishedModelUtils {
         if ((modelId != null && !modelId.equals(published.getId()))
                 || (instanceId != null && !instanceId.equals(published.getInstanceId()))
                 || (versionId != null && !versionId.equals(published.getVersionId()))) {
-            throw new ServiceException("模型已重新发布或当前实例不可用，请返回卡片列表后重新进入");
+            throw new ServiceException("模型已重新发布或当前实例不可用，请返回卡片列表后重新进入", HttpStatus.WARN);
         }
     }
 

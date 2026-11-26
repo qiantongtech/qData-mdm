@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.auth.api.dataauthorization.dto.DataAuthorizationSaveReqDTO;
 import tech.qiantong.qdata.mdm.auth.api.enums.AuthorizationOperation;
 import tech.qiantong.qdata.mdm.auth.api.enums.AuthorizationSubjectType;
@@ -93,7 +94,7 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
             if (findCurrentGrants(request, getSubjectIds(request).get(0), new Date()).stream()
                     .anyMatch(item -> !request.getId().equals(item.getId()))) {
                 throw new ServiceException(subjectDisplayName(request.getSubjectType(), getSubjectIds(request).get(0))
-                        + "对该主数据模型已有其他授权，请勿重复配置");
+                        + "对该主数据模型已有其他授权，请勿重复配置", HttpStatus.WARN);
             }
             AuthGrantDO grant = buildGrant(request, request.getId(), getSubjectIds(request).get(0));
             if (AuthorizationStatus.REVOKED.matches(previous.getStatus()) && grant.getExpireTime() != null
@@ -109,7 +110,7 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
         for (Long subjectId : getSubjectIds(request)) {
             if (!findCurrentGrants(request, subjectId, new Date()).isEmpty()) {
                 throw new ServiceException(subjectDisplayName(request.getSubjectType(), subjectId)
-                        + "对该主数据模型已有授权，请使用修改授权或批量授权");
+                        + "对该主数据模型已有授权，请使用修改授权或批量授权", HttpStatus.WARN);
             }
             AuthGrantDO grant = buildGrant(request, null, subjectId);
             grantMapper.insert(grant);
@@ -135,7 +136,7 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
             List<AuthGrantDO> matches = findCurrentGrants(request, subjectId, now);
             if (matches.size() > 1) {
                 throw new ServiceException(subjectDisplayName(request.getSubjectType(), subjectId)
-                        + "对该模型存在多条可用授权，请先单独处理重复记录");
+                        + "对该模型存在多条可用授权，请先单独处理重复记录", HttpStatus.WARN);
             }
             if (matches.isEmpty()) {
                 AuthGrantDO grant = buildGrant(request, null, subjectId);
@@ -649,7 +650,7 @@ public class DataAuthorizationServiceImpl implements DataAuthorizationService {
     private AuthGrantDO requireGrant(Long id) {
         AuthGrantDO grant = grantMapper.selectById(id);
         if (grant == null) {
-            throw new ServiceException("数据授权不存在或已删除");
+            throw new ServiceException("数据授权不存在或已删除", HttpStatus.WARN);
         }
         return grant;
     }

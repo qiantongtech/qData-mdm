@@ -188,6 +188,7 @@
                          link
                          type="primary"
                          icon="Edit"
+                         :disabled="row.status === '1'"
                          @click="openForm(row)"
               >修改
               </el-button>
@@ -446,7 +447,7 @@ const tableStore = reactive({
     {label: '运行控制', prop: 'status', slot: 'status', minWidth: 165, align: 'left'},
     {label: '接入方式与调度', prop: 'ingestMode', slot: 'schedule', minWidth: 220, align: 'left'},
     {
-      label: '责任人',
+      label: '负责人',
       prop: 'responsiblePersonName',
       slot: 'responsiblePerson',
       minWidth: 160,

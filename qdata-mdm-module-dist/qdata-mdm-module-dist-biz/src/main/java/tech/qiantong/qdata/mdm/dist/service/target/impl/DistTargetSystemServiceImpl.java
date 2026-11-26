@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
@@ -167,7 +168,7 @@ public class DistTargetSystemServiceImpl extends ServiceImpl<DistTargetSystemMap
         }
         DistTargetSystemDO existing = distTargetSystemMapper.selectById(updateReqVO.getId());
         if (existing == null) {
-            throw new ServiceException("目标系统不存在或已删除");
+            throw new ServiceException("目标系统不存在或已删除",HttpStatus.WARN);
         }
         validateAndNormalize(updateReqVO, false);
         fillResponsibleContact(updateReqVO);
@@ -245,7 +246,7 @@ public class DistTargetSystemServiceImpl extends ServiceImpl<DistTargetSystemMap
     private void ensureCodeUnique(String code) {
         Long count = distTargetSystemMapper.selectCount(new LambdaQueryWrapper<DistTargetSystemDO>()
                 .eq(DistTargetSystemDO::getCode, code));
-        if (count > 0) throw new ServiceException("系统编码已存在，请更换编码");
+        if (count > 0) throw new ServiceException("系统编码已存在，请更换编码", HttpStatus.WARN);
     }
     /**
      * 批量删除目标系统；启用中或被分发任务引用的记录不能删除。
@@ -261,18 +262,18 @@ public class DistTargetSystemServiceImpl extends ServiceImpl<DistTargetSystemMap
         }
         List<DistTargetSystemDO> systems = distTargetSystemMapper.selectBatchIds(idList);
         if (systems.size() != new HashSet<>(idList).size()) {
-            throw new ServiceException("目标系统不存在或已删除，请刷新列表");
+            throw new ServiceException("目标系统不存在或已删除，请刷新列表",HttpStatus.WARN);
         }
         for (DistTargetSystemDO system : systems) {
             if (!"2".equals(system.getStatus())) {
-                throw new ServiceException("只能删除禁用状态的目标系统，请先禁用“" + system.getName() + "”");
+                throw new ServiceException("只能删除禁用状态的目标系统，请先禁用“" + system.getName() + "”", HttpStatus.WARN);
             }
         }
         // 有未删除任务仍引用目标系统时拒绝删除，保留任务与接收方的关联。
         Long linkedTaskCount = distTaskMapper.selectCount(new LambdaQueryWrapper<DistTaskDO>()
                 .in(DistTaskDO::getTargetSystemId, idList));
         if (linkedTaskCount > 0) {
-            throw new ServiceException("目标系统存在关联分发任务，请先处理关联任务后再删除");
+            throw new ServiceException("目标系统存在关联分发任务，请先处理关联任务后再删除",HttpStatus.WARN);
         }
         return distTargetSystemMapper.deleteBatchIds(idList);
     }

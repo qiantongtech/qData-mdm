@@ -149,7 +149,7 @@ public class MasterChangeRequestController extends BaseController {
             @PathVariable("instanceId") Long instanceId,
             @Valid @RequestBody MasterChangeRequestSaveReqVO request) {
         return CommonResult.success(masterChangeRequestService.submitSingle(
-                instanceId, request, getUserId(), getUsername()));
+                instanceId, request, getUserId(), getNickName()));
     }
 
     @Operation(summary = "提交批量维护申请并建立正式申请记录")
@@ -162,7 +162,7 @@ public class MasterChangeRequestController extends BaseController {
             @PathVariable("instanceId") Long instanceId,
             @Valid @RequestBody MasterChangeRequestBatchSaveReqVO request) {
         return CommonResult.success(masterChangeRequestService.submitBatch(
-                instanceId, request, getUserId(), getUsername()));
+                instanceId, request, getUserId(), getNickName()));
     }
 
     @Operation(summary = "下载当前模型动态字段的 XLSX 导入模板")
