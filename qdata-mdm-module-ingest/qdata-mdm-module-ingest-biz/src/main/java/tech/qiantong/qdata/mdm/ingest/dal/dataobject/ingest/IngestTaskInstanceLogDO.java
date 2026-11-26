@@ -26,13 +26,16 @@ import lombok.Data;
 import java.util.Date;
 
 /**
- * 执行事件按实例及序号幂等落库，不保存来源原始数据。
+ * 接入任务运行日志实体，对应表 {@code INGEST_TASK_INSTANCE_LOG}。
+ *
+ * @author chentangwen
  */
 @Data
 @TableName("INGEST_TASK_INSTANCE_LOG")
 public class IngestTaskInstanceLogDO {
+
     /**
-     * 数据库日志主键，与实例内 eventSeq 的用途不同。
+     * 运行日志主键 ID。
      */
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -43,7 +46,7 @@ public class IngestTaskInstanceLogDO {
     private Long taskInstanceId;
 
     /**
-     * 实例内递增序号，用于归档去重与增量读取。
+     * 运行实例内递增的事件序号，用于日志归档去重和增量读取。
      */
     private Long eventSeq;
 
@@ -53,17 +56,17 @@ public class IngestTaskInstanceLogDO {
     private String logLevel;
 
     /**
-     * 执行阶段。
+     * 日志所属执行阶段。
      */
     private String stage;
 
     /**
-     * 日志正文，不保存来源原始数据。
+     * 日志内容。
      */
     private String message;
 
     /**
-     * 事件发生时间。
+     * 日志事件发生时间。
      */
     private Date logTime;
 }

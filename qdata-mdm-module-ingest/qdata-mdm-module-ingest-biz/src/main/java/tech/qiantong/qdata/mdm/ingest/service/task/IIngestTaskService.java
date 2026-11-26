@@ -73,6 +73,9 @@ public interface IIngestTaskService {
 
     /**
      * 工作线程执行前读取并校验当前任务配置。
+     *
+     * @param id 接入任务编号
+     * @return 校验通过的完整任务配置
      */
     IngestTaskRespVO prepareExecution(Long id);
 
@@ -102,7 +105,7 @@ public interface IIngestTaskService {
     Long copy(Long id, String operator);
 
     /**
-     * 修改接入任务启用状态。
+     * 修改任务启用状态；停用任务时一并关闭调度，重新启用任务不会自动开启调度。
      *
      * @param id 接入任务编号
      * @param status 目标状态
@@ -112,16 +115,19 @@ public interface IIngestTaskService {
     int changeStatus(Long id, String status, String operator);
 
     /**
-     * 独立启停定时调度，提交后同步现有 Quartz 作业。
+     * 独立启用或暂停定时调度，提交后按最新配置同步 Quartz 作业。
+     * 只有已启用且配置了有效 Cron 的定时任务才能开启调度。
+     *
      * @param id 接入任务编号
-     * @param status 调度状态，1启用、0暂停
+     * @param status 调度状态，1 表示启用，0 表示暂停
      * @param operator 操作人
      * @return 更新行数
      */
     int changeScheduleStatus(Long id, String status, String operator);
 
     /**
-     * 批量删除接入任务。
+     * 批量逻辑删除接入任务；排队或执行中的任务不允许删除。
+     * 删除提交后逐条清理调度，失败项由后台校正重试。
      *
      * @param ids 接入任务编号集合
      * @return 删除行数
@@ -136,10 +142,4 @@ public interface IIngestTaskService {
      */
     List<IngestModelFieldRespVO> modelFields(Long modelId);
 
-    /**
-     * 校验接入任务配置。
-     *
-     * @param req 接入任务信息
-     */
-    void validate(IngestTaskSaveReqVO req);
 }

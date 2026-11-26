@@ -21,6 +21,7 @@ package tech.qiantong.qdata.mdm.merge.service.manage.impl;
 import tech.qiantong.qdata.mdm.master.dal.mapper.data.MasterDataVersionMapper;
 import tech.qiantong.qdata.mdm.master.dal.dataobject.data.MasterDataVersionDO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -102,6 +103,11 @@ public class MergeManageQualityServiceImpl implements IMergeManageQualityService
                 rules.add(rule);
             }
         }
+        if (rules.isEmpty()) {
+            // 无适用规则时跳过质检，模型约束由权威主数据提交环节校验。
+            saveQualityResult(pending, rules, Collections.emptyList(), null, operatorId, operatorName);
+            return;
+        }
         Map<String, String> finals = new HashMap<>();
         for (MergePendingMasterFieldDO field : fields) {
             finals.put(field.getFieldPath(), MergeAudit.text(field.getFinalValue()));
@@ -116,45 +122,26 @@ public class MergeManageQualityServiceImpl implements IMergeManageQualityService
                 generated.add(column.getCode());
             }
         }
+        Map<String, Set<String>> references = rules.stream()
+                .anyMatch(rule -> "REF_DATA_VALID".equalsIgnoreCase(rule.getRuleType()))
+                ? MergeQualityChecker.referenceValues(modelPublishedApi.getPublishedModelStructure(pending.getModelId()))
+                : Collections.emptyMap();
         List<MergeQualityCheckItemBO> items = MergeQualityChecker.check(finals, rules,
-                uniquePeers(pending, rules, columns), generated, referenceValues(pending.getModelId()));
+                uniquePeers(pending, rules, columns), generated, references);
         items.addAll(constraintItems(pending, fields, columns));
         String failureMessage = failureMessage(items);
         saveQualityResult(pending, rules, items, failureMessage, operatorId, operatorName);
     }
 
-    /** 从同一次成功发布的参考数据快照构建字段允许值，避免把草稿或其他集合混入检查。 */
-    private Map<String, Set<String>> referenceValues(Long modelId) {
-        return MergeQualityChecker.referenceValues(modelPublishedApi.getPublishedModelStructure(modelId));
-    }
-
-    /**
-     * 汇总规则结论，模型约束不能替代配置规则；null 表示全部通过。
-     */
+    /** 汇总未执行或未通过的检查项；无失败项时返回 null。 */
     private String failureMessage(List<MergeQualityCheckItemBO> items) {
-        boolean hasExecutedRule = false;
-        boolean unsupported = false;
-        boolean failed = false;
         List<String> messages = new ArrayList<>();
         for (MergeQualityCheckItemBO item : items) {
-            if (!item.isExecuted()) {
-                unsupported = true;
-                messages.add(item.getRuleName() + "：" + item.getMessage());
-            } else if (!item.isModelConstraint()) {
-                hasExecutedRule = true;
-            }
-            if (item.isExecuted() && !item.isPassed()) {
-                failed = true;
+            if (!item.isExecuted() || !item.isPassed()) {
                 messages.add(item.getRuleName() + "：" + item.getMessage());
             }
         }
-        if (unsupported) {
-            return MergeAudit.cut(join(messages), 500);
-        }
-        if (!hasExecutedRule) {
-            return "未配置可执行的质量规则，不能提交审批";
-        }
-        return failed ? MergeAudit.cut(join(messages), 500) : null;
+        return messages.isEmpty() ? null : MergeAudit.cut(join(messages), 500);
     }
 
     /**
@@ -183,7 +170,11 @@ public class MergeManageQualityServiceImpl implements IMergeManageQualityService
         qualityLog.setStartTime(now);
         qualityLog.setEndTime(now);
         qualityLog.setOperatorId(operatorId == null ? 0L : operatorId);
-        qualityLog.setResultMessage(pass ? "质量通过" : failureMessage);
+        if (pass) {
+            qualityLog.setResultMessage(rules.isEmpty() ? "当前模型无适用质量规则，已跳过质量检测" : "质量通过");
+        } else {
+            qualityLog.setResultMessage(failureMessage);
+        }
         qualityLog.setValidFlag(MergeCodes.YES);
         qualityLog.setDelFlag(MergeCodes.NO);
         MergeAudit.fill(qualityLog, operatorId, operatorName);
@@ -193,7 +184,9 @@ public class MergeManageQualityServiceImpl implements IMergeManageQualityService
         pending.setStatus(pass ? MergeCodes.PENDING_WAIT_SUBMIT : MergeCodes.PENDING_QUALITY_FAIL);
         pending.setErrorMessage(failureMessage);
         MergeAudit.touch(pending, operatorId, operatorName);
-        mergePendingMasterMapper.updateById(pending);
+        mergePendingMasterMapper.update(pending, new LambdaUpdateWrapper<MergePendingMasterDO>()
+                .eq(MergePendingMasterDO::getId, pending.getId())
+                .set(pass, MergePendingMasterDO::getErrorMessage, null));
     }
 
     /**
@@ -303,7 +296,7 @@ public class MergeManageQualityServiceImpl implements IMergeManageQualityService
     }
 
     /**
-     * 记录不通过的模型约束，模型约束不替代配置的质量规则。
+     * 记录不通过的模型约束。
      */
     private MergeQualityCheckItemBO constraint(String name, String message) {
         MergeQualityCheckItemBO item = new MergeQualityCheckItemBO();
@@ -311,7 +304,6 @@ public class MergeManageQualityServiceImpl implements IMergeManageQualityService
         item.setExecuted(true);
         item.setPassed(false);
         item.setMessage(message);
-        item.setModelConstraint(true);
         return item;
     }
 

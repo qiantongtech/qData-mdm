@@ -23,7 +23,7 @@
 -->
 <template>
   <div ref="app-container" class="app-container" :class="{ 'detect-detail-page': detailPage }">
-    <GuideTip v-if="!detailPage" tip-id="merge/detect.list" />
+    <guide-tip v-if="!detailPage" tip-id="merge/detect.list" />
     <el-container>
       <qt-tree v-if="!detailPage"
         ref="modelTreeRef"
@@ -53,7 +53,7 @@
               type="danger"
               plain
               icon="Delete"
-              :disabled="!listSelection.rows.length"
+              :disabled="!listSelection.rows.length || listSelection.rows.some(row => !canDeleteTask(row))"
               @click="deleteTasks(listSelection.rows)"
             >批量删除</el-button>
           </template>
@@ -199,7 +199,7 @@
                 link
                 type="primary"
                 icon="Edit"
-                :disabled="String(row.status) === '1'"
+                :disabled="row.enableStatus === 'ENABLED' || String(row.status) === '1'"
                 @click="openEdit(row)"
               >修改</el-button>
               <el-popover
@@ -232,7 +232,7 @@
                     link
                     type="danger"
                     icon="Delete"
-                    :disabled="String(row.status) === '1'"
+                    :disabled="!canDeleteTask(row)"
                     @click="deleteTask(row)"
                   >删除任务</el-button>
                 </div>
@@ -396,11 +396,8 @@
                 <template #rule-type="{ row }">
                   <el-tag type="info" effect="light" size="small">{{ ruleTypeLabel(row.ruleType) }}</el-tag>
                 </template>
-                <template #rule-config="{ row }">
-                  <div class="detect-rule-logic">
-                    <div v-for="(line, index) in ruleLogicLines(row)" :key="line.key" :class="{ 'detect-rule-logic__secondary': index > 0 }">{{ line.text }}</div>
-                  </div>
-                </template>
+                <template #rule-fields="{ row }">{{ ruleDisplayConfig(row).fields }}</template>
+                <template #rule-logic="{ row }">{{ ruleDisplayConfig(row).logic }}</template>
                 <template #rule-score="{ row }">{{ displayText(row.ruleScore) }}</template>
                 <template #rule-available="{ row }">{{ ruleAvailabilityText(row) }}</template>
                 <template #rule-status="{ row }">
@@ -691,7 +688,7 @@ const tableStore = reactive({
     { label: '责任人', prop: 'responsibleUserId', slot: 'responsiblePerson', width: 140, minWidth: 140, align: 'left' },
     { label: '创建人', prop: 'createBy', slot: 'creator', width: 160, minWidth: 160, align: 'left' },
     { label: '创建时间', prop: 'createTime', slot: 'createTime', sortable: true, sortableKey: 'create_time', width: 180, minWidth: 180, align: 'left' },
-    { label: '操作', slot: 'handle', fixed: 'right', width: 220, minWidth: 220, align: 'left' },
+    { label: '操作', slot: 'handle', fixed: 'right', width: 220, minWidth: 220, align: 'center' },
   ],
 })
 
@@ -787,9 +784,10 @@ const ruleTableColumns = reactive([
   { key: 'id', label: '编号', visible: true },
   { key: 'ruleName', label: '规则名称', visible: true },
   { key: 'ruleType', label: '匹配方式', visible: true },
-  { key: 'ruleConfig', label: '参与字段 / 匹配逻辑', visible: true },
+  { key: 'ruleFields', label: '参与字段', visible: true },
+  { key: 'ruleLogic', label: '匹配逻辑', visible: true },
   { key: 'ruleScore', label: '匹配分值', visible: true },
-  { key: 'available', label: '当前是否可用', visible: true },
+  { key: 'available', label: '检测时是否可用', visible: true },
   { key: 'status', label: '规则状态', visible: true },
   { key: 'createBy', label: '创建人', visible: true },
   { key: 'createTime', label: '创建时间', visible: true },
@@ -798,7 +796,8 @@ const ruleQtColumnOptions = {
   id: { prop: 'id', slot: 'rule-id', width: 70, minWidth: 70, align: 'center', sortable: true },
   ruleName: { prop: 'ruleName', slot: 'rule-name', minWidth: 220, align: 'left', showOverflowTooltip: true },
   ruleType: { prop: 'ruleType', slot: 'rule-type', minWidth: 150, align: 'left', showOverflowTooltip: true },
-  ruleConfig: { prop: 'ruleConfig', slot: 'rule-config', minWidth: 260, align: 'left', showOverflowTooltip: true },
+  ruleFields: { prop: 'ruleFields', slot: 'rule-fields', minWidth: 180, align: 'left', showOverflowTooltip: true },
+  ruleLogic: { prop: 'ruleLogic', slot: 'rule-logic', minWidth: 200, align: 'left', showOverflowTooltip: true },
   ruleScore: { prop: 'ruleScore', slot: 'rule-score', minWidth: 110, align: 'center' },
   available: { prop: 'available', slot: 'rule-available', minWidth: 130, align: 'center' },
   status: { prop: 'status', slot: 'rule-status', minWidth: 140, align: 'center' },
@@ -943,11 +942,11 @@ function ruleFieldName(fieldId) {
 }
 
 /**
- * 将参与字段与匹配逻辑拆为上下两行展示。
+ * 分别生成参与字段与匹配逻辑的展示文本。
  * @param {*} row 当前业务记录。
- * @returns {Array} 整理后的业务记录集合。
+ * @returns {Object} 参与字段与匹配逻辑的展示文本。
  */
-function ruleLogicLines(row) {
+function ruleDisplayConfig(row) {
   const config = parseJson(row.ruleConfig, {})
   const fields = Array.isArray(config?.fieldList) && config.fieldList.length
     ? config.fieldList
@@ -961,10 +960,7 @@ function ruleLogicLines(row) {
   if (row.ruleType === 'FUZZY') logicText = `编辑距离相似度 ≥ ${config.similarityThreshold ?? '-'}`
   else if (row.ruleType === 'WEIGHTED') logicText = `最终阈值 ${config.finalThreshold ?? '-'}`
   else if (row.ruleType === 'STD_EXACT') logicText = '标准化后完全一致'
-  return [
-    { key: 'fields', text: displayFieldText },
-    { key: 'logic', text: logicText },
-  ]
+  return { fields: displayFieldText, logic: logicText }
 }
 
 /**
@@ -977,7 +973,7 @@ function isRuleEnabled(row) {
 }
 
 /**
- * 判断规则是否满足当前检测的可用条件。
+ * 判断规则快照在本次检测时是否可用。
  * @param {*} row 当前业务记录。
  * @returns {boolean} 是否满足当前业务条件。
  */
@@ -986,7 +982,7 @@ function isRuleAvailable(row) {
 }
 
 /**
- * 生成规则当前是否可用的展示文本。
+ * 生成规则在检测时是否可用的展示文本。
  * @param {*} row 当前业务记录。
  * @returns {string} 用于页面展示的格式化文本。
  */
@@ -1130,7 +1126,7 @@ function handleCreateConfirm() {
  * @returns {boolean} 是否满足当前业务条件。
  */
 function canDeleteTask(row) {
-  return String(row?.status) !== '1'
+  return row?.enableStatus === 'DISABLED' && String(row.status) !== '1'
 }
 
 /**
@@ -1139,11 +1135,14 @@ function canDeleteTask(row) {
  * @returns {Promise<void>} 通过状态或事件更新页面，无返回值。
  */
 async function deleteTasks(rows) {
-  const list = (rows || []).filter((row) => row?.id && canDeleteTask(row))
-  if (!list.length) return
+  if (!rows?.length) return
+  if (rows.some((row) => !row?.id || !canDeleteTask(row))) {
+    proxy.$modal.msgWarning('只能删除已停用且不在执行中的重复检测任务')
+    return
+  }
   try {
-    await proxy.$modal.confirm(`确认删除选中的 ${list.length} 个检测任务？`)
-    await deleteMergeDetectTask(list.map((row) => row.id).join(','))
+    await proxy.$modal.confirm(`确认删除选中的 ${rows.length} 个检测任务？`)
+    await deleteMergeDetectTask(rows.map((row) => row.id).join(','))
     proxy.$modal.msgSuccess('删除成功')
     listSelection.rows = []
     tableRef.value?.elTableRef?.clearSelection()
@@ -1159,6 +1158,10 @@ async function deleteTasks(rows) {
  * @returns {Promise<void>} 通过状态或事件更新页面，无返回值。
  */
 async function deleteTask(row) {
+  if (!row?.id || !canDeleteTask(row)) {
+    proxy.$modal.msgWarning('只能删除已停用且不在执行中的重复检测任务')
+    return
+  }
   try {
     await proxy.$modal.confirm(`是否确认删除检测任务“${row.taskNo || row.id}”？`)
     await deleteMergeDetectTask(row.id)
@@ -1210,10 +1213,16 @@ async function runModel(taskId) {
   if (starting.value) return
   starting.value = true
   try {
-    await proxy.$modal.confirm('确认执行一次？本次将按已保存的任务范围获取当前可参与检测的来源数据。')
+    await proxy.$modal.confirm('确认执行该重复检测任务一次？')
     await executeMergeDetectTask({ taskId })
-    proxy.$modal.msgSuccess('执行成功')
-    if (detailTask.value) closeDetail()
+    proxy.$modal.msgSuccess('任务已提交')
+    if (detailTask.value) {
+      detailTask.value = { ...detailTask.value, status: '1' }
+      detailTab.value = 'executions'
+      instancesLoaded = false
+      sourceDetailLoaded = false
+      await loadDetailTabData('executions')
+    }
     await nextTick()
     tableRef.value?.getList()
   } catch {
@@ -1609,10 +1618,6 @@ watch(() => [route.query.id, route.query.taskNo, route.query.tab], async ([id, t
   }
 }
 
-.detect-rule-logic {
-  line-height: 20px;
-}
-
 .detect-last-execute-info {
   display: flex;
   flex-direction: column;
@@ -1651,11 +1656,6 @@ watch(() => [route.query.id, route.query.taskNo, route.query.tab], async ([id, t
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.detect-rule-logic__secondary {
-  color: var(--el-text-color-secondary);
-  font-size: var(--el-font-size-extra-small);
 }
 
 .detect-source-secondary-cell {

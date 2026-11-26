@@ -18,6 +18,7 @@
 
 package tech.qiantong.qdata.mdm.ingest.service.task.impl;
 
+import cn.hutool.core.util.ObjectUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestTaskRespVO;
@@ -43,7 +45,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Resource;
 
@@ -55,7 +56,10 @@ import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.RUN_
 import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.SCHEDULED;
 
 /**
- * 先提交实例和数据库占用，再交给专用线程池，互斥覆盖等待和执行全过程。
+ * 人工和定时接入任务的统一提交服务，负责异步派发、实例续期和超时恢复。
+ *
+ * <p>先在独立事务中创建运行实例并取得数据库占用，再交给专用线程池。
+ * 占用覆盖排队和执行全过程；本机记录仅用于续期，跨节点互斥以数据库为准。</p>
  *
  * @author chentangwen
  */
@@ -67,10 +71,12 @@ public class IngestTaskSubmitServiceImpl implements IIngestTaskSubmitService {
      * 运行概览错误摘要的最大字符数。
      */
     private static final int MAX_ERROR_MESSAGE_LENGTH = 2000;
+
     /**
      * 超过五分钟未续期才允许恢复流程回收实例。
      */
     private static final long RUN_LEASE_MILLIS = TimeUnit.MINUTES.toMillis(5);
+
     /**
      * 本机负责续期的任务与实例；不承担跨节点互斥，互斥由数据库占用保证。
      */
@@ -104,24 +110,24 @@ public class IngestTaskSubmitServiceImpl implements IIngestTaskSubmitService {
      * 在独立事务内创建实例并占用任务，事务提交后再提交执行线程。
      * 数据库占用覆盖排队与执行，保证人工和定时入口共用同一互斥规则。
      *
-     * @param taskId 接入任务 ID
+     * @param taskId      接入任务 ID
      * @param triggerType 实际触发方式：人工或定时
-     * @param operator 执行操作人
+     * @param operator    执行操作人
      * @return 已受理的实例快照，不代表执行已经完成
-     * @throws ServiceException 任务不可执行、已有运行实例、队列拒绝或日志暂存失败
+     * @throws ServiceException 任务不可执行、已有运行实例、线程池拒绝或日志暂存失败
      */
     @Override
     public IngestTaskRunRespVO submit(Long taskId, String triggerType, String operator) {
         if (!MANUAL.equals(triggerType) && !SCHEDULED.equals(triggerType)) {
-            throw new ServiceException("执行方式不正确");
+            throw new ServiceException("执行方式不正确", HttpStatus.WARN);
         }
         IngestTaskInstanceDO instance = transaction().execute(status -> {
             IngestTaskDO task = scheduleMapper.lockScheduleTask(taskId);
             checkRunnable(task, triggerType);
-            if (task.getActiveRunId() != null) {
+            if (ObjectUtil.isNotNull(task.getActiveRunId())) {
                 log.warn("拒绝重复提交接入任务，taskId={}, activeRunId={}, triggerType={}, operator={}",
                         taskId, task.getActiveRunId(), triggerType, operator);
-                throw new ServiceException("任务正在执行，请勿重复提交");
+                throw new ServiceException("任务正在执行，请勿重复提交", HttpStatus.WARN);
             }
             IngestTaskInstanceDO run = new IngestTaskInstanceDO();
             run.setTaskId(taskId);
@@ -136,34 +142,35 @@ public class IngestTaskSubmitServiceImpl implements IIngestTaskSubmitService {
             run.setFailureCount(0L);
             run.setSkipCount(0L);
             instanceMapper.insert(run);
-            if (run.getId() == null) {
+            if (ObjectUtil.isNull(run.getId())) {
                 throw new ServiceException("创建任务运行记录失败");
             }
             if (scheduleMapper.claimRun(taskId, run.getId()) != 1) {
-                throw new ServiceException("任务正在执行或已停用");
+                throw new ServiceException("任务正在执行或已停用", HttpStatus.WARN);
             }
             return run;
         });
         IngestTaskRunRespVO accepted = BeanUtils.toBean(instance, IngestTaskRunRespVO.class);
         localRuns.put(taskId, instance.getId());
+        // 区分日志暂存和线程池提交失败，避免将执行器异常误报为日志服务故障。
+        String failureMessage = "执行日志暂存失败，任务未开始执行";
         try {
             runLogService.publish(instance, "INFO", "QUEUED", "任务已提交，等待执行；触发方式：" + triggerType);
+            failureMessage = "接入执行线程池暂不可用，请稍后重试";
+            // 此处已离开提交事务，工作线程只能读取已提交的实例。
+            executor.execute(() -> run(instance));
             log.info("接入任务已受理，taskId={}, runId={}, triggerType={}, operator={}",
                     taskId, instance.getId(), triggerType, operator);
-            // 此处已离开提交事务，工作线程只能读取已提交的实例。
-            executor.execute(() -> run(instance, operator));
         } catch (RuntimeException ex) {
             localRuns.remove(taskId, instance.getId());
-            String reason = ex instanceof RejectedExecutionException
-                    ? "接入执行队列已满，请稍后重试" : "执行日志服务不可用，任务未开始执行";
             log.error("接入任务提交失败，taskId={}, runId={}, triggerType={}",
                     taskId, instance.getId(), triggerType, ex);
             try {
-                fail(instance, reason);
+                fail(instance, failureMessage);
             } catch (Exception failure) {
                 log.error("接入提交失败待恢复，taskId={}, runId={}", taskId, instance.getId(), failure);
             }
-            throw new ServiceException(reason);
+            throw new ServiceException(failureMessage);
         }
         return accepted;
     }
@@ -173,9 +180,8 @@ public class IngestTaskSubmitServiceImpl implements IIngestTaskSubmitService {
      * 若异常收尾也失败，则停止本机续期，由超时恢复流程后续处理。
      *
      * @param instance 已提交数据库并取得占用的实例
-     * @param operator 写入来源记录的操作人
      */
-    private void run(IngestTaskInstanceDO instance, String operator) {
+    private void run(IngestTaskInstanceDO instance) {
         try {
             IngestTaskRespVO task = transaction().execute(status -> {
                 IngestTaskDO current = scheduleMapper.lockScheduleTask(instance.getTaskId());
@@ -187,9 +193,10 @@ public class IngestTaskSubmitServiceImpl implements IIngestTaskSubmitService {
                 return taskService.getObject().prepareExecution(instance.getTaskId());
             });
             runLogService.publish(instance, "INFO", "PREPARE", "任务配置校验完成，开始加载模型字段");
-            executeService.execute(task,
-                    taskService.getObject().modelFields(task.getModelId()), operator, instance);
-            transaction().executeWithoutResult(status -> releaseRun(instance.getTaskId(), instance.getId()));
+            executeService.execute(task, taskService.getObject().modelFields(task.getModelId()), instance);
+            // Mapper 同时匹配任务和实例编号，旧实例不能释放后续实例的占用。
+            transaction().executeWithoutResult(status ->
+                    scheduleMapper.releaseRun(instance.getTaskId(), instance.getId()));
         } catch (Exception ex) {
             log.error("接入任务执行失败，taskId={}, runId={}", instance.getTaskId(), instance.getId(), ex);
             try {
@@ -205,42 +212,54 @@ public class IngestTaskSubmitServiceImpl implements IIngestTaskSubmitService {
     /**
      * 为本机排队和执行中的实例续期，并回收超过租期的实例。
      * 过期判断使用数据库时间；加锁后再次检查心跳，避免回收刚被续期的实例。
-     * 已在 Redis 结束的实例仅释放占用，不覆盖其最终结果。
+     * 已在 Redis 结束的实例先补写数据库终态再释放占用，不覆盖其最终结果。
+     *
+     * <p>续期返回零时移除对应本机记录；续期异常时保留记录供下轮重试。
+     * 回收仅标记失败并释放占用，旧执行线程在后续归属校验时停止。</p>
      */
     @Override
     public void maintainRuns() {
         localRuns.forEach((taskId, runId) -> {
             try {
                 int updated = scheduleMapper.heartbeat(taskId, runId);
+                if (updated == 0) {
+                    // 按实例编号移除，避免并发提交的新实例被旧续期结果误删。
+                    localRuns.remove(taskId, runId);
+                }
                 log.debug("接入任务续期，taskId={}, runId={}, updated={}", taskId, runId, updated);
             } catch (Exception ex) {
                 log.error("接入任务续期失败，taskId={}, runId={}", taskId, runId, ex);
             }
         });
         Date databaseTime = scheduleMapper.databaseTime();
-        if (databaseTime == null) {
+        if (ObjectUtil.isNull(databaseTime)) {
             return;
         }
         Date expiredBefore = new Date(databaseTime.getTime() - RUN_LEASE_MILLIS);
         for (Long taskId : scheduleMapper.selectExpiredRuns(expiredBefore)) {
             try {
-                transaction().executeWithoutResult(status -> {
+                IngestTaskInstanceDO recovered = transaction().execute(status -> {
                     IngestTaskDO task = scheduleMapper.lockScheduleTask(taskId);
-                    if (task == null || task.getActiveRunId() == null || (task.getRunHeartbeatTime() != null
+                    if (ObjectUtil.isNull(task) || ObjectUtil.isNull(task.getActiveRunId())
+                            || (ObjectUtil.isNotNull(task.getRunHeartbeatTime())
                             && !task.getRunHeartbeatTime().before(expiredBefore))) {
-                        return;
+                        return null;
                     }
-                    IngestTaskInstanceDO run = runLogService.latest(instanceMapper.selectById(task.getActiveRunId()));
-                    if (run != null && RUNNING.equals(run.getStatus())) {
+                    IngestTaskInstanceDO run = runLogService.latest(instanceMapper.lockRun(task.getActiveRunId()));
+                    if (ObjectUtil.isNotNull(run) && RUNNING.equals(run.getStatus())) {
                         run.setStatus(RUN_FAILED);
                         run.setEndTime(new Date());
-                        run.setErrorMessage("执行节点超过5分钟未续期，本次运行已终止");
-                        runLogService.publish(run, "ERROR", "RECOVERY", run.getErrorMessage());
+                        run.setErrorMessage("执行节点超过5分钟未续期，本次运行已标记失败");
+                    }
+                    if (ObjectUtil.isNotNull(run) && run.getEndTime() != null) {
+                        instanceMapper.updateById(run);
                     }
                     log.warn("回收心跳超时的接入实例，taskId={}, runId={}, heartbeatTime={}",
                             taskId, task.getActiveRunId(), task.getRunHeartbeatTime());
-                    releaseRun(taskId, task.getActiveRunId());
+                    scheduleMapper.releaseRun(taskId, task.getActiveRunId());
+                    return run;
                 });
+                publishFailure(recovered, "RECOVERY");
             } catch (Exception ex) {
                 log.error("回收接入实例失败，taskId={}", taskId, ex);
             }
@@ -248,61 +267,73 @@ public class IngestTaskSubmitServiceImpl implements IIngestTaskSubmitService {
     }
 
     /**
-     * 校验任务是否存在、启用，以及实际触发方式是否仍与配置一致。
+     * 校验任务是否存在并启用；定时触发还须符合执行方式和调度开关配置。
      *
-     * @param task 加锁读取的任务，可能为空
+     * @param task        加锁读取的任务，可能为空
      * @param triggerType 本次实际触发方式
      * @throws ServiceException 任务已删除、停用或不再允许定时触发
      */
     private void checkRunnable(IngestTaskDO task, String triggerType) {
-        if (task == null || !NOT_DELETED.equals(task.getDelFlag())) {
+        if (ObjectUtil.isNull(task) || !NOT_DELETED.equals(task.getDelFlag())) {
             throw new ServiceException("接入任务不存在");
         }
         if (!ENABLED.equals(task.getStatus())) {
             log.warn("接入任务未执行，taskId={}, triggerType={}, reason=任务已停用", task.getId(), triggerType);
-            throw new ServiceException("停用任务不能执行");
+            throw new ServiceException("停用任务不能执行", HttpStatus.WARN);
         }
         if (SCHEDULED.equals(triggerType) && !SCHEDULED.equals(task.getTriggerType())) {
-            throw new ServiceException("任务已改为人工执行");
+            throw new ServiceException("任务已改为人工执行", HttpStatus.WARN);
         }
         // 拦截暂停后尚未清除的触发及已排队的定时执行，人工执行不受影响。
         if (SCHEDULED.equals(triggerType) && !ENABLED.equals(task.getSchedulerStatus())) {
-            throw new ServiceException("任务调度已暂停");
+            throw new ServiceException("任务调度已暂停", HttpStatus.WARN);
         }
     }
 
     /**
-     * 持有任务行锁时发布失败终态，再释放本实例占用。
-     * Redis 写入失败会使数据库事务回滚，保留占用等待超时恢复。
+     * 在数据库事务内保存终态并释放占用，提交后再尝试发布失败日志。
+     * 日志服务故障不影响失败收尾，已结束实例的最终结果保持不变。
      *
      * @param instance 需要终止的运行实例
-     * @param message 对外展示的失败原因，截断到运行概览允许的长度
+     * @param message  对外展示的失败原因，截断到运行概览允许的长度
      */
     private void fail(IngestTaskInstanceDO instance, String message) {
-        transaction().executeWithoutResult(status -> {
+        IngestTaskInstanceDO failed = transaction().execute(status -> {
             IngestTaskDO current = scheduleMapper.lockScheduleTask(instance.getTaskId());
-            if (current == null || !instance.getId().equals(current.getActiveRunId())) {
+            if (ObjectUtil.isNull(current) || !instance.getId().equals(current.getActiveRunId())) {
                 log.warn("跳过失效实例的失败收尾，taskId={}, runId={}", instance.getTaskId(), instance.getId());
-                return;
+                return null;
+            }
+            IngestTaskInstanceDO stored = runLogService.latest(instanceMapper.lockRun(instance.getId()));
+            if (stored != null && stored.getEndTime() != null) {
+                instanceMapper.updateById(stored);
+                scheduleMapper.releaseRun(instance.getTaskId(), instance.getId());
+                return null;
             }
             instance.setStatus(RUN_FAILED);
             instance.setEndTime(new Date());
-            instance.setErrorMessage(message == null ? "任务执行失败"
+            instance.setErrorMessage(ObjectUtil.isNull(message) ? "任务执行失败"
                     : message.substring(0, Math.min(MAX_ERROR_MESSAGE_LENGTH, message.length())));
-            runLogService.publish(instance, "ERROR", "FAILED", instance.getErrorMessage());
-            releaseRun(instance.getTaskId(), instance.getId());
+            instanceMapper.updateById(instance);
+            scheduleMapper.releaseRun(instance.getTaskId(), instance.getId());
+            return instance;
         });
+        publishFailure(failed, "FAILED");
     }
 
     /**
-     * 仅释放仍属于指定实例的执行占用，避免旧实例释放新实例的锁。
-     *
-     * @param taskId 接入任务 ID
-     * @param runId 持有占用的运行实例 ID
+     * 数据库终态已提交，日志发布失败仅记录服务日志，不再阻塞实例释放。
      */
-    private void releaseRun(Long taskId, Long runId) {
-        int updated = scheduleMapper.releaseRun(taskId, runId);
-        log.debug("释放接入任务执行占用，taskId={}, runId={}, updated={}", taskId, runId, updated);
+    private void publishFailure(IngestTaskInstanceDO instance, String stage) {
+        if (instance == null || !RUN_FAILED.equals(instance.getStatus())) {
+            return;
+        }
+        try {
+            runLogService.publish(instance, "ERROR", stage, instance.getErrorMessage());
+        } catch (RuntimeException ex) {
+            log.error("接入失败终态已保存，日志暂存失败，taskId={}, runId={}, stage={}",
+                    instance.getTaskId(), instance.getId(), stage, ex);
+        }
     }
 
     /**

@@ -31,6 +31,7 @@ import tech.qiantong.qdata.mdm.common.utils.MessageUtils;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -40,6 +41,72 @@ import java.util.stream.Collectors;
  * @date 2022-11-14
  */
 public class PostgreDialect extends AbstractDbDialect {
+
+    // pg_get_expr 会将时间戳字面量还原为带完整类型名称的转换表达式。
+    private static final String COLUMN_DEFAULT_SQL = "regexp_replace(pg_get_expr(d.adbin, d.adrelid), "
+            + "'(::((timestamp|time) (with|without) time zone|[a-zA-Z0-9_]+( [a-zA-Z0-9_]+)?))+$', '') AS DATADEFAULT,";
+
+    private static void appendDefaultClause(StringBuilder sql, String dataType, String defaultValue) {
+        if (StringUtils.isBlank(defaultValue)) {
+            return;
+        }
+        sql.append(" DEFAULT ").append(defaultExpression(dataType, defaultValue));
+    }
+
+    private static String defaultExpression(String dataType, String defaultValue) {
+        String def = normalizeDefaultValue(defaultValue);
+        if (StringUtils.isBlank(def)
+                || isQuotedDefault(def)
+                || isNumericDefault(def)
+                || isKeywordOrFunctionDefault(def)) {
+            return def;
+        }
+        if (isStringOrTemporalType(dataType)) {
+            return "'" + DatabaseUtil.escapeSingleQuotes(def) + "'";
+        }
+        return def;
+    }
+
+    private static String normalizeDefaultValue(String defaultValue) {
+        String def = defaultValue == null ? "" : defaultValue.trim();
+        while (def.length() >= 2 && def.startsWith("(") && def.endsWith(")")) {
+            def = def.substring(1, def.length() - 1).trim();
+        }
+        return def;
+    }
+
+    private static boolean isQuotedDefault(String defaultValue) {
+        return defaultValue.length() >= 2 && defaultValue.startsWith("'") && defaultValue.endsWith("'");
+    }
+
+    private static boolean isNumericDefault(String defaultValue) {
+        return defaultValue.matches("^-?\\d+(\\.\\d+)?$");
+    }
+
+    private static boolean isKeywordOrFunctionDefault(String defaultValue) {
+        String def = defaultValue.trim().toUpperCase(Locale.ROOT);
+        return "CURRENT_TIMESTAMP".equals(def)
+                || "CURRENT_DATE".equals(def)
+                || "CURRENT_TIME".equals(def)
+                || "LOCALTIME".equals(def)
+                || "LOCALTIMESTAMP".equals(def)
+                || "NOW()".equals(def)
+                || "UUID()".equals(def)
+                || "NULL".equals(def)
+                || "TRUE".equals(def)
+                || "FALSE".equals(def)
+                || (def.endsWith(")") && def.contains("("));
+    }
+
+    private static boolean isStringOrTemporalType(String dataType) {
+        String type = dataType == null ? "" : dataType.trim().toUpperCase(Locale.ROOT);
+        return type.contains("CHAR")
+                || type.contains("TEXT")
+                || type.contains("CLOB")
+                || type.contains("STRING")
+                || type.contains("DATE")
+                || type.contains("TIME");
+    }
 
     @Override
     public String getColumnType(DbColumn column) {
@@ -130,7 +197,7 @@ public class PostgreDialect extends AbstractDbDialect {
                 "CASE WHEN t.typname IN ('numeric', 'decimal') THEN isc.numeric_scale WHEN t.typname IN ('float4', 'float8') THEN 0 ELSE NULL END AS DATASCALE, " +
                 "CASE WHEN con.contype = 'p' THEN TRUE ELSE FALSE END AS COLKEY, " +
                 "NOT a.attnotnull AS NULLABLE, a.attnum AS COLPOSITION, " +
-                "regexp_replace(pg_get_expr(d.adbin, d.adrelid), '(::[a-zA-Z0-9_]+( [a-zA-Z0-9_]+)?)+$', '') AS DATADEFAULT," +
+                COLUMN_DEFAULT_SQL +
                 "col_description(a.attrelid, a.attnum) AS COLCOMMENT " +
                 "FROM pg_attribute a " +
                 "JOIN pg_class c ON a.attrelid = c.oid " +
@@ -164,7 +231,7 @@ public class PostgreDialect extends AbstractDbDialect {
                 "CASE WHEN t.typname IN ('numeric', 'decimal') THEN isc.numeric_scale WHEN t.typname IN ('float4', 'float8') THEN 0 ELSE NULL END AS DATASCALE, " +
                 "CASE WHEN con.contype = 'p' THEN TRUE ELSE FALSE END AS COLKEY, " +
                 "NOT a.attnotnull AS NULLABLE, a.attnum AS COLPOSITION, " +
-                "regexp_replace(pg_get_expr(d.adbin, d.adrelid), '(::[a-zA-Z0-9_]+( [a-zA-Z0-9_]+)?)+$', '') AS DATADEFAULT," +
+                COLUMN_DEFAULT_SQL +
                 "col_description(a.attrelid, a.attnum) AS COLCOMMENT " +
                 "FROM pg_attribute a " +
                 "JOIN pg_class c ON a.attrelid = c.oid " +
@@ -268,11 +335,7 @@ public class PostgreDialect extends AbstractDbDialect {
 
                 // Default value handling
                 if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                    if (columnType.equals("VARCHAR") || columnType.equals("CHAR") || columnType.equals("TEXT")) {
-                        sql.append(" DEFAULT '").append(column.getDataDefault()).append("'");
-                    } else {
-                        sql.append(" DEFAULT ").append(column.getDataDefault());
-                    }
+                    appendDefaultClause(sql, columnType, column.getDataDefault());
                 }
 
                 // Add the field to the primary key list, if it is a primary key
@@ -644,7 +707,8 @@ public class PostgreDialect extends AbstractDbDialect {
             }
 
             if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quoteIdentifier(column.getColName()) + " SET DEFAULT " + column.getDataDefault());
+                sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quoteIdentifier(column.getColName())
+                        + " SET DEFAULT " + defaultExpression(column.getDataType(), column.getDataDefault()));
             } else {
                 sqlList.add("ALTER TABLE " + fullTableName + " ALTER COLUMN " + quoteIdentifier(column.getColName()) + " DROP DEFAULT");
             }
@@ -733,7 +797,7 @@ public class PostgreDialect extends AbstractDbDialect {
             }
 
             if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                sql.append(" DEFAULT ").append(column.getDataDefault());
+                appendDefaultClause(sql, columnType, column.getDataDefault());
             }
 
             sqlList.add(sql.toString());
@@ -812,7 +876,7 @@ public class PostgreDialect extends AbstractDbDialect {
             }
 
             if (StringUtils.isNotEmpty(column.getDataDefault())) {
-                sql.append(" DEFAULT ").append(column.getDataDefault());
+                appendDefaultClause(sql, columnType, column.getDataDefault());
             }
 
             sqlList.add(sql.toString());

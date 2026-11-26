@@ -23,6 +23,7 @@ import lombok.Data;
 import tech.qiantong.qdata.mdm.common.core.domain.BaseEntity;
 
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 
 /**
@@ -42,11 +43,14 @@ public class ModelProjectSaveReqVO extends BaseEntity {
 
     @Schema(description = "主数据域编码", example = "")
     @NotBlank(message = "主数据域编码不能为空")
-    @Size(max = 512, message = "主数据域编码长度不能超过512个字符")
+    @Size(max = 64, message = "主数据域编码长度不能超过64个字符")
+    @Pattern(regexp = "[A-Za-z0-9_]*", message = "主数据域编码支持英文字母、数字和下划线")
     private String code;
 
     @Schema(description = "主数据域名称", example = "")
-    @Size(max = 512, message = "主数据域名称长度不能超过512个字符")
+    @NotBlank(message = "主数据域名称不能为空")
+    @Size(max = 64, message = "主数据域名称长度不能超过64个字符")
+    @Pattern(regexp = "[\u4e00-\u9fa5A-Za-z0-9_-]*", message = "主数据域名称支持中文、英文字符、数字、下划线和短横线")
     private String name;
 
     /**
@@ -63,7 +67,14 @@ public class ModelProjectSaveReqVO extends BaseEntity {
     private Long responsibleUserId;
 
     @Schema(description = "描述", example = "")
-    @Size(max = 512, message = "描述长度不能超过512个字符")
+    @Size(max = 256, message = "描述长度不能超过256个字符")
     private String description;
 
+    public void setCode(String code) {
+        this.code = code == null ? null : code.trim();
+    }
+
+    public void setName(String name) {
+        this.name = name == null ? null : name.trim();
+    }
 }

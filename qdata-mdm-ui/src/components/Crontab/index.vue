@@ -17,7 +17,7 @@
 -->
 
 <template>
-  <div>
+  <div class="schedule-crontab">
     <el-tabs type="border-card">
       <el-tab-pane :label="td('common.crontab.tab.second')" v-if="shouldHide('second')">
         <CrontabSecond
@@ -148,13 +148,13 @@
         </table>
       </div>
       <CrontabResult :ex="crontabValueString" v-if="Crontab"></CrontabResult>
-      <div class="pop_btn" v-if="btn">
-        <el-button type="primary" @click="submitFill">{{ td('common.button.confirm') }}</el-button>
-        <el-button type="warning" plain @click="clearCron">{{
-          td('common.button.reset')
-        }}</el-button>
-        <el-button @click="hidePopup">{{ td('common.button.cancel') }}</el-button>
-      </div>
+    </div>
+    <div class="pop_btn" v-if="btn">
+      <el-button type="warning" plain @click="clearCron">{{
+        td('common.button.reset')
+      }}</el-button>
+      <el-button @click="hidePopup">{{ td('common.button.cancel') }}</el-button>
+      <el-button type="primary" @click="submitFill">{{ td('common.button.confirm') }}</el-button>
     </div>
   </div>
 </template>
@@ -310,9 +310,66 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+:global(.el-dialog:has(> .el-dialog__body > .schedule-crontab)) {
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+:global(.el-dialog:has(> .el-dialog__body > .schedule-crontab) > .el-dialog__header) {
+  height: 42px;
+  margin: 0 !important;
+  padding: 0 var(--qt-space-5) !important;
+  background: var(--el-fill-color-light);
+  box-shadow: 0 1px 0 var(--el-border-color-lighter);
+  display: flex;
+  align-items: center;
+}
+
+:global(.el-dialog:has(> .el-dialog__body > .schedule-crontab) > .el-dialog__header .el-dialog__title) {
+  color: var(--qt-text-primary);
+  font-family: var(--qt-font-family);
+  font-size: var(--qt-font-size-title);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+:global(.el-dialog:has(> .el-dialog__body > .schedule-crontab) > .el-dialog__header .el-dialog__headerbtn) {
+  top: 0 !important;
+  right: 0 !important;
+  width: 42px !important;
+  height: 42px;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:global(.el-dialog:has(> .el-dialog__body > .schedule-crontab) > .el-dialog__footer) {
+  padding: 10px var(--qt-space-5) var(--qt-space-5) !important;
+  border-top: 1px solid var(--el-border-color-lighter);
+  text-align: right;
+  box-sizing: border-box;
+}
+
+:global(.el-dialog:has(> .el-dialog__body > .schedule-crontab) > .el-dialog__body) {
+  padding: var(--qt-space-5) 40px !important;
+  box-sizing: border-box;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.pop_btn :deep(.el-button) {
+  --el-border-radius-base: var(--qt-radius-small);
+  border-radius: var(--qt-radius-small) !important;
+}
+
 .pop_btn {
-  text-align: center;
-  margin-top: 20px;
+  margin: var(--qt-space-5) -40px calc(-1 * var(--qt-space-5));
+  padding: 15px var(--qt-space-5);
+  border-top: 1px solid var(--el-border-color-lighter);
+  text-align: right;
 }
 
 .popup-main {

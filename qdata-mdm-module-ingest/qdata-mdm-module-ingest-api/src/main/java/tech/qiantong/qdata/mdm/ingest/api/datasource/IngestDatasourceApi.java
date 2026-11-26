@@ -21,8 +21,20 @@ package tech.qiantong.qdata.mdm.ingest.api.datasource;
 import tech.qiantong.qdata.mdm.ingest.api.datasource.dto.IngestDatasourceRespDTO;
 
 /**
- * 模块间读取数据源连接配置的后端接口。
+ * 供其他后端模块读取数据源连接配置的公共接口。
+ * <p>
+ * 调用方通过本接口及返回 DTO 获取配置，具体查询由 ingest-biz 模块实现。
+ *
  */
 public interface IngestDatasourceApi {
+
+    /**
+     * 根据数据源 ID 查询连接配置信息，供调用方访问目标数据库时使用。
+     * <p>
+     * 本接口仅提供配置查询，不建立目标数据库连接；数据源是否启用由调用方校验。
+     *
+     * @param datasourceId 数据源 ID
+     * @return 数据源连接配置信息
+     */
     IngestDatasourceRespDTO getDatasource(Long datasourceId);
 }

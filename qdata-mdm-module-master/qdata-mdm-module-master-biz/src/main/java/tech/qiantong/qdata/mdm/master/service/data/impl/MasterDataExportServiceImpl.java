@@ -23,12 +23,15 @@ import org.apache.poi.ss.usermodel.Cell;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.master.controller.admin.data.vo.MasterColumnRespVO;
 import tech.qiantong.qdata.mdm.master.controller.admin.data.vo.MasterDataPageReqVO;
@@ -44,10 +47,19 @@ import tech.qiantong.qdata.mdm.master.service.data.reference.MasterReferenceServ
 import tech.qiantong.qdata.mdm.master.service.data.reference.MasterReferenceService;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
 import javax.servlet.http.HttpServletResponse;
 
 /**
@@ -59,6 +71,10 @@ import javax.servlet.http.HttpServletResponse;
 public class MasterDataExportServiceImpl implements IMasterDataExportService {
     private static final int PAGE_SIZE = 100;
     private static final int MAX_ROWS = 5000;
+    private static final List<String> HIDDEN_LIST_COLUMNS =
+            Arrays.asList("UPDATED_BY", "UPDATE_BY", "UPDATED_TIME", "UPDATE_TIME", "REMARK");
+    private static final List<String> TRAILING_COLUMN_ORDER =
+            Arrays.asList("STATUS", "CREATED_BY", "CREATE_BY", "CREATED_TIME", "CREATE_TIME");
     private final IMasterDataService dataService;
     private final IMasterDataMetadataService metadataService;
     private final MasterReferenceService references;
@@ -78,22 +94,21 @@ public class MasterDataExportServiceImpl implements IMasterDataExportService {
         MasterDataMetadataRespVO definition = metadataService.getMetadata(instanceId, filter.getModelId());
         MasterDataRespVO first = dataService.getData(instanceId, filter);
         if (!definition.getModelVersionId().equals(first.getModelVersionId())) {
-            throw new ServiceException("导出期间模型版本发生变化，请重试");
+            throw new ServiceException("导出期间模型版本发生变化，请重试", HttpStatus.WARN);
         }
         long total = first.getTotal() == null ? 0L : first.getTotal();
-        if (total > MAX_ROWS) throw new ServiceException("当前筛选结果超过 5000 条，请缩小范围后导出");
+        if (total > MAX_ROWS) {
+            throw new ServiceException("当前筛选结果超过 5000 条，请缩小范围后导出", HttpStatus.WARN);
+        }
         if (first.getRows() == null || first.getRows().size() != Math.min(total, PAGE_SIZE)) {
-            throw new ServiceException("导出期间数据发生变化，请重试");
+            throw new ServiceException("导出期间数据发生变化，请重试", HttpStatus.WARN);
         }
         // 与 qData-pro2 的导出一样，先按查询条件取完整结果，再写入 HttpServletResponse。
         // 当前模型的列来自元数据，不能使用仅支持固定 @Excel 注解字段的 ExcelUtil<T>。
-        List<MasterColumnRespVO> columns = new ArrayList<>(definition.getColumns());
-        // 主数据ID在首列，其后依次为业务字段和其他系统字段；组内保留元数据顺序。
-        columns.sort(Comparator.comparingInt(column -> "ID".equalsIgnoreCase(column.getProp()) ? 0
-                : Boolean.TRUE.equals(column.getBusinessField()) ? 1 : 2));
+        List<MasterColumnRespVO> columns = listOrderColumns(definition.getColumns());
         MasterModelRespDTO model = metadataService.getModel(instanceId, definition.getModelId());
         if (!definition.getModelVersionId().equals(model.getModelVersionId()))
-            throw new ServiceException("导出期间模型版本发生变化，请重试");
+            throw new ServiceException("导出期间模型版本发生变化，请重试", HttpStatus.WARN);
         Map<String, ReferenceValues> choices = references.load(model);
         List<Map<String, Object>> rows = new ArrayList<>(first.getRows());
         for (int page = 2; rows.size() < total; page++) {
@@ -103,7 +118,7 @@ public class MasterDataExportServiceImpl implements IMasterDataExportService {
             if (!first.getModelVersionId().equals(next.getModelVersionId())
                     || next.getTotal() == null || next.getTotal() != total
                     || next.getRows() == null || next.getRows().size() != expected) {
-                throw new ServiceException("导出期间数据发生变化，请重试");
+                throw new ServiceException("导出期间数据发生变化，请重试", HttpStatus.WARN);
             }
             rows.addAll(next.getRows());
         }
@@ -114,13 +129,23 @@ public class MasterDataExportServiceImpl implements IMasterDataExportService {
             Sheet sheet = book.createSheet("正式数据");
             CellStyle textStyle = book.createCellStyle();
             textStyle.setDataFormat(book.createDataFormat().getFormat("@"));
+            DataFormat dataFormat = book.createDataFormat();
+            CellStyle dateStyle = book.createCellStyle();
+            dateStyle.setDataFormat(dataFormat.getFormat("yyyy-mm-dd"));
+            CellStyle dateTimeStyle = book.createCellStyle();
+            dateTimeStyle.setDataFormat(dataFormat.getFormat("yyyy-mm-dd hh:mm:ss"));
+            CellStyle creatorStyle = book.createCellStyle();
+            creatorStyle.cloneStyleFrom(textStyle);
+            creatorStyle.setWrapText(true);
             Row header = sheet.createRow(0);
             for (int i = 0; i < columns.size(); i++) {
                 header.createCell(i).setCellValue(columns.get(i).getLabel());
                 sheet.setColumnWidth(i, 20 * 256);
             }
             MasterEditableWorkbook.attach(book, sheet, model, columns, choices, rows.size());
-            writeRows(sheet, 1, columns, rows, textStyle, choices);
+            int nextRow = writeRows(sheet, 1, columns, rows, textStyle, dateStyle, dateTimeStyle,
+                    creatorStyle, choices);
+            MasterEditableWorkbook.setStreamingSheetRange(sheet, nextRow - 1, columns.size() - 1);
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             response.setCharacterEncoding("utf-8");
             book.write(response.getOutputStream());
@@ -141,26 +166,130 @@ public class MasterDataExportServiceImpl implements IMasterDataExportService {
         }
     }
 
+    private List<MasterColumnRespVO> listOrderColumns(List<MasterColumnRespVO> definitionColumns) {
+        List<MasterColumnRespVO> ordered = new ArrayList<>();
+        Set<String> included = new HashSet<>();
+        appendColumns(ordered, included, definitionColumns,
+                column -> "ID".equalsIgnoreCase(column.getProp()));
+        appendColumns(ordered, included, definitionColumns,
+                column -> Boolean.TRUE.equals(column.getBusinessField())
+                        && !"ID".equalsIgnoreCase(column.getProp()));
+        appendColumns(ordered, included, definitionColumns,
+                column -> !Boolean.TRUE.equals(column.getBusinessField())
+                        && column.getProp() != null
+                        && !"ID".equalsIgnoreCase(column.getProp())
+                        && !TRAILING_COLUMN_ORDER.contains(column.getProp().toUpperCase(Locale.ROOT))
+                        && !HIDDEN_LIST_COLUMNS.contains(column.getProp().toUpperCase(Locale.ROOT)));
+        for (String prop : TRAILING_COLUMN_ORDER) {
+            appendColumns(ordered, included, definitionColumns,
+                    column -> prop.equalsIgnoreCase(column.getProp()));
+        }
+        appendColumns(ordered, included, definitionColumns, column -> true);
+        return ordered;
+    }
+
+    private void appendColumns(List<MasterColumnRespVO> ordered, Set<String> included,
+            List<MasterColumnRespVO> definitionColumns,
+            Predicate<MasterColumnRespVO> matches) {
+        for (MasterColumnRespVO column : definitionColumns) {
+            String prop = column.getProp();
+            if (prop != null && matches.test(column) && included.add(prop.toUpperCase(Locale.ROOT))) {
+                ordered.add(column);
+            }
+        }
+    }
+
     private int writeRows(Sheet sheet, int index, List<MasterColumnRespVO> columns,
-                          List<Map<String, Object>> rows, CellStyle textStyle, Map<String, ReferenceValues> choices) {
+                          List<Map<String, Object>> rows, CellStyle textStyle, CellStyle dateStyle,
+                          CellStyle dateTimeStyle, CellStyle creatorStyle, Map<String, ReferenceValues> choices) {
         if (rows == null) return index;
         for (Map<String, Object> data : rows) {
             Row row = sheet.createRow(index++);
             for (int i = 0; i < columns.size(); i++) {
                 MasterColumnRespVO column = columns.get(i);
-                Object value = data.get(column.getProp());
                 Cell cell = row.createCell(i);
+                if (isUserColumn(column)) {
+                    String userType = isCreatorColumn(column) ? "CREATED_BY" : "UPDATED_BY";
+                    String name = text(data.get(userType + "_NAME"));
+                    if (name.isEmpty()) name = text(data.get(column.getProp()));
+                    String phone = text(data.get(userType + "_PHONE"));
+                    cell.setCellStyle(creatorStyle);
+                    cell.setCellValue(phone.isEmpty() ? name : name + "\n" + phone);
+                    if (!phone.isEmpty()) row.setHeightInPoints(sheet.getDefaultRowHeightInPoints() * 2);
+                    continue;
+                }
+                String dataType = column.getDataType() == null ? ""
+                        : column.getDataType().trim().toUpperCase(Locale.ROOT).replaceAll("\\(.*\\)$", "");
+                if ("DATE".equals(dataType) || "DATETIME".equals(dataType) || "TIMESTAMP".equals(dataType)) {
+                    boolean dateOnly = "DATE".equals(dataType);
+                    cell.setCellStyle(dateOnly ? dateStyle : dateTimeStyle);
+                    Object value = data.get(column.getProp());
+                    if (value != null && !String.valueOf(value).trim().isEmpty()) {
+                        Double serial = excelDateValue(value, dateOnly);
+                        if (serial != null) {
+                            cell.setCellValue(serial);
+                            continue;
+                        }
+                        cell.setCellStyle(textStyle);
+                        cell.setCellValue(String.valueOf(value));
+                    }
+                    continue;
+                }
                 cell.setCellStyle(textStyle);
+                Object value = data.get(column.getProp());
                 ReferenceValues fieldChoices = choices.get(column.getProp());
-                cell.setCellValue(fieldChoices == null ? display(value, column) : fieldChoices.display(value));
+                cell.setCellValue(fieldChoices == null
+                        ? display(value, column) : display(fieldChoices.display(value), column));
             }
         }
         return index;
     }
 
+    private Double excelDateValue(Object value, boolean dateOnly) {
+        try {
+            String text = String.valueOf(value).trim();
+            if (dateOnly) {
+                LocalDate date = LocalDate.parse(text, DateTimeFormatter.ISO_LOCAL_DATE);
+                return DateUtil.getExcelDate(java.util.Date.from(
+                        date.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+            }
+            LocalDateTime dateTime = LocalDateTime.parse(text.replace(' ', 'T'),
+                    DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            return DateUtil.getExcelDate(java.util.Date.from(
+                    dateTime.atZone(ZoneId.systemDefault()).toInstant()));
+        } catch (DateTimeParseException ex) {
+            return null;
+        }
+    }
+
+    private boolean isCreatorColumn(MasterColumnRespVO column) {
+        return "CREATED_BY".equalsIgnoreCase(column.getProp())
+                || "CREATE_BY".equalsIgnoreCase(column.getProp())
+                || "创建人".equals(column.getLabel());
+    }
+
+    private boolean isUserColumn(MasterColumnRespVO column) {
+        return isCreatorColumn(column)
+                || "UPDATED_BY".equalsIgnoreCase(column.getProp())
+                || "UPDATE_BY".equalsIgnoreCase(column.getProp())
+                || "更新人".equals(column.getLabel());
+    }
+
+    private String text(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
     String display(Object value, MasterColumnRespVO column) {
         if (value == null) return "";
         String text = String.valueOf(value);
+        if ("DATA_SOURCE".equalsIgnoreCase(column == null ? null : column.getProp())) {
+            switch (text) {
+                case "MANUAL": return "平台录入";
+                case "IMPORT": return "批量导入";
+                case "MERGE": return "多源融合";
+                default: return text;
+            }
+        }
         String dict = column == null ? null : column.getDict();
         if ("master_data_status".equals(dict)) {
             String label = MasterStatusLabels.lifecycle(text);

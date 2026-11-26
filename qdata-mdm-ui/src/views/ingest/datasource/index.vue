@@ -18,7 +18,7 @@
 
 <template>
   <div class="app-container" ref="app-container">
-    <GuideTip tip-id="da/daDatasource.list"/>
+    <guide-tip tip-id="da/daDatasource.list"/>
 
     <qt-wrap :columns="tableStore.columns" :tableRef="tableRef">
       <template #search>
@@ -98,6 +98,7 @@
                   link
                   type="primary"
                   icon="Edit"
+                  :disabled="row.validFlag === true"
                   @click="handleUpdate(row)"
                   v-hasPermi="['ingest:datasource:edit']"
               >修改连接
@@ -108,6 +109,7 @@
                   link
                   type="danger"
                   icon="Delete"
+                  :disabled="row.validFlag !== false"
                   @click="handleDelete(row)"
                   v-hasPermi="['ingest:datasource:remove']"
               >删除连接
@@ -409,8 +411,6 @@ const datasourceTypeMap = {
   ORACLE: "Oracle",
   POSTGRESQL: "PostgreSQL",
   SQLSERVER: "SQL Server",
-  GBase8c: "GBase 8c",
-  HighGo: "瀚高数据库",
   UNKNOWN: "未知类型",
 };
 
@@ -644,12 +644,9 @@ function handleFieldChange({field}) {
 }
 
 //数据连接类型change事件
-function handleDatasourceChange(type) {
+function handleDatasourceChange() {
   form.value.useSSL = 0;
   form.value.sslConfig = {};
-  if (isOceanBaseDatasource(type)) {
-    form.value.port = form.value.port || "2881";
-  }
 }
 
 function handleSSLChange() {
@@ -908,11 +905,6 @@ async function handleStepChange(targetIndex) {
 // 接收 DatasourceConfirmStep 传出的诊断结果
 function onDiagnosisChange(result) {
   currentDiagnosis.value = result;
-}
-
-function isOceanBaseDatasource(type) {
-  const datasourceType = String(type || "").toUpperCase();
-  return datasourceType === "OCEANBASE" || datasourceType === "OCEANBASE_ORACLE";
 }
 
 // 构建测试连接数据
@@ -1345,6 +1337,10 @@ function doSubmit() {
 
 /** 删除按钮操作 */
 function handleDelete(row) {
+  if (row.validFlag !== false) {
+    proxy.$modal.msgWarning("数据连接已启用，请先禁用后再删除");
+    return;
+  }
   const _ids = row.id || ids.value;
   proxy.$modal
       .confirm('是否确认删除数据连接编号为"' + _ids + '"的数据项？')
@@ -1393,7 +1389,7 @@ function handleStatusChange(row) {
                       handleQuery();
                     });
               } else {
-                ElMessageBox.alert(error.msg, "提示", {
+                ElMessageBox.alert(error?.msg || error?.message || '状态修改失败，请稍后重试', "提示", {
                   confirmButtonText: "确定",
                   type: "warning",
                 });

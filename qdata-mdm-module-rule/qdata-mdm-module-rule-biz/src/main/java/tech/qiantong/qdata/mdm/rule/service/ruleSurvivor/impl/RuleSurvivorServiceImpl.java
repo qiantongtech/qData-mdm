@@ -18,11 +18,14 @@
 
 package tech.qiantong.qdata.mdm.rule.service.ruleSurvivor.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -135,10 +138,25 @@ public class RuleSurvivorServiceImpl  extends ServiceImpl<RuleSurvivorMapper,Rul
                 .set(updateReqVO.isResponsibleUserSpecified() && updateReqVO.getResponsibleUserId() == null,
                         RuleSurvivorDO::getResponsibleUserId, null));
     }
+    /** 锁定待删除规则，确认整批均已禁用后才逻辑删除。 */
     @Override
     public int removeRuleSurvivor(Collection<Long> idList) {
-        // 批量删除生存规则
-        return ruleSurvivorMapper.deleteBatchIds(idList);
+        if (idList == null || idList.isEmpty()) {
+            return 0;
+        }
+        Set<Long> ids = new HashSet<>(idList);
+        List<RuleSurvivorDO> rules = ruleSurvivorMapper.selectList(new LambdaQueryWrapper<RuleSurvivorDO>()
+                .select(RuleSurvivorDO::getId, RuleSurvivorDO::getValidFlag)
+                .in(RuleSurvivorDO::getId, ids)
+                .orderByAsc(RuleSurvivorDO::getId)
+                .last("FOR UPDATE"));
+        if (rules.size() != ids.size()) {
+            throw new tech.qiantong.qdata.mdm.common.exception.ServiceException("所选规则已不存在，请刷新列表后重试");
+        }
+        if (rules.stream().anyMatch(rule -> !Boolean.FALSE.equals(rule.getValidFlag()))) {
+            throw new tech.qiantong.qdata.mdm.common.exception.ServiceException("请先禁用所选规则再删除");
+        }
+        return ruleSurvivorMapper.deleteBatchIds(ids);
     }
 
     @Override

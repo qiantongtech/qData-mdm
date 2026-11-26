@@ -26,6 +26,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestRunLogRespVO;
@@ -79,11 +80,14 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
      * 终态事件全部归档后，序号与快照继续保留的秒数。
      */
     private static final int COMPLETED_CACHE_SECONDS = 86400;
+    private static final long SEQUENCE_SEED_REQUIRED = -2L;
 
     /**
      * 原子追加脚本：KEYS 依次对应序号、快照、事件集合、待归档实例集合。
-     * ARGV 依次为事件 JSON、实例 ID、终态标志；返回正序号、0（已有终态）或 -1（积压）。
+     * ARGV 依次为事件 JSON、实例 ID、终态标志、已归档最大序号（首次调用为空）。
+     * 返回正序号、0（已有终态）、-1（积压）或 -2（需要查询已归档序号）。
      * 未归档事件不设置过期时间，避免数据库不可用时被自动淘汰。
+     * 多字段快照使用 HMSET，兼容 Redis 4.0 之前的版本。
      */
     private static final DefaultRedisScript<Long> APPEND = new DefaultRedisScript<>(
             "if redis.call('hget', KEYS[2], 'finished') == '1' then\n"
@@ -92,9 +96,18 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
                     + "if ARGV[3] == '0' and redis.call('zcard', KEYS[3]) >= " + MAX_PENDING_EVENTS + " then\n"
                     + "  return -1\n"
                     + "end\n"
+                    + "if redis.call('exists', KEYS[1]) == 0 then\n"
+                    + "  if ARGV[4] == '' then return " + SEQUENCE_SEED_REQUIRED + " end\n"
+                    + "  local base = tonumber(ARGV[4])\n"
+                    + "  local newest = redis.call('zrevrange', KEYS[3], 0, 0, 'WITHSCORES')\n"
+                    + "  if newest[2] then base = math.max(base, tonumber(newest[2])) end\n"
+                    + "  local snapshot = redis.call('hget', KEYS[2], 'event')\n"
+                    + "  if snapshot then base = math.max(base, tonumber(string.match(snapshot, '^(%d+)|'))) end\n"
+                    + "  redis.call('set', KEYS[1], string.format('%.0f', base))\n"
+                    + "end\n"
                     + "local seq = redis.call('incr', KEYS[1])\n"
                     + "local event = tostring(seq) .. '|' .. ARGV[1]\n"
-                    + "redis.call('hset', KEYS[2], 'event', event, 'finished', ARGV[3])\n"
+                    + "redis.call('hmset', KEYS[2], 'event', event, 'finished', ARGV[3])\n"
                     + "redis.call('persist', KEYS[1])\n"
                     + "redis.call('persist', KEYS[2])\n"
                     + "redis.call('zadd', KEYS[3], seq, event)\n"
@@ -103,11 +116,13 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
 
     /**
      * 归档确认脚本：KEYS 与追加脚本一致，ARGV 为已提交最大序号和实例 ID。
-     * 仅移除已提交事件；集合清空时移出待归档集合，并为终态序号和快照设置保留期限。
+     * 仅移除已提交事件，序号为零时只检查集合是否为空；为空则移除待归档标记并设置终态缓存有效期。
      * 返回 1 表示本次确认执行完成。
      */
     private static final DefaultRedisScript<Long> ACK = new DefaultRedisScript<>(
-            "redis.call('zremrangebyscore', KEYS[3], '-inf', ARGV[1])\n"
+            "if ARGV[1] ~= '0' then\n"
+                    + "  redis.call('zremrangebyscore', KEYS[3], '-inf', ARGV[1])\n"
+                    + "end\n"
                     + "if redis.call('zcard', KEYS[3]) == 0 then\n"
                     + "  redis.call('srem', KEYS[4], ARGV[2])\n"
                     + "  if redis.call('hget', KEYS[2], 'finished') == '1' then\n"
@@ -152,14 +167,10 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
      */
     @Override
     public void publish(IngestTaskInstanceDO instance, String level, String stage, String message) {
-        // Redis 缓存丢失或过期后从已归档序号续接，避免序号回退造成去重误丢。
-        String sequenceKey = keys(instance.getId()).get(0);
-        if (!Boolean.TRUE.equals(stringRedisTemplate.hasKey(sequenceKey))) {
-            stringRedisTemplate.opsForValue().setIfAbsent(sequenceKey,
-                    Long.toString(logMapper.maxSequence(instance.getId())));
-        }
+        Long runId = instance.getId();
+        List<String> redisKeys = keys(runId);
         IngestTaskInstanceLogDO record = new IngestTaskInstanceLogDO();
-        record.setTaskInstanceId(instance.getId());
+        record.setTaskInstanceId(runId);
         record.setLogLevel(level);
         record.setStage(stage);
         record.setMessage(message == null ? "" : message.substring(0, Math.min(MAX_MESSAGE_LENGTH, message.length())));
@@ -167,8 +178,14 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
         IngestRunEvent event = new IngestRunEvent();
         event.setSnapshot(instance);
         event.setLog(record);
-        Long seq = stringRedisTemplate.execute(APPEND, keys(instance.getId()), JSON.toJSONString(event),
-                instance.getId().toString(), instance.getEndTime() == null ? "0" : "1");
+        String payload = JSON.toJSONString(event);
+        String finished = instance.getEndTime() == null ? "0" : "1";
+        Long seq = stringRedisTemplate.execute(APPEND, redisKeys, payload, runId.toString(), finished, "");
+        if (Long.valueOf(SEQUENCE_SEED_REQUIRED).equals(seq)) {
+            // 仅在序号键缺失时查库，脚本合并已归档序号、待归档序号和快照序号后原子续接。
+            seq = stringRedisTemplate.execute(APPEND, redisKeys, payload, runId.toString(), finished,
+                    Long.toString(logMapper.maxSequence(runId)));
+        }
         if (seq == null) {
             throw new ServiceException("执行日志暂存失败");
         }
@@ -198,8 +215,8 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
             return stored;
         }
         try {
-            Object event = stringRedisTemplate.opsForHash().get(keys(stored.getId()).get(1), "event");
-            return event == null ? stored : decode(event.toString()).getSnapshot();
+            IngestRunEvent event = readSnapshot(keys(stored.getId()).get(1));
+            return event == null ? stored : event.getSnapshot();
         } catch (Exception ex) {
             log.warn("读取实时接入进度失败，runId={}", stored.getId(), ex);
             return stored;
@@ -219,29 +236,33 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
     @Override
     public IngestRunLogRespVO read(Long taskId, Long runId, long afterSeq) {
         if (afterSeq < 0) {
-            throw new ServiceException("日志游标不正确");
+            throw new ServiceException("日志游标不正确", HttpStatus.WARN);
         }
         IngestTaskInstanceDO stored = instanceMapper.selectById(runId);
         if (stored == null || !Objects.equals(taskId, stored.getTaskId())) {
-            throw new ServiceException("运行记录不存在");
+            throw new ServiceException("运行记录不存在", HttpStatus.WARN);
         }
-        // 先取状态再取日志，避免页面看到终态后停刷，却未拿到对应的结束事件。
-        IngestTaskInstanceDO current = latest(stored);
-        long lastSeq = logMapper.maxSequence(runId);
+        List<String> redisKeys = keys(runId);
+        IngestTaskInstanceDO current = stored;
+        long lastSeq = 0;
         TreeMap<Long, IngestTaskInstanceLogDO> rows = new TreeMap<>();
-        // 先读待落库事件，再读数据库，覆盖两次读取之间的归档窗口。
         try {
-            Set<String> cached = stringRedisTemplate.opsForZSet().rangeByScore(keys(runId).get(2),
+            // 先读快照再读日志，避免返回终态时遗漏对应的结束事件。
+            IngestRunEvent snapshotEvent = readSnapshot(redisKeys.get(1));
+            if (snapshotEvent != null) {
+                lastSeq = snapshotEvent.getLog().getEventSeq();
+                if (stored.getEndTime() == null) {
+                    current = snapshotEvent.getSnapshot();
+                }
+            }
+            // 先读待归档事件，再读数据库，覆盖两次读取之间的归档窗口。
+            Set<String> cached = stringRedisTemplate.opsForZSet().rangeByScore(redisKeys.get(2),
                     afterSeq + 1D, Double.POSITIVE_INFINITY, 0, BATCH_SIZE + 1);
             if (cached != null) {
                 for (String value : cached) {
                     IngestRunEvent event = decode(value);
                     rows.put(event.getLog().getEventSeq(), event.getLog());
                 }
-            }
-            Object snapshotEvent = stringRedisTemplate.opsForHash().get(keys(runId).get(1), "event");
-            if (snapshotEvent != null) {
-                lastSeq = Math.max(lastSeq, decode(snapshotEvent.toString()).getLog().getEventSeq());
             }
         } catch (Exception ex) {
             if (stored.getEndTime() == null) {
@@ -250,6 +271,7 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
             }
             log.warn("Redis不可用，读取已归档运行日志，runId={}", runId, ex);
         }
+        lastSeq = Math.max(lastSeq, logMapper.maxSequence(runId));
         PageHelper.startPage(1, BATCH_SIZE + 1, false);
         try {
             for (IngestTaskInstanceLogDO record : logMapper.selectAfter(runId, afterSeq)) {
@@ -302,15 +324,16 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
      * @throws ServiceException 实例不存在或数据库提交后的 Redis 确认失败
      */
     void flushRun(Long runId) {
+        List<String> redisKeys = keys(runId);
         Long acknowledged = new TransactionTemplate(transactionManager).execute(status -> {
             // 数据库行锁串行化多个服务节点的归档；重试按事件序号去重。
             IngestTaskInstanceDO stored = instanceMapper.lockRun(runId);
-            if (stored == null) {
-                throw new ServiceException("日志所属运行实例不存在");
-            }
-            Set<String> batch = stringRedisTemplate.opsForZSet().range(keys(runId).get(2), 0, BATCH_SIZE - 1);
+            Set<String> batch = stringRedisTemplate.opsForZSet().range(redisKeys.get(2), 0, BATCH_SIZE - 1);
             if (batch == null || batch.isEmpty()) {
                 return 0L;
+            }
+            if (stored == null) {
+                throw new ServiceException("日志所属运行实例不存在");
             }
             long persisted = logMapper.maxSequence(runId);
             long last = 0;
@@ -329,13 +352,24 @@ public class IngestRunLogServiceImpl implements IIngestRunLogService {
             }
             return last;
         });
-        if (acknowledged != null && acknowledged > 0) {
-            Long confirmed = stringRedisTemplate.execute(ACK, keys(runId), acknowledged.toString(), runId.toString());
+        if (acknowledged != null) {
+            Long confirmed = stringRedisTemplate.execute(ACK, redisKeys, acknowledged.toString(), runId.toString());
             if (!Long.valueOf(1L).equals(confirmed)) {
                 throw new ServiceException("日志已入库但 Redis 确认失败，等待幂等重试");
             }
             log.debug("接入日志归档确认完成，runId={}, acknowledgedSeq={}", runId, acknowledged);
         }
+    }
+
+    /**
+     * 读取最新的日志事件及运行快照。
+     *
+     * @param snapshotKey Redis 快照键
+     * @return 最新事件，快照不存在时返回空
+     */
+    private IngestRunEvent readSnapshot(String snapshotKey) {
+        Object event = stringRedisTemplate.opsForHash().get(snapshotKey, "event");
+        return event == null ? null : decode(event.toString());
     }
 
     /**

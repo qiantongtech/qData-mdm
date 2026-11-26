@@ -26,13 +26,13 @@ import tech.qiantong.qdata.mdm.ingest.controller.admin.task.vo.IngestTaskRespVO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.ingest.IngestTaskInstanceDO;
 import tech.qiantong.qdata.mdm.ingest.utils.task.IngestTaskExecutionUtils;
 
-import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.GOVERNANCE_PENDING;
-
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static tech.qiantong.qdata.mdm.ingest.enums.task.IngestTaskConstants.GOVERNANCE_PENDING;
 
 /**
  * 来源实体表按来源记录唯一标识追加业务值、融合状态及采集版本字段。
@@ -59,8 +59,19 @@ public class IngestSourceTableSession implements AutoCloseable {
      * 实际 JDBC 类型用于绑定参数，避免依赖数据库隐式转换。
      */
     private final Map<String, Integer> columnTypes = new LinkedHashMap<>();
+    private int sourceRecordIdLength;
     private String insertSql;
 
+    /**
+     * 保存本次写入所用的连接和表信息，排除由系统管理的主键及状态列。
+     *
+     * @param query 本次运行独占的查询器
+     * @param connection 目标库连接
+     * @param dialect 目标库方言
+     * @param schemaName 来源表所在模式，可为空
+     * @param tableName 来源表表名
+     * @param columns 模型业务字段编码
+     */
     private IngestSourceTableSession(DbQuery query, Connection connection, DbDialect dialect, String schemaName, String tableName, List<String> columns) {
         this.query = query;
         this.connection = connection;
@@ -78,8 +89,9 @@ public class IngestSourceTableSession implements AutoCloseable {
      * @param dialect 与目标数据源匹配的数据库方言
      * @param schemaName 模型发布的目标模式，可为空；与表名分段校验并引用
      * @param tableName 模型生成的来源表名，不包含模式前缀
-     * @param columns 模型业务字段，id 和 status 由接入逻辑管理
-     * @return 已校验物理列和写入约束的会话
+     * @param columns 模型业务字段，id 由数据库自增生成，status 由接入逻辑管理
+     * @return 已准备好插入 SQL 和参数类型的写入会话
+     * @throws ServiceException 连接、写入 SQL 准备或事务初始化失败
      */
     static IngestSourceTableSession open(DbQuery query, DbDialect dialect, String schemaName, String tableName, List<String> columns) {
         Connection connection = null;
@@ -99,7 +111,10 @@ public class IngestSourceTableSession implements AutoCloseable {
     }
 
     /**
-     * 校验实际列名及扩展字段，业务列按模型编码忽略大小写匹配；SQL 标识符和锁查询使用公共方言。
+     * 读取物理列信息，校验必填列并生成插入 SQL 和绑定参数。
+     *
+     * @throws SQLException 查询物理表或列元数据失败
+     * @throws ServiceException 表名或列名无效，或者插入 SQL 所需的列不存在
      */
     private void prepare() throws SQLException {
         String table = quoteIdentifier(tableName);
@@ -118,6 +133,9 @@ public class IngestSourceTableSession implements AutoCloseable {
                     String key = column.toLowerCase(Locale.ROOT);
                     physicalColumns.put(key, quoteIdentifier(column));
                     columnTypes.put(key, metadata.getColumnType(i));
+                    if ("source_record_id".equals(key)) {
+                        sourceRecordIdLength = metadata.getPrecision(i);
+                    }
                 }
             }
         }
@@ -141,28 +159,51 @@ public class IngestSourceTableSession implements AutoCloseable {
         List<String> columns = new ArrayList<>(mappedColumns);
         columns.add("status");
         columns.addAll(EXTENSION_COLUMNS);
+        validateConstraints(columns);
         insertSql = "INSERT INTO " + table + " (" + columns.stream().map(this::physicalColumn)
                 .collect(Collectors.joining(",")) + ") VALUES ("
                 + String.join(",", Collections.nCopies(columns.size(), "?")) + ")";
-        validateConstraints(columns);
     }
 
     /**
-     * 为每次成功采集追加一个来源数据版本，不在本方法中提交。
-     * 最终失败交由执行服务回滚；调用方 commitRow 成功后才能计入成功数。
+     * 根据原始唯一字段生成标识，使用当前来源表的列长度校验。
+     *
+     * @param identityValues 来源唯一字段及其原始值
+     * @return 校验通过的来源记录标识
+     * @throws ServiceException 唯一字段缺失、值无效或标识超过实际列长度
+     */
+    public String prepareRecordId(Map<String, Object> identityValues) {
+        return IngestTaskExecutionUtils.stableRecordId(identityValues, sourceRecordIdLength);
+    }
+
+    /**
+     * 追加一个来源数据版本，不在本方法中提交。
+     *
+     * @param task 本次接入任务配置
+     * @param instance 本次运行实例及批次信息
+     * @param recordKey 已校验的来源记录标识
+     * @param modelData 已转换的目标字段值，未映射列写入 null
+     * @throws ServiceException 插入失败或影响行数不为一
      */
     public void writeRecord(IngestTaskRespVO task, IngestTaskInstanceDO instance,
-                            Map<String, Object> identityValues, Map<String, Object> modelData) {
-        String recordKey = IngestTaskExecutionUtils.stableRecordId(identityValues);
+                            String recordKey, Map<String, Object> modelData) {
         Object batch = numericColumn("batch_id") ? instance.getId() : instance.getBatchNo();
         insertVersion(modelData, task.getSourceId(), recordKey, task.getId(), batch,
                 new Timestamp(System.currentTimeMillis()));
     }
 
     /**
-     * 每个版本的主键由数据库自增生成，并置为待融合，便于按批次追溯本次采集值。
+     * 插入一条待融合的来源记录；主键由数据库自增生成。
+     *
+     * @param data 已转换的业务字段值
+     * @param sourceId 来源系统 ID
+     * @param recordKey 来源记录标识
+     * @param taskId 接入任务 ID
+     * @param batch 批次编号，类型与物理列一致
+     * @param receivedAt 本条记录的采集时间
+     * @throws ServiceException 插入失败或影响行数不为一
      */
-    private void insertVersion(Map<String, Object> data, Long sourceId, Object recordKey,
+    private void insertVersion(Map<String, Object> data, Long sourceId, String recordKey,
                                Long taskId, Object batch, Timestamp receivedAt) {
         /*
          * 保持与 prepare 中占位符一致的列顺序，避免业务值与采集字段错位。
@@ -194,7 +235,13 @@ public class IngestSourceTableSession implements AutoCloseable {
     }
 
     /**
-     * 按物理列类型绑定参数；日期字符串先转为 JDBC 日期或时间戳，不将值拼入 SQL。
+     * 按物理列类型绑定参数；日期文本转为 JDBC 日期或时间戳。
+     *
+     * @param statement 待绑定参数的插入语句
+     * @param index 从 1 开始的参数位置
+     * @param column 参数对应的逻辑列名
+     * @param value 待绑定的值，可为空
+     * @throws SQLException JDBC 参数绑定失败
      */
     private void bindValue(PreparedStatement statement, int index, String column, Object value) throws SQLException {
         int type = columnTypes.get(column.toLowerCase(Locale.ROOT));
@@ -211,7 +258,9 @@ public class IngestSourceTableSession implements AutoCloseable {
     }
 
     /**
-     * 按 del_flag 实际类型使用 false、数字0或字符串0表示正常。
+     * 获取正常记录对应的删除标记。
+     *
+     * @return 按物理列类型返回 false、数字 0 或字符串 0
      */
     private Object activeFlag() {
         int type = columnTypes.get("del_flag");
@@ -220,7 +269,10 @@ public class IngestSourceTableSession implements AutoCloseable {
     }
 
     /**
-     * 识别整数或精确数值列，用于批次号和逻辑删除标识的值类型选择。
+     * 识别整数或精确数值列，用于选择采集扩展字段的绑定类型。
+     *
+     * @param column 已校验的逻辑列名
+     * @return 列为整数或精确数值类型时返回 true
      */
     private boolean numericColumn(String column) {
         int type = columnTypes.get(column);
@@ -229,7 +281,9 @@ public class IngestSourceTableSession implements AutoCloseable {
     }
 
     /**
-     * 提交目标实体行；调用方提交成功后才增加运行成功数。
+     * 提交当前行的目标库事务；调用方只有在提交成功后才能增加成功数。
+     *
+     * @throws ServiceException 目标库提交失败，调用方不能假定未提交
      */
     public void commitRow() {
         try {
@@ -240,7 +294,9 @@ public class IngestSourceTableSession implements AutoCloseable {
     }
 
     /**
-     * 单行任一阶段失败时释放目标锁并回滚暂存写入，不让半条记录进入下一行。
+     * 回滚当前行尚未提交的目标库写入并释放事务锁。
+     *
+     * @throws ServiceException 回滚失败，调用方必须终止本次运行
      */
     public void rollbackRow() {
         try {
@@ -250,9 +306,7 @@ public class IngestSourceTableSession implements AutoCloseable {
         }
     }
 
-    /**
-     * 仅检查未提供值的必填列；不要求改动既有主键、索引或业务列类型。
-     */
+    /** 校验未写入且没有默认值的必填列。 */
     private void validateConstraints(List<String> writtenColumns) throws SQLException {
         DatabaseMetaData metadata = connection.getMetaData();
         String catalog = connection.getCatalog();
@@ -296,8 +350,12 @@ public class IngestSourceTableSession implements AutoCloseable {
         }
     }
 
+
     /**
-     * 仅回显数据库错误码和安全的字段名称，不把驱动消息中的业务值、连接信息带到页面。
+     * 将 JDBC 错误转换为可展示的业务异常，原始异常仅保留在异常链中。
+     *
+     * @param ex 驱动抛出的原始异常
+     * @return 包含数据库错误码及可识别列名的业务异常
      */
     private ServiceException sqlFailure(SQLException ex) {
         String message = "来源表 " + tableName + " 写入失败（SQLState=" + ex.getSQLState()
@@ -312,7 +370,10 @@ public class IngestSourceTableSession implements AutoCloseable {
     }
 
     /**
-     * 必需字段以物理表为准，缺失时在执行写入前终止。
+     * 确认必需列存在于物理表，忽略列名大小写。
+     *
+     * @param column 必需的逻辑列名
+     * @throws ServiceException 物理表缺少指定列
      */
     private void requireColumn(String column) {
         if (!physicalColumns.containsKey(column.toLowerCase(Locale.ROOT))) {
@@ -321,14 +382,21 @@ public class IngestSourceTableSession implements AutoCloseable {
     }
 
     /**
-     * 取初始化时已经校验和引用的真实列名，供 SQL 组装使用。
+     * 获取用于组装 SQL 的物理列名。
+     *
+     * @param column 已校验的逻辑列名
+     * @return 初始化时已按目标库方言引用的列名
      */
     private String physicalColumn(String column) {
         return physicalColumns.get(column.toLowerCase(Locale.ROOT));
     }
 
     /**
-     * 名称只接受单段标识符；业务值始终通过预编译参数绑定。
+     * 校验单段标识符并按目标库方言引用。
+     *
+     * @param name 未引用的模式名、表名或列名
+     * @return 可用于组装 SQL 的引用标识符
+     * @throws ServiceException 名称不是有效的单段标识符
      */
     private String quoteIdentifier(String name) {
         if (name == null || !name.matches("[\\p{L}_][\\p{L}\\p{N}_$]*")) {
@@ -338,7 +406,11 @@ public class IngestSourceTableSession implements AutoCloseable {
     }
 
     /**
-     * 页面使用业务提示，原始异常保留为 cause 便于服务端定位。
+     * 创建可展示的业务异常，并保留原始原因供服务日志定位。
+     *
+     * @param message 可向用户展示的错误提示
+     * @param cause 原始异常
+     * @return 保留原始原因的业务异常
      */
     private static ServiceException failure(String message, Exception cause) {
         ServiceException failure = new ServiceException(message);
@@ -362,6 +434,9 @@ public class IngestSourceTableSession implements AutoCloseable {
 
     /**
      * 先关闭本次连接，再释放查询器资源；清理异常仅记录，不覆盖主异常。
+     *
+     * @param query 本次运行独占的查询器
+     * @param connection 待关闭的连接，获取失败时可为空
      */
     private static void closeResources(DbQuery query, Connection connection) {
         if (connection != null) {

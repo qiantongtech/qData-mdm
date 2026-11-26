@@ -30,7 +30,7 @@ import tech.qiantong.qdata.mdm.common.core.domain.CommonResult;
 import tech.qiantong.qdata.mdm.common.core.page.PageParam;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.enums.BusinessType;
-import tech.qiantong.qdata.mdm.common.exception.enums.GlobalErrorCodeConstants;
+import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.model.controller.admin.base.vo.*;
 import tech.qiantong.qdata.mdm.model.dal.dataobject.base.ModelBaseDO;
@@ -96,8 +96,6 @@ public class ModelBaseController extends BaseController {
     @Log(title = "主数据模型基本信息", businessType = BusinessType.INSERT)
     @PostMapping
     public CommonResult<Long> add(@Valid @RequestBody ModelBaseSaveReqVO modelBase) {
-        if (!modelBaseService.checkCodeUnique(modelBase.getCode(), null))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "新增主数据模型'" + modelBase.getCode() + "'失败，编码已存在");
         modelBase.setCreatorId(getUserId());
         modelBase.setCreateBy(getNickName());
         modelBase.setCreateTime(DateUtil.date());
@@ -109,8 +107,6 @@ public class ModelBaseController extends BaseController {
     @Log(title = "主数据模型基本信息", businessType = BusinessType.UPDATE)
     @PutMapping
     public CommonResult<Integer> edit(@Valid @RequestBody ModelBaseSaveReqVO modelBase) {
-        if (!modelBaseService.checkCodeUnique(modelBase.getCode(), modelBase.getId()))
-            return CommonResult.error(GlobalErrorCodeConstants.ERROR.getCode(), "修改主数据模型'" + modelBase.getCode() + "'失败，编码已存在");
         modelBase.setUpdatorId(getUserId());
         modelBase.setUpdateBy(getNickName());
         modelBase.setUpdateTime(DateUtil.date());
@@ -118,7 +114,7 @@ public class ModelBaseController extends BaseController {
     }
 
     /**
-     * 沿用原发布入口，成功返回实例结果；失败由现有异常处理器返回错误码及结果信息。
+     * 发布接口返回操作结果，具体失败原因在发布历史中查看。
      */
     @Operation(summary = "发布主数据模型")
     @PreAuthorize("@ss.hasPermi('model:base:edit')")
@@ -126,8 +122,13 @@ public class ModelBaseController extends BaseController {
     @PostMapping("/{id}/publish")
     public CommonResult<ModelBasePublishRespVO> publish(@PathVariable Long id,
                                                         @Valid @RequestBody ModelBasePublishReqVO publishReqVO) {
-        // 入口只接收主模型ID、目标数据源及当前操作人；主子模型和两套表由后端一起发布。
-        return CommonResult.success(modelBaseService.publishModelBase(id, publishReqVO, getUserId(), getNickName()));
+        Long userId = getUserId();
+        String userName = getNickName();
+        try {
+            return CommonResult.success(modelBaseService.publishModelBase(id, publishReqVO, userId, userName));
+        } catch (RuntimeException ex) {
+            throw publishResponseFailure(ex);
+        }
     }
 
     @Operation(summary = "停用模型")
@@ -143,7 +144,25 @@ public class ModelBaseController extends BaseController {
     @Log(title = "批量发布主数据模型", businessType = BusinessType.UPDATE)
     @PostMapping("/batch/publish")
     public CommonResult<ModelBaseBatchRespVO> batchPublish(@Valid @RequestBody ModelBaseBatchPublishReqVO request) {
-        return CommonResult.success(modelBaseService.batchPublishModelBase(request, getUserId(), getNickName()));
+        Long userId = getUserId();
+        String userName = getNickName();
+        try {
+            return CommonResult.success(modelBaseService.batchPublishModelBase(request, userId, userName));
+        } catch (RuntimeException ex) {
+            throw publishResponseFailure(ex);
+        }
+    }
+
+    private ServiceException publishResponseFailure(RuntimeException cause) {
+        ServiceException failure;
+        if (cause instanceof ServiceException) {
+            ServiceException serviceException = (ServiceException) cause;
+            failure = new ServiceException("发布失败", serviceException.getCode(), serviceException.getErrorData());
+        } else {
+            failure = new ServiceException("发布失败");
+        }
+        failure.initCause(cause);
+        return failure;
     }
 
     @Operation(summary = "批量停用主数据模型")

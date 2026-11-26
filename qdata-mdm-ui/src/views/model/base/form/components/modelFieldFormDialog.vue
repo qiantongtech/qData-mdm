@@ -66,7 +66,7 @@
                 :key="item.value"
                 :label="item.label"
                 :value="item.value"
-                :disabled="item.unresolved"
+                :disabled="item.unresolved || !canSelectDataType(item.value)"
             />
           </el-select>
         </qt-form-item>
@@ -125,15 +125,19 @@
           <el-input-number
               v-model="form.dataLength"
               :min="minimumLength"
+              :precision="0"
               :disabled="propertyReadonly('dataLength') || !showLength"
               controls-position="right"
               class="full-width"
               @change.capture="handleLengthInputChange"
+              @change="handleDecimalLengthChange"
           />
         </qt-form-item>
         <qt-form-item v-if="form.dataType === 'DECIMAL'" class="row-full" label="精度">
           <el-input-number
               v-model="form.dataScale"
+              :max="Math.max(0, Number(form.dataLength) || 0)"
+              :precision="0"
               :min="0"
               controls-position="right"
               class="full-width"
@@ -327,7 +331,7 @@
                 :key="item.key"
                 :label="item.label"
                 :value="item.value"
-                :disabled="item.unresolved"
+                :disabled="item.unresolved || !canSelectDataType(item.dataType)"
             />
           </el-select>
         </qt-form-item>
@@ -465,7 +469,7 @@ const props = defineProps({
   projectOptions: {type: Array, default: () => []},
   sourceFields: {type: Array, default: () => []},
   currentModelId: {type: [Number, String], default: null},
-  // 这里只接收成功发布的字段，保存过草稿的新字段仍可修改类型等属性。
+  // 这里只接收成功发布的字段，用于识别已物化字段。
   structureReadonly: {type: Boolean, default: false},
   originalFields: {type: Array, default: () => []},
   publishedFields: {type: Array, default: () => []},
@@ -565,6 +569,10 @@ const form = reactive(createEmptyForm());
 const originalField = computed(() => form.id == null ? null
     : props.originalFields.find(item => item.id != null && String(item.id) === String(form.id)));
 
+function canSelectDataType(type) {
+  return !props.structureReadonly || form.id == null || type === form.dataType || ['STRING', 'TEXT'].includes(type);
+}
+
 // 只替换判断值，保留现有的字段修改限制。
 function propertyReadonly(property) {
   if (props.readonly || form.readonly || form.columnCategory === 'SYSTEM') {
@@ -661,8 +669,27 @@ function handleLengthInputChange(event) {
   }
 }
 
+function handleDecimalLengthChange() {
+  if (form.dataType === 'DECIMAL' && !propertyReadonly('dataScale')
+      && form.dataScale > form.dataLength) {
+    form.dataScale = Math.max(0, Number(form.dataLength) || 0);
+  }
+}
+
 // 仅检查当前弹窗的长度，不对其他字段执行全量校验。
 function validateLength(_rule, value, callback) {
+  if (form.dataType === 'DECIMAL') {
+    const length = Number(value);
+    const scale = Number(form.dataScale ?? 0);
+    if (!Number.isSafeInteger(length) || length < 1) {
+      callback(new Error('属性长度必须是大于0的整数'));
+      return;
+    }
+    if (!Number.isSafeInteger(scale) || scale < 0 || scale > length) {
+      callback(new Error('小数位数必须是0到属性长度之间的整数'));
+      return;
+    }
+  }
   if (form.dataType === 'STRING') {
     const length = value == null || value === '' ? 255 : Number(value);
     if (!Number.isSafeInteger(length) || length < minimumLength.value) {
@@ -1044,7 +1071,6 @@ async function loadRelatedModels(projectId, layerId = form.layerId) {
           projectId,
           layerId,
           type: fieldKind.value === 'CLASS' ? 'CATEGORY' : 'NORMAL',
-          id: props.currentModelId || undefined,
         })
         : {data: []};
     const rows = response.data?.rows || response.data || [];
@@ -1165,14 +1191,14 @@ function handleDataTypeChange(dataType) {
   if (propertyReadonly('dataType')) {
     return;
   }
-  // 切换类型后不沿用上一个类型的默认值；字符串默认长度 255，小数默认精度 2。
+  // 切换类型后不沿用上一个类型的默认值；字符串默认长度 255，小数默认长度 1、小数位数 0。
   form.defaultValue = "";
   if (dataType === 'STRING') {
     form.dataLength = 255;
     form.dataScale = null;
   } else if (dataType === 'DECIMAL') {
-    form.dataLength = 18;
-    form.dataScale = 2;
+    form.dataLength = 1;
+    form.dataScale = 0;
   } else {
     form.dataLength = null;
     form.dataScale = null;

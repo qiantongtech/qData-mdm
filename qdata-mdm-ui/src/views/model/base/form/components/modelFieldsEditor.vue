@@ -117,6 +117,8 @@
                 :key="item.value"
                 :label="item.label"
                 :value="item.value"
+                :disabled="published && row.id != null && item.value !== row.dataType
+                    && !['STRING', 'TEXT'].includes(item.value)"
             />
           </el-select>
         </template>
@@ -205,6 +207,7 @@
               :data-model-field="row.localId"
               data-model-property="dataLength"
               :min="minimumLength(row)"
+              :precision="0"
               :disabled="isReadonly(row, 'dataLength')"
               :controls="false"
               placeholder="请输入属性长度"
@@ -217,6 +220,8 @@
           <el-input-number
               v-if="row.dataType === 'DECIMAL'"
               v-model="row.dataScale"
+              :max="Math.max(0, Number(row.dataLength) || 0)"
+              :precision="0"
               :data-model-field="row.localId"
               data-model-property="dataScale"
               :min="0"
@@ -386,9 +391,9 @@ const businessColumns = computed(() => [
   {label: "属性长度", prop: "localId", slot: "dataLength", minWidth: 100},
   {label: "小数", prop: "localId", slot: "dataScale", minWidth: 65},
   {label: "默认值", prop: "localId", slot: "defaultValue", minWidth: 132},
-  {label: fieldPropertyLabel('requiredFlag'), prop: "requiredFlag", slot: "requiredFlag", minWidth: 60},
-  {label: fieldPropertyLabel('uniqueFlag'), prop: "uniqueFlag", slot: "uniqueFlag", minWidth: 60},
-  {label: fieldPropertyLabel('nameFlag'), prop: "nameFlag", slot: "nameFlag", minWidth: 80},
+  {label: fieldPropertyLabel('requiredFlag'), prop: "requiredFlag", slot: "requiredFlag", minWidth: 90},
+  {label: fieldPropertyLabel('uniqueFlag'), prop: "uniqueFlag", slot: "uniqueFlag", minWidth: 90},
+  {label: fieldPropertyLabel('nameFlag'), prop: "nameFlag", slot: "nameFlag", minWidth: 100},
   {label: "参考数据", prop: "localId", slot: "reference", minWidth: 190, align: "left"},
 ]);
 
@@ -470,7 +475,7 @@ watch(visibleFields, () => {
 // 父组件切换子模型字段页签时，同步编辑器的当前字段分类。
 watch(() => props.initialKind, value => activeKind.value = value);
 
-// 只按成功发布字段的ID识别旧字段；新增字段即使保存过草稿、有了ID，也不受发布限制。
+// 只按成功发布字段的 ID 识别已物化字段。
 function originalField(row) {
   return row.id == null ? null : props.originalFields.find(item => item.id != null && String(item.id) === String(row.id));
 }
@@ -598,6 +603,16 @@ function validateFields() {
       const length = field.dataLength == null || field.dataLength === '' ? 255 : Number(field.dataLength);
       if (!Number.isSafeInteger(length) || length < minimumLength(field)) {
         return warnInvalidField(`属性长度必须是不小于${minimumLength(field)}`);
+      }
+    }
+    if (field.dataType === 'DECIMAL') {
+      const length = Number(field.dataLength);
+      const scale = Number(field.dataScale ?? 0);
+      if (!Number.isSafeInteger(length) || length < 1) {
+        return warnInvalidField('属性长度必须是大于0的整数');
+      }
+      if (!Number.isSafeInteger(scale) || scale < 0 || scale > length) {
+        return warnInvalidField('小数位数必须是0到属性长度之间的整数');
       }
     }
     if (!field.columnCategory) {
@@ -778,8 +793,8 @@ function handleInlineTypeChange(row) {
     row.dataScale = null;
   }
   if (row.dataType === 'DECIMAL') {
-    row.dataLength = row.dataLength || 18;
-    row.dataScale = 2;
+    row.dataLength = 1;
+    row.dataScale = 0;
   }
   if (!['STRING', 'DECIMAL'].includes(row.dataType)) {
     row.dataLength = null;
@@ -804,6 +819,10 @@ function updateFields(next) {
 
 // 行内变化只同步字段列表；新增统一校验模块已按要求移除。
 async function handleFieldChange(row, property) {
+  if (property === 'dataLength' && row.dataType === 'DECIMAL'
+      && !isReadonly(row, 'dataScale') && row.dataScale > row.dataLength) {
+    row.dataScale = Math.max(0, Number(row.dataLength) || 0);
+  }
   if (property === 'code' && row.columnCategory === 'BUSINESS') {
     const result = await confirmFieldRestoration(row, props.modelValue, props.publishedFields);
     if (result.restored) {

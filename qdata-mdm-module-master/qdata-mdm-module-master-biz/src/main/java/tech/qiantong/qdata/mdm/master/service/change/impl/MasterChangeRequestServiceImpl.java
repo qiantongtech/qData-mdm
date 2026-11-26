@@ -31,6 +31,8 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.poi.EncryptedDocumentException;
+import org.apache.poi.ooxml.POIXMLException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
@@ -49,6 +51,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.model.base.dto.ModelPublishedRespDTO;
 import tech.qiantong.qdata.mdm.model.base.dto.ModelBaseRespDTO;
 import tech.qiantong.qdata.mdm.model.service.base.service.ModelPublishedApi;
@@ -111,6 +114,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -390,8 +394,8 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void withdrawMyRequest(Long requestId) {
-        if (requestId == null || requestId <= 0) throw new ServiceException("申请ID无效");
         Long applicantId = myCurrentUserId();
+        requireOwnedRequest(requestId, applicantId);
         Date now = new Date();
         LambdaUpdateWrapper<MasterChangeRequestDO> update = new LambdaUpdateWrapper<>();
         update.eq(MasterChangeRequestDO::getId, requestId)
@@ -405,33 +409,40 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
                 .set(MasterChangeRequestDO::getTerminateReason, "申请人主动撤回")
                 .set(MasterChangeRequestDO::getExecuteMessage, null)
                 .set(MasterChangeRequestDO::getUpdateBy, String.valueOf(applicantId))
-                .set(MasterChangeRequestDO::getUpdatorId, applicantId)
+                .setSql("UPDATER_ID = {0}", applicantId)
                 .set(MasterChangeRequestDO::getUpdateTime, now);
-        if (changeRequestMapper.update(null, update) != 1) {
-            throw new ServiceException("申请不存在、无权撤回或状态已发生变化，请刷新后重试");
-        }
+        int affected = changeRequestMapper.update(null, update);
+        if (affected == 0) throw warning("申请当前状态无法撤回，请刷新后重试");
+        if (affected != 1) throw new ServiceException("撤回申请失败");
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public MasterChangeRequestSubmitRespVO reapplyMyRequest(Long requestId) {
-        if (requestId == null || requestId <= 0) throw new ServiceException("申请ID无效");
         Long applicantId = myCurrentUserId();
-        MasterChangeRequestDO source = changeRequestMapper.selectById(requestId);
-        if (source == null || !Boolean.TRUE.equals(source.getValidFlag()) || Boolean.TRUE.equals(source.getDelFlag())
-                || !Arrays.asList("MANUAL", "MERGE").contains(source.getChangeSource())
-                || !applicantId.equals(source.getApplicantId())) {
-            throw new ServiceException("申请不存在或无权重新申请");
+        MasterChangeRequestDO source = requireOwnedRequest(requestId, applicantId);
+        if (!Arrays.asList("MANUAL", "MERGE").contains(source.getChangeSource())) {
+            throw warning("当前申请来源不支持重新申请");
         }
         if (!Arrays.asList("2", "3", "4").contains(source.getStatus())
                 || !"0".equals(source.getExecuteStatus())) {
-            throw new ServiceException("只有未执行的已驳回、已撤回或已终止申请可以重新申请");
+            throw warning("只有未执行的已驳回、已撤回或已终止申请可以重新申请");
         }
         maintenanceValidator.validateApplicant(applicantId, source.getChangeType());
-        MasterModelRespDTO model = metadataService.getModel(source.getInstanceId());
-        if (!java.util.Objects.equals(model.getModelId(), source.getModelId())
-                || !java.util.Objects.equals(model.getModelVersionId(), source.getModelVersionId())) {
-            throw new ServiceException("主数据模型已变更，请从主数据工作区重新发起申请");
+        String modelChangedMessage = "主数据模型已变更，请从主数据工作区重新发起申请";
+        MasterModelRespDTO model;
+        try {
+            model = metadataService.getModel(source.getInstanceId());
+        } catch (ServiceException ex) {
+            // 重新发布后，旧实例可能在读取模型配置时就被拒绝。
+            if (!modelPublishedApi.isPublishedInstance(source.getModelId(), source.getInstanceId(), source.getModelVersionId())) {
+                throw warning(modelChangedMessage);
+            }
+            throw ex;
+        }
+        if (!Objects.equals(model.getModelId(), source.getModelId())
+                || !Objects.equals(model.getModelVersionId(), source.getModelVersionId())) {
+            throw warning(modelChangedMessage);
         }
         List<MasterChangeRequestItemDO> sourceItems = changeRequestItemService.getItemsForReapply(requestId);
         if (sourceItems.isEmpty()) throw new ServiceException("原申请没有可重新提交的明细");
@@ -443,12 +454,12 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
             if (sourceItem.getMasterRecordId() == null) continue;
             String currentVersion = currentVersions.get(sourceItem.getMasterRecordId());
             if (!java.util.Objects.equals(currentVersion, sourceItem.getCurrentVersionNo())) {
-                throw new ServiceException("主数据已发生变化，请从主数据工作区重新发起申请");
+                throw warning("主数据已发生变化，请从主数据工作区重新发起申请");
             }
             Long pending = changeRequestItemService.getPendingCountForRecord(
                     source.getModelId(), sourceItem.getMasterRecordId());
             if (pending != null && pending > 0) {
-                throw new ServiceException(pendingMaintenanceMessage(source.getModelId(), sourceItem.getMasterRecordId()));
+                throw warning(pendingMaintenanceMessage(source.getModelId(), sourceItem.getMasterRecordId()));
             }
         }
         SysUser user = sysUserService.selectUserById(applicantId);
@@ -505,6 +516,20 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         if (!changeRequestItemService.insertItems(newItems)) throw new ServiceException("重新建立申请明细失败");
         executeTaskService.createPendingTask(request.getId());
         return submissionResponse(request.getId(), requestNo, request.getRequestName(), sourceItems.size());
+    }
+
+    private MasterChangeRequestDO requireOwnedRequest(Long requestId, Long applicantId) {
+        if (requestId == null || requestId <= 0) {
+            throw new ServiceException("申请ID无效", HttpStatus.BAD_REQUEST);
+        }
+        MasterChangeRequestDO request = changeRequestMapper.selectById(requestId);
+        if (request == null || !Boolean.TRUE.equals(request.getValidFlag()) || Boolean.TRUE.equals(request.getDelFlag())) {
+            throw new ServiceException("申请不存在或已失效", HttpStatus.NOT_FOUND);
+        }
+        if (!applicantId.equals(request.getApplicantId())) {
+            throw new ServiceException("无权操作他人的申请", HttpStatus.FORBIDDEN);
+        }
+        return request;
     }
 
     private Long myCurrentUserId() {
@@ -1394,7 +1419,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         MasterChangeValidateRespVO validation =
                 validateMaintenance(instanceId, request);
         if (!validation.isValid()) {
-            throw new ServiceException(submissionValidationMessage(validation));
+            throw warning(submissionValidationMessage(validation));
         }
 
         String mode = request.getMode();
@@ -1406,7 +1431,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
             request.setValues(values);
             validation = validateMaintenance(instanceId, request, false);
             if (!validation.isValid()) {
-                throw new ServiceException(submissionValidationMessage(validation));
+                throw warning(submissionValidationMessage(validation));
             }
         }
         boolean lifecycle = MasterLifecycleRules.isAction(mode);
@@ -1474,13 +1499,13 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         submissionPositiveId(applicantId, "请先登录再提交申请");
         MasterChangeBatchValidateRespVO validation = validateBatch(instanceId, request, applicantId);
         if (!validation.isValid()) {
-            throw new ServiceException(submissionValidationMessage(validation));
+            throw warning(submissionValidationMessage(validation));
         }
 
         if ("BATCH_IMPORT".equals(request.getMode())
                 && (request.getFileName() == null || request.getFileName().trim().isEmpty()
                     || request.getFileName().length() > 256)) {
-            throw new ServiceException("上传文件名不能为空且不能超过256字");
+            throw warning("上传文件名不能为空且不能超过256字");
         }
 
         MasterModelRespDTO model = metadataService.getModel(instanceId);
@@ -1564,7 +1589,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         List<MasterChangeRequestItemQueryDTO> pending =
                 changeRequestMapper.selectPendingRecordRequests(modelId, recordIds);
         if (pending != null && !pending.isEmpty()) {
-            throw new ServiceException(pendingMaintenanceMessage(pending.get(0)));
+            throw warning(pendingMaintenanceMessage(pending.get(0)));
         }
     }
 
@@ -1612,7 +1637,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
                     automaticEncodingGenerator.generate(model, proposed);
                     Map<String, String> generatedErrors = maintenanceValidator.validate(model, proposed, null, false);
                     if (!generatedErrors.isEmpty()) {
-                        throw new ServiceException("第" + checked.getRowNo() + "行自动编码生成后校验失败："
+                        throw warning("第" + checked.getRowNo() + "行自动编码生成后校验失败："
                                 + generatedErrors.values().iterator().next());
                     }
                 }
@@ -1627,7 +1652,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
                                 ? beforeStatus : "1",
                         currentVersions.get(recordId)));
             }
-            if (items.isEmpty()) throw new ServiceException("没有可处理的数据行，请检查导入方式和匹配键");
+            if (items.isEmpty()) throw warning("没有可处理的数据行，请检查导入方式和匹配键");
             return items;
         }
 
@@ -1782,6 +1807,11 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         return "申请校验未通过";
     }
 
+    /** User-correctable submission conditions use the project warning business code. */
+    private ServiceException warning(String message) {
+        return new ServiceException(message, HttpStatus.WARN);
+    }
+
     private String submissionValidationMessage(MasterChangeBatchValidateRespVO validation) {
         if (!validation.getErrors().isEmpty()) {
             return "批量申请校验未通过：" + validation.getErrors().values().iterator().next();
@@ -1878,20 +1908,18 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     public MasterChangeImportParseRespVO parseImportFile(Long instanceId, MultipartFile file) {
         MasterModelRespDTO model = metadataService.getModel(instanceId);
         if (file == null || file.isEmpty() || file.getSize() > MAX_BYTES) {
-            throw new ServiceException("导入文件不能为空且不能超过5 MiB");
+            throw warning("导入文件不能为空且不能超过5 MiB");
         }
         String name = file.getOriginalFilename();
         String suffix = name == null || !name.contains(".") ? ""
                 : name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
         if (!"csv".equals(suffix) && !"xlsx".equals(suffix)) {
-            throw new ServiceException("仅支持 CSV 或 XLSX 导入文件");
+            throw warning("仅支持 CSV 或 XLSX 导入文件");
         }
         try (InputStream input = file.getInputStream()) {
             return "csv".equals(suffix) ? parseCsv(model, input) : parseXlsx(model, input);
-        } catch (ServiceException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            throw new ServiceException("导入文件无法解析，请检查编码、表头和文件格式");
+        } catch (IOException | UncheckedIOException ex) {
+            throw warning("导入文件无法解析，请检查编码、表头和文件格式");
         }
     }
 
@@ -1911,15 +1939,24 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
             Row header = sheet.createRow(0);
             CellStyle textStyle = book.createCellStyle();
             textStyle.setDataFormat(book.createDataFormat().getFormat("@"));
+            CellStyle dateStyle = book.createCellStyle();
+            dateStyle.setDataFormat(book.createDataFormat().getFormat("yyyy-mm-dd"));
+            CellStyle dateTimeStyle = book.createCellStyle();
+            dateTimeStyle.setDataFormat(book.createDataFormat().getFormat("yyyy-mm-dd hh:mm:ss"));
+            Map<String, MasterFieldRespDTO> fieldsByCode = importFieldsByCode(model);
             for (int i = 0; i < codes.size(); i++) {
-                header.createCell(i).setCellValue(codes.get(i));
-                sheet.setDefaultColumnStyle(i, textStyle);
+                String code = codes.get(i);
+                MasterFieldRespDTO field = fieldsByCode.get(code);
+                header.createCell(i).setCellValue(code);
+                sheet.setDefaultColumnStyle(i, templateDateStyle(field, textStyle, dateStyle, dateTimeStyle));
                 sheet.setColumnWidth(i, 22 * 256);
             }
             List<MasterColumnRespVO> templateColumns = new ArrayList<>();
             for (String code : codes) {
                 MasterColumnRespVO column = new MasterColumnRespVO();
                 column.setProp(code);
+                MasterFieldRespDTO field = fieldsByCode.get(code);
+                if (field != null) column.setDataType(field.getDataType());
                 templateColumns.add(column);
             }
             MasterEditableWorkbook.attach(book, sheet, model, templateColumns, choices, IMPORT_MAX_ROWS);
@@ -1960,6 +1997,15 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         }
     }
 
+    private CellStyle templateDateStyle(MasterFieldRespDTO field, CellStyle textStyle,
+            CellStyle dateStyle, CellStyle dateTimeStyle) {
+        if (field == null || field.getDataType() == null) return textStyle;
+        String type = field.getDataType().trim().toUpperCase(Locale.ROOT).replaceAll("\\(.*\\)$", "");
+        if ("DATE".equals(type)) return dateStyle;
+        if ("DATETIME".equals(type) || "TIMESTAMP".equals(type)) return dateTimeStyle;
+        return textStyle;
+    }
+
     private String safeCellText(String value) {
         return value == null ? "" : value;
     }
@@ -1987,7 +2033,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
                 .onUnmappableCharacter(CodingErrorAction.REPORT));
                 CSVParser parser = new CSVParser(reader, CSVFormat.DEFAULT.builder().setIgnoreEmptyLines(false).build())) {
             Iterator<CSVRecord> records = parser.iterator();
-            if (!records.hasNext()) throw new ServiceException("导入文件缺少表头");
+            if (!records.hasNext()) throw warning("导入文件缺少表头");
             CSVRecord header = records.next();
             List<String> names = new ArrayList<>();
             for (String value : header) names.add(value);
@@ -1995,15 +2041,18 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
             Map<String, ReferenceValues> choices = references.load(model, names);
             MasterChangeImportParseRespVO result = new MasterChangeImportParseRespVO();
             result.setHeaders(names);
-            while (records.hasNext()) {
+            Map<String, MasterFieldRespDTO> fieldsByCode = importFieldsByCode(model);
+            // hasNext 会预读整条记录，必须先记下起始行，才能正确定位包含换行的字段。
+            for (int rowNo = (int) parser.getCurrentLineNumber() + 1; records.hasNext();
+                    rowNo = (int) parser.getCurrentLineNumber() + 1) {
                 CSVRecord record = records.next();
                 if (record.size() == 1 && record.get(0).trim().isEmpty()) continue;
                 if (record.size() != names.size()) {
-                    throw new ServiceException("第" + record.getRecordNumber() + "行字段数与表头不一致");
+                    throw warning("第" + rowNo + "行字段数与表头不一致");
                 }
                 List<String> values = new ArrayList<>();
                 for (String value : record) values.add(value);
-                appendRow(result, model, names, values, (int) record.getRecordNumber(), choices, null);
+                appendRow(result, model, names, values, rowNo, choices, null, fieldsByCode);
             }
             result.setTotal(result.getRows().size());
             return result;
@@ -2011,52 +2060,56 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private MasterChangeImportParseRespVO parseXlsx(MasterModelRespDTO model, InputStream input)
-            throws Exception {
-        try (Workbook book = WorkbookFactory.create(input)) {
-            if (!(book instanceof XSSFWorkbook)) throw new ServiceException("仅支持 XLSX 工作簿");
+            throws IOException {
+        Workbook workbook;
+        try {
+            workbook = WorkbookFactory.create(input);
+        } catch (IllegalArgumentException | EncryptedDocumentException | POIXMLException ex) {
+            throw warning("导入文件无法解析，请检查文件格式或是否加密");
+        }
+        try (Workbook book = workbook) {
+            if (!(book instanceof XSSFWorkbook)) throw warning("仅支持 XLSX 工作簿");
             Sheet sheet = book.getNumberOfSheets() == 0 ? null : book.getSheetAt(0);
-            if (sheet == null || sheet.getRow(0) == null) throw new ServiceException("导入文件缺少表头");
+            if (sheet == null || sheet.getRow(0) == null) throw warning("导入文件缺少表头");
             Row header = sheet.getRow(0);
             int width = header.getLastCellNum();
-            if (width <= 0) throw new ServiceException("导入文件缺少表头");
+            if (width <= 0) throw warning("导入文件缺少表头");
             DataFormatter formatter = new DataFormatter();
             List<String> names = new ArrayList<>();
             for (int i = 0; i < width; i++) names.add(cellText(header.getCell(i), formatter, 1));
             MasterEditableWorkbook.Binding binding = MasterEditableWorkbook.read(book, model);
             if (binding == null) validateHeaders(model, names);
             else {
-                if (names.size() > MasterEditableWorkbook.MAX_COLUMNS) throw new ServiceException("导出表头数量无效");
+                if (names.size() > MasterEditableWorkbook.MAX_COLUMNS) throw warning("导出表头数量无效");
                 Set<String> seen = new HashSet<>();
                 for (int i = 0; i < names.size(); i++) {
                     String code = binding.header(names.get(i));
-                    if (!seen.add(code)) throw new ServiceException("导出表头重复：" + names.get(i));
+                    if (!seen.add(code)) throw warning("导出表头重复：" + names.get(i));
                     names.set(i, code);
                 }
             }
             Set<String> importable = new HashSet<>(templateHeaders(model));
             List<String> editableHeaders = names.stream().filter(importable::contains)
                     .collect(java.util.stream.Collectors.toList());
-            if (editableHeaders.isEmpty()) throw new ServiceException("导入文件至少包含一个可维护业务字段");
+            if (editableHeaders.isEmpty()) throw warning("导入文件至少包含一个可维护业务字段");
             Map<String, ReferenceValues> choices = references.load(model, editableHeaders);
             MasterChangeImportParseRespVO result = new MasterChangeImportParseRespVO();
             result.setHeaders(editableHeaders);
-            Map<String, String> fieldTypes = new HashMap<>();
-            for (MasterFieldRespDTO field : model.getFields()) {
-                fieldTypes.put(field.getCode(), field.getDataType());
-            }
+            Map<String, MasterFieldRespDTO> fieldsByCode = importFieldsByCode(model);
             for (int index = 1; index <= sheet.getLastRowNum(); index++) {
                 Row row = sheet.getRow(index);
                 if (row == null) continue;
                 List<String> values = new ArrayList<>();
                 for (int i = 0; i < names.size(); i++) {
-                    values.add(cellText(row.getCell(i), formatter, index + 1, fieldTypes.get(names.get(i))));
+                    MasterFieldRespDTO field = fieldsByCode.get(names.get(i));
+                    values.add(cellText(row.getCell(i), formatter, index + 1, field == null ? null : field.getDataType()));
                 }
                 for (int i = names.size(); i < row.getLastCellNum(); i++) {
                     if (!cellText(row.getCell(i), formatter, index + 1).trim().isEmpty()) {
-                        throw new ServiceException("第" + (index + 1) + "行包含表头之外的数据列");
+                        throw warning("第" + (index + 1) + "行包含表头之外的数据列");
                     }
                 }
-                appendRow(result, model, names, values, index + 1, choices, binding);
+                appendRow(result, model, names, values, index + 1, choices, binding, fieldsByCode);
             }
             result.setTotal(result.getRows().size());
             return result;
@@ -2070,10 +2123,10 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     private String cellText(Cell cell, DataFormatter formatter, int rowNo, String dataType) {
         if (cell == null) return "";
         if (cell.getCellType() == CellType.FORMULA) {
-            throw new ServiceException("第" + rowNo + "行包含公式，请改为文本值");
+            throw warning("第" + rowNo + "行包含公式，请改为文本值");
         }
         if (cell.getCellType() == CellType.NUMERIC && Math.abs(cell.getNumericCellValue()) >= 1e15) {
-            throw new ServiceException("第" + rowNo + "行包含超过15位的数字，请将该列设置为文本以避免精度损失");
+            throw warning("第" + rowNo + "行包含超过15位的数字，请将该列设置为文本以避免精度损失");
         }
         if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
             if ("DATE".equalsIgnoreCase(dataType)) {
@@ -2086,19 +2139,23 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         return formatter.formatCellValue(cell);
     }
 
+    private Map<String, MasterFieldRespDTO> importFieldsByCode(MasterModelRespDTO model) {
+        Map<String, MasterFieldRespDTO> fields = new HashMap<>();
+        for (MasterFieldRespDTO field : model.getFields()) {
+            fields.put(field.getCode(), field);
+        }
+        return fields;
+    }
+
     private void appendRow(MasterChangeImportParseRespVO result, MasterModelRespDTO model,
             List<String> names, List<String> values, int rowNo, Map<String, ReferenceValues> choices,
-            MasterEditableWorkbook.Binding binding) {
+            MasterEditableWorkbook.Binding binding, Map<String, MasterFieldRespDTO> fieldsByCode) {
         if (values.stream().allMatch(value -> value == null || value.trim().isEmpty())) return;
-        if (result.getRows().size() >= IMPORT_MAX_ROWS) throw new ServiceException("单批最多导入500行数据");
+        if (result.getRows().size() >= IMPORT_MAX_ROWS) throw warning("单批最多导入500行数据");
         MasterChangeRequestBatchSaveReqVO.ImportRow row = new MasterChangeRequestBatchSaveReqVO.ImportRow();
         row.setRowNo(rowNo);
         Map<String, String> fields = new LinkedHashMap<>();
         Set<String> editable = new HashSet<>(result.getHeaders());
-        Map<String, String> fieldTypes = new HashMap<>();
-        for (MasterFieldRespDTO field : model.getFields()) {
-            fieldTypes.put(field.getCode(), field.getDataType());
-        }
         for (int i = 0; i < names.size(); i++) {
             String code = names.get(i);
             if (binding != null && "ID".equals(code)) {
@@ -2107,13 +2164,16 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
                 row.setParentId(values.get(i).trim());
             } else if (editable.contains(code)) {
                 String value = values.get(i);
+                MasterFieldRespDTO field = fieldsByCode.get(code);
                 ReferenceValues fieldChoices = choices.get(code);
                 try {
                     if (fieldChoices != null) value = fieldChoices.resolve(value, binding == null ? null : binding.options(code));
                 } catch (ServiceException ex) {
-                    throw new ServiceException("第" + rowNo + "行 " + code + "：" + ex.getMessage());
+                    String fieldName = field != null && approvalHasText(field.getName()) ? field.getName() : code;
+                    throw new ServiceException("第" + rowNo + "行「" + fieldName + "」：" + ex.getMessage(),
+                            ex.getCode() == null ? HttpStatus.WARN : ex.getCode(), ex.getErrorData());
                 }
-                fields.put(code, MaintenanceData.normalizeImportDate(fieldTypes.get(code), value));
+                fields.put(code, MaintenanceData.normalizeImportDate(field == null ? null : field.getDataType(), value));
             }
         }
         row.setValues(fields);
@@ -2121,7 +2181,7 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
     }
 
     private void validateHeaders(MasterModelRespDTO model, List<String> names) {
-        if (names.isEmpty() || names.size() > 201) throw new ServiceException("导入表头数量无效");
+        if (names.isEmpty() || names.size() > 201) throw warning("导入表头数量无效");
         Set<String> allowed = new HashSet<>(templateHeaders(model));
         Map<String, List<String>> nameAliases = new LinkedHashMap<>();
         for (MasterFieldRespDTO field : importableFields(model)) {
@@ -2136,10 +2196,10 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
             String originalName = names.get(i).replace("\uFEFF", "").trim();
             String canonicalName = resolveHeader(model, allowed, nameAliases, originalName);
             names.set(i, canonicalName);
-            if (!seen.add(canonicalName)) throw new ServiceException("导入表头重复：" + originalName);
+            if (!seen.add(canonicalName)) throw warning("导入表头重复：" + originalName);
             if (!"CATEGORY_ID".equals(canonicalName)) business = true;
         }
-        if (!business) throw new ServiceException("导入文件至少包含一个业务字段");
+        if (!business) throw warning("导入文件至少包含一个业务字段");
     }
 
     private String resolveHeader(MasterModelRespDTO model, Set<String> allowed,
@@ -2152,10 +2212,10 @@ public class MasterChangeRequestServiceImpl implements IMasterChangeRequestServi
         }
         List<String> matches = nameAliases.get(originalName);
         if (matches == null || matches.isEmpty()) {
-            throw new ServiceException("导入表头不是当前模型字段：" + originalName);
+            throw warning("导入表头不是当前模型字段：" + originalName);
         }
         if (matches.size() > 1) {
-            throw new ServiceException("导入表头对应多个模型字段：" + originalName + "，请改用字段编码");
+            throw warning("导入表头对应多个模型字段：" + originalName + "，请改用字段编码");
         }
         return matches.get(0);
     }

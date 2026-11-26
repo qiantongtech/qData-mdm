@@ -814,8 +814,8 @@ async function confirmDialog() {
       await updateMergeDetectTask(form.id, payload)
       proxy.$modal.msgSuccess('检测任务修改成功')
     } else {
-      const res = await saveMergeDetectTask(payload)
-      proxy.$modal.msgSuccess(`检测任务已保存，任务ID ${res.data}，可点击“执行一次”发起检测`)
+      await saveMergeDetectTask(payload)
+      proxy.$modal.msgSuccess('保存成功')
     }
     emit('confirm')
     if (requestId === initRequest) visibleDialog.value = false

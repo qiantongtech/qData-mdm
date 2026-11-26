@@ -17,43 +17,45 @@
 -->
 
 <template>
-  <section class="model-summary">
-    <div class="model-summary__identity">
-      <div class="model-summary__icon" aria-hidden="true">
-        <img :src="getDefaultModelIcon(modelType)" alt="" />
-      </div>
-      <div class="model-summary__name">
-        <div class="model-summary__title">
-          <strong :title="detail.modelName || fallbackName">{{ detail.modelName || fallbackName }}</strong>
-          <el-tag size="small" type="success" effect="light">已发布</el-tag>
-        </div>
-        <div class="model-summary__code" :title="detail.modelCode">{{ detail.modelCode || '-' }}</div>
-      </div>
-    </div>
-
-    <div class="model-summary__facts">
-      <div v-for="item in items" :key="item.label" class="model-summary__fact">
+  <section class="model-summary-container">
+    <div class="model-summary">
+      <div class="model-summary__identity">
         <div class="model-summary__icon" aria-hidden="true">
-          <svg-icon :icon-class="item.icon" />
+          <img :src="getDefaultModelIcon(modelType)" alt="" />
         </div>
-        <div class="model-summary__fact-text">
-          <span>{{ item.label }}</span>
-          <strong :title="item.value">{{ item.value }}</strong>
+        <div class="model-summary__name">
+          <div class="model-summary__title">
+            <strong :title="detail.modelName || fallbackName">{{ detail.modelName || fallbackName }}</strong>
+            <el-tag size="small" type="success" effect="light">已发布</el-tag>
+          </div>
+          <div class="model-summary__code" :title="detail.modelCode">{{ detail.modelCode || '-' }}</div>
         </div>
       </div>
-    </div>
 
-    <div class="model-summary__actions btn-style">
-      <el-button
+      <div class="model-summary__facts">
+        <div v-for="item in items" :key="item.label" class="model-summary__fact">
+          <div class="model-summary__icon" aria-hidden="true">
+            <svg-icon :icon-class="item.icon" />
+          </div>
+          <div class="model-summary__fact-text">
+            <span>{{ item.label }}</span>
+            <strong :title="item.value">{{ item.value }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="model-summary__actions btn-style">
+        <el-button
           class="fh_btn"
           type="primary"
           plain
           @mousedown="event => event.preventDefault()"
           @click="$emit('back')"
-      >
-        <svg-icon iconClass="fhs"/>
-        返回
-      </el-button>
+        >
+          <svg-icon iconClass="fhs"/>
+          返回
+        </el-button>
+      </div>
     </div>
   </section>
 </template>
@@ -83,6 +85,10 @@ const items = computed(() => [
 </script>
 
 <style scoped lang="scss">
+.model-summary-container {
+  container: model-summary / inline-size;
+}
+
 .model-summary {
   display: flex;
   align-items: center;
@@ -102,7 +108,6 @@ const items = computed(() => [
   min-width: 0;
   padding-right: 15px;
   border-right: 1px solid #f0f0f0;
-
 }
 
 .model-summary__icon {
@@ -159,8 +164,8 @@ const items = computed(() => [
 
 .model-summary__facts {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, max-content));
-  flex: 0 1 auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.55fr);
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -168,9 +173,9 @@ const items = computed(() => [
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
-  padding: 0 42px;
+  padding: 0 12px;
   border-right: 1px solid #f0f0f0;
 
   &:last-child { border-right: 0; }
@@ -189,7 +194,12 @@ const items = computed(() => [
   min-width: 0;
 
   span,
-  strong { display: block; }
+  strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   span {
     margin-bottom: 6px;
@@ -199,14 +209,11 @@ const items = computed(() => [
   }
 
   strong {
-    overflow: hidden;
     color: #303133;
     font-family: PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif;
     font-size: 14px;
     font-weight: 500;
     line-height: 20px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 }
 
@@ -215,7 +222,7 @@ const items = computed(() => [
   margin-left: auto;
 }
 
-@media (max-width: 1180px) {
+@container model-summary (width < 1200px) {
   .model-summary {
     flex-wrap: wrap;
     row-gap: 15px;
@@ -227,18 +234,12 @@ const items = computed(() => [
   }
 
   .model-summary__facts {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.55fr);
     flex-basis: 100%;
     order: 3;
   }
-
-  .model-summary__fact {
-    gap: 12px;
-    padding: 0 12px;
-  }
 }
 
-@media (max-width: 760px) {
+@container model-summary (width < 820px) {
   .model-summary__facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 15px 0;
@@ -252,7 +253,7 @@ const items = computed(() => [
   }
 }
 
-@media (max-width: 480px) {
+@container model-summary (width < 480px) {
   .model-summary__facts { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

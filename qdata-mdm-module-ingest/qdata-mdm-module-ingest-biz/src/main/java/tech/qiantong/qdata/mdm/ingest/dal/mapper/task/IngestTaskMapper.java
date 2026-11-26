@@ -39,12 +39,6 @@ public interface IngestTaskMapper extends BaseMapperX<IngestTaskDO> {
             "</script>"})
     List<IngestTaskFieldMappingDO> selectMappingsByTaskIds(@Param("taskIds") Collection<Long> taskIds);
 
-    @Select("SELECT ID AS id, MODEL_ID AS model_id, NAME AS column_name, CODE AS column_code, "
-            + "COLUMN_CATEGORY AS column_category, DATA_TYPE AS data_type, DATA_LENGTH AS data_length, "
-            + "DATA_SCALE AS data_scale FROM MODEL_COLUMN "
-            + "WHERE MODEL_ID = #{modelId} AND DEL_FLAG = '0' ORDER BY ID")
-    List<IngestModelFieldRespVO> selectModelFields(@Param("modelId") Long modelId);
-
     @Select(
             "SELECT COUNT(1) FROM INGEST_TASK WHERE CODE=#{code} AND DEL_FLAG='0' AND ID <> COALESCE(#{id},-1)")
     long countCode(@Param("code") String code, @Param("id") Long id);

@@ -26,7 +26,11 @@ import org.apache.poi.ss.usermodel.Name;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
+import org.openxmlformats.schemas.spreadsheetml.x2006.main.CTWorksheet;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.master.api.instance.dto.MasterModelRespDTO;
 import tech.qiantong.qdata.mdm.master.controller.admin.data.vo.MasterColumnRespVO;
@@ -109,8 +113,20 @@ public final class MasterEditableWorkbook {
             validation.createErrorBox("请选择有效选项", "请从下拉列表选择名称，导入时会自动转换为对应编码。");
             data.addValidationData(validation);
         }
+        setStreamingSheetRange(binding, columns.size(), values.length - 1);
+        setStreamingSheetRange(options, optionRowNo - 1, optionHeader.getLastCellNum() - 1);
         book.setSheetHidden(book.getSheetIndex(binding), true);
         book.setSheetHidden(book.getSheetIndex(options), true);
+    }
+
+    /** POI 4.1.2 does not update the sheet dimension from streamed rows. */
+    public static void setStreamingSheetRange(Sheet sheet, int lastRow, int lastColumn) {
+        if (sheet instanceof SXSSFSheet) {
+            SXSSFSheet streamed = (SXSSFSheet) sheet;
+            CTWorksheet xml = streamed.getWorkbook().getXSSFWorkbook().getSheet(sheet.getSheetName()).getCTWorksheet();
+            CellRangeAddress range = new CellRangeAddress(0, lastRow, 0, lastColumn);
+            (xml.isSetDimension() ? xml.getDimension() : xml.addNewDimension()).setRef(range.formatAsString());
+        }
     }
 
     /** 读取并检查文件绑定；无绑定表时返回 null，由调用方按普通模板解析。 */
@@ -122,45 +138,49 @@ public final class MasterEditableWorkbook {
                 || !String.valueOf(model.getModelId()).equals(text(context.getCell(1)))
                 || !String.valueOf(model.getInstanceId()).equals(text(context.getCell(2)))
                 || !String.valueOf(model.getModelVersionId()).equals(text(context.getCell(3))))
-            throw new ServiceException("导出文件与当前模型发布版本不一致，请重新导出");
+            throw invalidBinding("导出文件与当前模型发布版本不一致，请重新导出");
         if (sheet.getLastRowNum() < 1 || sheet.getLastRowNum() > MAX_COLUMNS)
-            throw new ServiceException("导出字段绑定数量无效，最多支持" + MAX_COLUMNS + "列");
+            throw invalidBinding("导出字段绑定数量无效，最多支持" + MAX_COLUMNS + "列");
         Set<String> allowed = new HashSet<>();
         model.getFields().forEach(field -> allowed.add(field.getCode()));
         Binding binding = new Binding();
         Set<String> seen = new HashSet<>();
         for (int i = 1; i <= sheet.getLastRowNum(); i++) {
             Row row = sheet.getRow(i);
-            if (row == null) throw new ServiceException("导出字段绑定不完整");
+            if (row == null) throw invalidBinding("导出字段绑定不完整");
             String code = text(row.getCell(0));
             String label = text(row.getCell(1));
             if (!allowed.contains(code) || label.isEmpty() || !seen.add(code)
                     || binding.headers.putIfAbsent(label, code) != null)
-                throw new ServiceException("导出字段绑定无效，请重新导出");
+                throw invalidBinding("导出字段绑定无效，请重新导出");
         }
         Sheet options = book.getSheet(OPTIONS);
-        if (options == null || options.getRow(0) == null) throw new ServiceException("导出选项绑定缺失，请重新导出");
+        if (options == null || options.getRow(0) == null) throw invalidBinding("导出选项绑定缺失，请重新导出");
         if (options.getLastRowNum() > MAX_OPTIONS)
-            throw new ServiceException("导出选项绑定数量无效");
+            throw invalidBinding("导出选项绑定数量无效");
         for (int rowNo = 1; rowNo <= options.getLastRowNum(); rowNo++) {
             Row row = options.getRow(rowNo);
-            if (row == null) throw new ServiceException("导出选项绑定不完整");
+            if (row == null) throw invalidBinding("导出选项绑定不完整");
             String code = text(row.getCell(0));
             if (!seen.contains(code))
-                throw new ServiceException("导出选项绑定字段无效");
+                throw invalidBinding("导出选项绑定字段无效");
             Map<String, String> choices = binding.options.computeIfAbsent(code, key -> new LinkedHashMap<>());
             String label = text(row.getCell(1));
             String value = text(row.getCell(2));
             if (label.isEmpty() || value.isEmpty() || choices.putIfAbsent(label, value) != null)
-                throw new ServiceException("导出选项名称绑定重复或为空");
+                throw invalidBinding("导出选项名称绑定重复或为空");
         }
         return binding;
     }
 
     private static String text(Cell cell) {
         if (cell == null || cell.getCellType() == CellType.BLANK) return "";
-        if (cell.getCellType() != CellType.STRING) throw new ServiceException("导出绑定必须为文本，不能包含公式或数字");
+        if (cell.getCellType() != CellType.STRING) throw invalidBinding("导出绑定必须为文本，不能包含公式或数字");
         return cell.getStringCellValue();
+    }
+
+    private static ServiceException invalidBinding(String message) {
+        return new ServiceException(message, HttpStatus.WARN);
     }
 
     /** 文件中的对应关系只用于解析；选项是否仍有效由引用值服务校验。 */
@@ -172,7 +192,7 @@ public final class MasterEditableWorkbook {
 
         public String header(String label) {
             String code = headers.get(label);
-            if (code == null) throw new ServiceException("导出列绑定缺失：" + label);
+            if (code == null) throw invalidBinding("导出列绑定缺失：" + label);
             return code;
         }
 

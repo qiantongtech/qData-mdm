@@ -39,9 +39,16 @@
           type="primary"
           allow-wrap
       />
-      <qt-form-item label="所属主数据域" prop="projectId" class="row-full">
-        <div v-if="readonly" class="form-readonly">{{ project.name || '-' }}</div>
-        <el-input v-else :model-value="project.name" disabled/>
+      <qt-form-item label="所属主数据域" prop="projectId" class="row-full"
+                    :tip="projectChangeLocked ? '包含子目录或已被模型引用的目录不能更换主数据域' : undefined">
+        <div v-if="readonly" class="form-readonly">{{ selectedProjectName }}</div>
+        <el-select v-else v-model="form.projectId"
+                   placeholder="请选择主数据域"
+                   filterable
+                   :disabled="projectChangeLocked || saving"
+                   @change="handleProjectChange">
+          <el-option v-for="item in projectOptions" :key="item.id" :label="item.name" :value="item.id"/>
+        </el-select>
       </qt-form-item>
       <qt-form-item label="上级模型目录" prop="parentId" class="row-full"
                     tip="支持最多 5 级模型目录；选择顶级节点时，默认创建为一级模型目录。">
@@ -51,6 +58,7 @@
             v-model="form.parentId"
             filterable
             :data="parentSelectOptions"
+            :disabled="loadingParents || !form.projectId"
             :props="{ value: 'id', label: 'name', children: 'children' }"
             value-key="id"
             placeholder="请选择上级"
@@ -102,7 +110,7 @@
             v-else
             v-model="form.description"
             type="textarea"
-            maxlength="256个字符"
+            :maxlength="256"
             show-word-limit
             placeholder="请输入目录描述"
             :min-height="192"
@@ -116,6 +124,7 @@
             v-if="!readonly"
             type="primary"
             :loading="saving"
+            :disabled="loadingParents"
             @click="submitForm"
         >确 定
         </el-button>
@@ -131,7 +140,8 @@
  * @prop {Object} project 当前主数据域信息
  */
 import { useUserDirectory } from '@/store/system/userDirectory';
-import {addLayer, getLayer, updateLayer} from "@/api/model/layer/layer.js";
+import {addLayer, getLayer, listLayer, updateLayer} from "@/api/model/layer/layer.js";
+import {treeProject} from "@/api/model/project/project.js";
 import {trimText, validateAlphaNumUnderscore, validatePattern, validateTrimmedRequired} from "@/utils/validate.js";
 import {useDict, loadDict} from "@/utils/dict";
 import GuideTipPanel from "@/components/GuideTip/GuideTipPanel.vue";
@@ -195,7 +205,7 @@ const formRef = ref();
 const emptyForm = () => ({
   id: null,
   projectId: null,
-  parentId: props.project?.id,
+  parentId: 0,
   code: null,
   name: null,
   responsibleUserId: null,
@@ -213,6 +223,7 @@ const userOptions = computed(() => {
   return users;
 });
 const rules = {
+  projectId: [{required: true, message: "请选择所属主数据域", trigger: "change"}],
   parentId: [{
     validator: (_rule, value, callback) => {
       const parent = findLayerOption(parentSelectOptions.value, value);
@@ -252,53 +263,96 @@ function reset() {
   formRef.value?.clearValidate();
 }
 
+const projectOptions = ref([]);
+const projectChangeLocked = ref(false);
+const loadingParents = ref(false);
 const layerTreeOptions = ref([]);
+let dialogRequest = 0;
+let parentRequest = 0;
+const selectedProjectName = computed(() =>
+  projectOptions.value.find(item => item.id === form.value.projectId)?.name || "-"
+);
 const parentSelectOptions = computed(() => buildLayerParentOptions(layerTreeOptions.value, form.value.id));
-const parentLayerName = computed(() => {
-  const findNode = (nodes) => {
-    for (const node of nodes || []) {
-      if (String(node.id) === String(form.value.parentId)) return node;
-      const matched = findNode(node.children);
-      if (matched) return matched;
-    }
-    return null;
-  };
-  return findNode(layerTreeOptions.value)?.name || form.value.parentName || "-";
-});
+const parentLayerName = computed(() =>
+  findLayerOption(layerTreeOptions.value, form.value.parentId)?.name || form.value.parentName || "-"
+);
+
+async function handleProjectChange(projectId) {
+  const request = ++parentRequest;
+  form.value.parentId = null;
+  layerTreeOptions.value = [];
+  loadingParents.value = true;
+  try {
+    const response = await listLayer({projectId});
+    if (request !== parentRequest) return;
+    layerTreeOptions.value = [{
+      id: 0,
+      name: "顶级节点",
+      children: proxy.handleTree(response.data || [], "id", "parentId"),
+    }];
+    form.value.parentId = 0;
+  } catch {
+    // 接口已提示错误，保持上级目录为空，避免提交上一个域的目录。
+  } finally {
+    if (request === parentRequest) loadingParents.value = false;
+  }
+}
 
 /** 初始化并打开弹窗，按传入记录加载详情。 */
 async function openDialog(row) {
-  model_layer_max_depth.value = await loadDict('model_layer_max_depth');
+  const request = ++dialogRequest;
+  ++parentRequest;
+  await nextTick();
+  const project = props.project;
+  const [depth, projects, response] = await Promise.all([
+    loadDict('model_layer_max_depth'),
+    row.readonly ? null : treeProject(),
+    row.id == null ? null : getLayer(row.id),
+  ]);
+  if (request !== dialogRequest || (row.id != null && !response?.data)) return;
+  model_layer_max_depth.value = depth;
   if (!maxLayerDepth.value) {
     proxy.$modal.msgError('请先配置模型分层最大深度字典');
     return;
   }
   reset();
+  title.value = row.title;
   readonly.value = Boolean(row.readonly);
+  loadingParents.value = false;
   layerTreeOptions.value = row.layerTreeOptions || [];
-  if (row?.id != null) {
-    title.value = row.title;
-    const response = await getLayer(row.id);
-    // 下拉选项用字符串 ID，回填也统一成字符串，避免有值却显示不出姓名。
-    form.value = {
-      ...response.data,
-      responsibleUserId: response.data.responsibleUserId == null ? null : String(response.data.responsibleUserId),
-    };
-  } else {
-    title.value = row.title;
-    form.value.parentId = row?.parentId ?? 0;
+  const detail = response?.data;
+  const projectId = detail?.projectId ?? project.id;
+  const options = (projects?.data || []).map(item => ({id: String(item.id), name: item.name}));
+  // 已停用的历史域仍可回填，编辑目录的其他信息时保留原归属。
+  const currentId = projectId == null ? null : String(projectId);
+  if (currentId && (detail || row.readonly) && !options.some(item => item.id === currentId)) {
+    const name = String(project.id) === currentId ? project.name : null;
+    options.unshift({id: currentId, name: name || currentId});
   }
+  projectOptions.value = options;
+  form.value.projectId = options.some(item => item.id === currentId) ? currentId : null;
+  form.value.parentId = row.parentId ?? 0;
+  if (detail) {
+    form.value = {
+      ...detail,
+      projectId: form.value.projectId,
+      parentId: detail.parentId ?? 0,
+      responsibleUserId: detail.responsibleUserId == null ? null : String(detail.responsibleUserId),
+    };
+  }
+  projectChangeLocked.value = Boolean(detail && (
+    Number(detail.modelCount) > 0 || findLayerOption(layerTreeOptions.value, detail.id)?.children?.length
+  ));
   visible.value = true;
 }
 
 /** 校验表单并保存当前记录，成功后通知父页面刷新。 */
 async function submitForm() {
-  if (readonly.value) return;
-  form.value.projectId = props.project.id;
-  const valid = await formRef.value.validate().catch(() => false);
-  if (!valid) return;
+  if (readonly.value || loadingParents.value || saving.value) return;
   saving.value = true;
   try {
+    const valid = await formRef.value.validate().catch(() => false);
+    if (!valid) return;
     const editing = form.value.id != null;
     // 清空选择后提交 null，不把下拉框的空字符串当成用户 ID。
     const payload = {...form.value, responsibleUserId: form.value.responsibleUserId || null};

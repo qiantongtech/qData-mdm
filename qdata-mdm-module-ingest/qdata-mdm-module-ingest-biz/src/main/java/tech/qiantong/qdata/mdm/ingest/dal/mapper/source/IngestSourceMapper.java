@@ -19,12 +19,15 @@
 package tech.qiantong.qdata.mdm.ingest.dal.mapper.source;
 
 import org.apache.ibatis.annotations.Param;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
+import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.ingest.controller.admin.source.vo.IngestSourcePageReqVO;
 import tech.qiantong.qdata.mdm.ingest.controller.admin.source.vo.IngestSourceTaskRespVO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceDO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceModelNameRow;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceResponsibleUserRow;
+import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceTaskCountRow;
 import tech.qiantong.qdata.mdm.mybatis.core.mapper.BaseMapperX;
 import tech.qiantong.qdata.mdm.mybatis.core.query.LambdaQueryWrapperX;
 
@@ -105,8 +108,8 @@ public interface IngestSourceMapper extends BaseMapperX<IngestSourceDO> {
                     .map(String::trim)
                     .map(LambdaQueryWrapperX::camelToUnderline)
                     .collect(Collectors.toList());
-            if (columns.stream().anyMatch(column -> !allowedColumns.contains(column))) {
-                throw new IllegalArgumentException("非法的排序字段：" + reqVO.getOrderByColumn());
+            if (columns.isEmpty() || columns.stream().anyMatch(column -> !allowedColumns.contains(column))) {
+                throw new ServiceException("非法的排序字段：" + reqVO.getOrderByColumn(), HttpStatus.WARN);
             }
             query.last("ORDER BY " + String.join(",", columns)
                     + ("asc".equalsIgnoreCase(reqVO.getIsAsc()) ? " ASC" : " DESC"));
@@ -149,12 +152,12 @@ public interface IngestSourceMapper extends BaseMapperX<IngestSourceDO> {
     Long countTaskBySourceId(Long sourceId);
 
     /**
-     * 批量查询来源系统对应的任务来源 ID。
+     * 批量统计各来源系统的有效接入任务数量，未引用的来源不返回分组。
      *
      * @param ids 来源系统 ID
-     * @return 任务来源 ID 列表
+     * @return 按来源系统分组的任务数量
      */
-    List<Long> selectTaskSourceIdsBySourceIds(@Param("ids") Collection<Long> ids);
+    List<IngestSourceTaskCountRow> selectTaskCountsBySourceIds(@Param("ids") Collection<Long> ids);
 
     /**
      * 查询来源系统下的接入任务及最近运行时间。

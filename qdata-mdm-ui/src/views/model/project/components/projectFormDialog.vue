@@ -95,7 +95,7 @@
             v-else
             v-model="form.description"
             type="textarea"
-            maxlength="256个字符"
+            :maxlength="256"
             show-word-limit
             placeholder="请输入该主题域的业务范围描述"
             :min-height="192"

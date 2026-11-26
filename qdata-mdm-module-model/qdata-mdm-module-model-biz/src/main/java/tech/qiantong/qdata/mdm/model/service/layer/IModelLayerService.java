@@ -58,10 +58,6 @@ public interface IModelLayerService extends IService<ModelLayerDO> {
      */
     int updateModelLayer(ModelLayerSaveReqVO updateReqVO);
 
-    /**
-     * 校验模型目录编码是否唯一
-     */
-    boolean checkCodeUnique(String code, Long id);
 
     /**
      * 批量校验模型目录是否被主数据模型引用

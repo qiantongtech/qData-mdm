@@ -33,6 +33,18 @@ import tech.qiantong.qdata.mdm.mybatis.core.mapper.BaseMapperX;
  */
 public interface MergeDuplicateTaskInstanceMapper extends BaseMapperX<MergeDuplicateTaskInstanceDO> {
 
+    /** 实时日志只查询运行状态和计数，不重复加载来源及规则快照。 */
+    default MergeDuplicateTaskInstanceDO selectProgress(Long instanceId) {
+        return selectOne(new LambdaQueryWrapperX<MergeDuplicateTaskInstanceDO>()
+                .eq(MergeDuplicateTaskInstanceDO::getId, instanceId)
+                .select(MergeDuplicateTaskInstanceDO::getId, MergeDuplicateTaskInstanceDO::getTaskId,
+                        MergeDuplicateTaskInstanceDO::getInstanceNo, MergeDuplicateTaskInstanceDO::getStatus,
+                        MergeDuplicateTaskInstanceDO::getSourceCount, MergeDuplicateTaskInstanceDO::getGroupCount,
+                        MergeDuplicateTaskInstanceDO::getSingleCount, MergeDuplicateTaskInstanceDO::getHistorySourceCount,
+                        MergeDuplicateTaskInstanceDO::getStartTime, MergeDuplicateTaskInstanceDO::getEndTime,
+                        MergeDuplicateTaskInstanceDO::getErrorMessage, MergeDuplicateTaskInstanceDO::getLogContent));
+    }
+
     /** 按模型、任务和状态分页查询检测实例，根据请求决定是否查询快照字段。 */
     default PageResult<MergeDuplicateTaskInstanceDO> selectPage(MergeTaskPageReqVO reqVO) {
         LambdaQueryWrapperX<MergeDuplicateTaskInstanceDO> wrapper = new LambdaQueryWrapperX<MergeDuplicateTaskInstanceDO>();

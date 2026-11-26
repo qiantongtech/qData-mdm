@@ -36,6 +36,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.merge.dal.dataobject.MergeDuplicateTaskDO;
 import tech.qiantong.qdata.mdm.merge.dal.mapper.detect.MergeDuplicateTaskScheduleMapper;
@@ -161,7 +162,7 @@ public class MergeDetectScheduleServiceImpl implements IMergeDetectScheduleServi
                 throw new IllegalArgumentException("Cron 没有下一次执行时间");
             }
         } catch (Exception ex) {
-            throw new ServiceException("Cron 表达式无效或没有下一次执行时间");
+            throw new ServiceException("Cron 表达式无效或没有下一次执行时间", HttpStatus.WARN);
         }
     }
 

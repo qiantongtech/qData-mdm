@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeGroupRespVO;
 import tech.qiantong.qdata.mdm.merge.service.review.IMergeReviewQueryService;
@@ -622,7 +623,7 @@ public class MergeManageQueryServiceImpl implements IMergeManageQueryService {
     private MergePendingMasterDO pendingOrThrow(Long pendingId) {
         MergePendingMasterDO pending = mergePendingMasterMapper.selectById(pendingId);
         if (pending == null || !MergeCodes.YES.equals(pending.getValidFlag())) {
-            throw new ServiceException("待提交结果不存在");
+            throw new ServiceException("待提交结果不存在", HttpStatus.WARN);
         }
         return pending;
     }

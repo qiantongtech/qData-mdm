@@ -17,7 +17,7 @@
 -->
 
 <!--
-  使用已有检测实例生成执行摘要，提供搜索、自动刷新和下载。
+  按游标读取重复检测过程日志，提供搜索、自动刷新和下载。
   @prop taskId 检测任务编号。
   @prop taskNo 检测任务编号文本。
   @author chentangwen
@@ -35,11 +35,11 @@
     class="medium-dialog ingest-run-log-dialog detect-instance-logs-dialog"
   >
     <div v-if="selectedRun" class="log-dialog-container">
-      <DetailInfo :data="runInfo" :items="detailItems" mode="free">
+      <detail-info :data="runInfo" :items="detailItems" mode="free">
         <template #statusSlot="{ data }">
-          <StatusTag :status="data.status" />
+          <status-tag :status="data.status" />
         </template>
-      </DetailInfo>
+      </detail-info>
       <div class="log-toolbar">
         <el-input
           v-model="searchKeyword"
@@ -62,18 +62,20 @@
         type="error"
         :closable="false"
       />
-      <div ref="logContentRef" v-loading="loading" class="log-content">
+      <div ref="logContentRef" v-loading="loading && logs.length === 0" class="log-content" @scroll="handleLogScroll">
         <div
           v-for="(log, index) in filteredLogs"
-          :key="log.key"
+          :key="log.eventSeq"
           class="log-row"
           :class="getLogLevelClass(log.logLevel)"
         >
           <span class="log-line-number">{{ index + 1 }}</span>
+          <span class="log-time-text">【{{ formatTime(log.logTime) }}】</span>
+          <span v-if="log.stage" class="log-stage-text">{{ log.stage }}</span>
           <span class="log-level-text">{{ log.logLevel }}</span>
-          <span class="log-content-text">{{ log.message }}</span>
+          <span class="log-content-text"><span v-for="(part, partIndex) in highlightParts(log.message)" :key="partIndex" :class="{ highlight: part.match }">{{ part.text }}</span></span>
         </div>
-        <div v-if="!loading && filteredLogs.length === 0" class="log-empty">暂无记录</div>
+        <div v-if="!loading && filteredLogs.length === 0" class="log-empty">暂无过程日志记录</div>
       </div>
     </div>
     <template #footer><div class="log-footer"><el-button @click="visible = false">关闭</el-button></div></template>
@@ -81,20 +83,16 @@
 </template>
 
 <script setup>
-import { useDict } from '@/utils/dict'
-import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
+
 import { Download, Search } from '@element-plus/icons-vue'
+
+import { useDict } from '@/utils/dict'
 import DetailInfo from '@/components/DetailInfo/index.vue'
 import StatusTag from '@/components/StatusTag/index.vue'
-import { getMergeInstance } from '@/api/merge/detect'
-
-function getOptionLabel(options, value) {
-  const found = (options || []).find((item) => String(item.value) === String(value))
-  return found?.label || (value === null || value === undefined || value === '' ? '-' : value)
-}
+import { getMergeDetectRunLogs } from '@/api/merge/detect'
 
 const { merge_task_status: TASK_STATUS_OPTIONS } = useDict('merge_task_status')
-
 const props = defineProps({
   taskId: { type: [String, Number], default: undefined },
   taskNo: { type: String, default: '' },
@@ -108,8 +106,12 @@ const loadError = ref(false)
 const searchKeyword = ref('')
 const autoRefresh = ref(false)
 const logContentRef = ref()
+const logs = ref([])
 let requestVersion = 0
 let refreshTimer
+let afterSeq = 0
+let shouldAutoScroll = true
+let active = true
 
 const isRunning = computed(() => String(selectedRun.value?.status) === '1')
 const runInfo = computed(() => ({
@@ -123,71 +125,45 @@ const detailItems = computed(() => [
   { label: '执行状态', key: 'status', slot: 'statusSlot' },
   { label: '开始时间', key: 'startTime', type: 'time', className: 'mt2 mb2' },
   { label: '已运行', key: 'runDuration', className: 'mt2 mb2' },
+  { label: isRunning.value ? '待检测数据' : '实际检测数据', key: 'sourceCount' },
+  { label: '历史比对数据', key: 'historySourceCount' },
+  { label: isRunning.value ? '已保存候选组' : '候选对象组', key: 'groupCount' },
+  { label: isRunning.value ? '已保存单条组' : '单条对象组', key: 'singleCount' },
   ...(selectedRun.value?.errorMessage ? [{ label: '错误原因', key: 'errorMessage' }] : []),
 ])
-/**
- * 将数据库已有实例字段转为统一的执行摘要，供页面和下载共同使用。
- * @param {*} row 当前业务记录。
- * @returns {Array} 整理后的业务记录集合。
- */
-function buildSummaryLines(row) {
-  if (!row) return []
-  return [
-    { key: 'status', logLevel: 'INFO', message: `执行状态：${statusLabel(row.status)}` },
-    { key: 'startTime', logLevel: 'INFO', message: `开始时间：${formatTime(row.startTime)}` },
-    { key: 'endTime', logLevel: 'INFO', message: `结束时间：${formatTime(row.endTime)}` },
-    { key: 'sourceCount', logLevel: 'INFO', message: `实际检测数据：${row.sourceCount ?? '-'}` },
-    { key: 'groupCount', logLevel: 'INFO', message: `候选对象组：${row.groupCount ?? '-'}` },
-    { key: 'errorMessage', logLevel: row.errorMessage ? 'ERROR' : 'INFO', message: `失败原因：${row.errorMessage || '-'}` },
-  ]
-}
-
-const summaryLines = computed(() => buildSummaryLines(selectedRun.value))
 const filteredLogs = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
-  return summaryLines.value.filter(log => !keyword || log.message.toLowerCase().includes(keyword))
+  return logs.value.filter(log => !keyword || formatLog(log).toLowerCase().includes(keyword))
 })
 
-/**
- * 打开指定运行实例并读取最新执行摘要。
- * @param {*} row 当前业务记录。
- * @returns {void} 通过状态或事件更新页面，无返回值。
- */
+/** 打开指定实例并从头增量读取，切换实例时丢弃旧响应。 */
 function open(row) {
   requestVersion++
   clearTimeout(refreshTimer)
+  afterSeq = 0
+  shouldAutoScroll = true
   loading.value = false
   selectedRun.value = row
+  logs.value = []
   visible.value = true
   loadError.value = false
   searchKeyword.value = ''
   autoRefresh.value = String(row.status) === '1'
-  nextTick(loadSummary)
+  nextTick(() => loadLogs(requestVersion))
 }
 
-/**
- * 将实例状态转成页面显示文本。
- * @param {*} value 待处理的字段值或状态编码。
- * @returns {string} 用于页面展示的格式化文本。
- */
+/** 使用字典显示实例状态，兼容现有状态编码。 */
 function statusLabel(value) {
-  return { '1': '运行中', '4': '成功', '2': '失败' }[String(value)] || getOptionLabel(TASK_STATUS_OPTIONS.value, value) || '-'
+  return { '1': '运行中', '4': '成功', '2': '失败' }[String(value)]
+    || TASK_STATUS_OPTIONS.value?.find(item => String(item.value) === String(value))?.label || '-'
 }
 
-/**
- * 按平台时间格式化实例时间。
- * @param {*} value 待处理的字段值或状态编码。
- * @returns {string} 用于页面展示的格式化文本。
- */
+/** 按平台时间格式化日志时间。 */
 function formatTime(value) {
   return value ? proxy.parseTime(value, '{y}-{m}-{d} {h}:{i}:{s}') : '-'
 }
 
-/**
- * 计算实例运行时长，运行中的实例按当前时间计算。
- * @param {*} row 当前业务记录。
- * @returns {string} 用于页面展示的格式化文本。
- */
+/** 计算运行时长，运行中使用当前时间。 */
 function formatDuration(row) {
   if (!row?.startTime) return '-'
   const start = new Date(String(row.startTime).replace(' ', 'T')).getTime()
@@ -199,19 +175,48 @@ function formatDuration(row) {
   return `${Math.floor(seconds / 3600)}时${Math.floor(seconds % 3600 / 60)}分`
 }
 
-/**
- * 重新获取实例，运行中的摘要随已保存状态更新。
- * @returns {Promise<void>} 通过状态或事件更新页面，无返回值。
- */
-async function loadSummary() {
-  if (!visible.value || !selectedRun.value || props.taskId == null || loading.value) return
-  const version = ++requestVersion
+/** 搜索、下载使用相同的时间、阶段、级别和正文。 */
+function formatLog(row) {
+  return `${formatTime(row.logTime)} [${row.stage || '-'}] [${row.logLevel}] ${row.message || ''}`
+}
+
+/** 旧实例没有过程日志时仅展示明确标记的最终摘要，不伪造历史过程。 */
+function legacySummary(row) {
+  return [
+    '该实例未记录过程日志，以下为最终结果摘要',
+    `执行状态：${statusLabel(row.status)}；检测数据：${row.sourceCount ?? '-'} 条；历史比对数据：${row.historySourceCount ?? '-'} 条`,
+    `候选对象组：${row.groupCount ?? '-'} 组；单条对象组：${row.singleCount ?? '-'} 组；失败原因：${row.errorMessage || '-'}`,
+  ].map((message, index) => ({ eventSeq: -(index + 1), logTime: row.endTime || row.startTime, stage: 'SUMMARY', logLevel: 'INFO', message }))
+}
+
+/** 固定本轮上界，追加日志而不覆盖已有内容，避免持续产生日志导致读取不结束。 */
+async function loadLogs(version = requestVersion) {
+  if (!visible.value || !selectedRun.value || props.taskId == null || loading.value || !active || document.hidden) return
   loading.value = true
-  loadError.value = false
+  let upperSeq
   try {
-    const { data } = await getMergeInstance(props.taskId, selectedRun.value.id)
+    let hasMore = true
+    while (hasMore) {
+      const { data } = await getMergeDetectRunLogs(props.taskId, selectedRun.value.id, afterSeq)
+      if (version !== requestVersion) return
+      upperSeq ??= data.lastSeq
+      // 分页期间任务结束时，补齐已归档的最后一批日志后再停止刷新。
+      if (String(data.run.status) !== '1') upperSeq = data.lastSeq
+      selectedRun.value = data.run
+      const page = data.logs.filter(row => row.eventSeq > afterSeq && row.eventSeq <= upperSeq)
+      logs.value.push(...page)
+      if (logs.value.length > 2000) logs.value.splice(0, logs.value.length - 2000)
+      const previousSeq = afterSeq
+      afterSeq = Math.min(data.nextSeq, upperSeq)
+      hasMore = data.hasMore && afterSeq < upperSeq && afterSeq > previousSeq
+    }
+    loadError.value = false
+    if (!isRunning.value && logs.value.length === 0) logs.value = legacySummary(selectedRun.value)
+    await nextTick()
     if (version !== requestVersion) return
-    selectedRun.value = data
+    if (shouldAutoScroll && !searchKeyword.value && logContentRef.value) {
+      logContentRef.value.scrollTop = logContentRef.value.scrollHeight
+    }
     if (!isRunning.value) autoRefresh.value = false
   } catch {
     if (version === requestVersion) loadError.value = true
@@ -223,77 +228,114 @@ async function loadSummary() {
   }
 }
 
-/**
- * 自动刷新开启时定时读取最新摘要，已完成实例也可刷新。
- * @returns {void} 通过状态或事件更新页面，无返回值。
- */
+/** 仅对可见且激活的日志弹窗轮询，失败后降低重试频率。 */
 function scheduleRefresh() {
   clearTimeout(refreshTimer)
-  if (autoRefresh.value && visible.value) {
-    refreshTimer = setTimeout(loadSummary, loadError.value ? 10000 : (isRunning.value ? 3000 : 10000))
+  if (autoRefresh.value && visible.value && active && !document.hidden) {
+    refreshTimer = setTimeout(() => loadLogs(requestVersion), loadError.value ? 10000 : 3000)
   }
 }
 
-/**
- * 搜索后将日志视口移动到顶部。
- * @returns {void} 通过状态或事件更新页面，无返回值。
- */
+/** 用户向上翻阅时暂停自动滚动。 */
+function handleLogScroll() {
+  const el = logContentRef.value
+  shouldAutoScroll = !el || el.scrollHeight - el.scrollTop - el.clientHeight <= 20
+}
+
+/** 搜索后把视口移动到顶部。 */
 function handleSearch() {
   if (logContentRef.value) logContentRef.value.scrollTop = 0
 }
 
-/**
- * 切换自动刷新后重置定时器。
- * @returns {void} 通过状态或事件更新页面，无返回值。
- */
+/** 开启自动刷新后立即读取。 */
 function handleAutoRefreshChange() {
   clearTimeout(refreshTimer)
-  if (autoRefresh.value) loadSummary()
+  if (autoRefresh.value) loadLogs(requestVersion)
 }
 
-/**
- * 用实例的最新字段下载执行摘要，历史实例也可以下载。
- * @param {*} row 当前业务记录。
- * @returns {Promise<void>} 通过状态或事件更新页面，无返回值。
- */
+/** 按下载开始时的日志上界导出全部过程，不受页面保留条数限制。 */
 async function download(row = selectedRun.value) {
   if (!row || props.taskId == null) return
+  const taskId = props.taskId
+  const records = []
+  let cursor = 0
+  let upperSeq
+  let run = row
   try {
-    const { data } = await getMergeInstance(props.taskId, row.id)
-    const content = [`执行编号：${data.instanceNo || data.id || '-'}`, ...buildSummaryLines(data).map(line => line.message)].join('\n')
-    proxy.downloadContent(content, `${data.instanceNo || data.id || '重复检测'}_执行摘要.log`)
+    let hasMore = true
+    while (hasMore) {
+      const { data } = await getMergeDetectRunLogs(taskId, row.id, cursor)
+      upperSeq ??= data.lastSeq
+      run = data.run
+      records.push(...data.logs.filter(log => log.eventSeq > cursor && log.eventSeq <= upperSeq).map(formatLog))
+      const previousSeq = cursor
+      cursor = Math.min(data.nextSeq, upperSeq)
+      hasMore = data.hasMore && cursor < upperSeq && cursor > previousSeq
+    }
+    if (!records.length && String(run.status) !== '1') records.push(...legacySummary(run).map(formatLog))
+    const content = [
+      `执行编号：${run.instanceNo || run.id || '-'}`,
+      `执行状态：${statusLabel(run.status)}`,
+      `开始时间：${formatTime(run.startTime)}`,
+      `结束时间：${formatTime(run.endTime)}`,
+      '',
+      ...records,
+    ].join('\n')
+    proxy.downloadContent(content, `${run.instanceNo || run.id || '重复检测'}_日志.log`)
   } catch {
-    proxy.$modal?.msgError?.('执行摘要下载失败，请稍后重试')
+    proxy.$modal.msgWarning('执行日志下载失败，请稍后重试')
   }
 }
 
-/**
- * 根据日志级别匹配终端日志颜色。
- * @param {*} level 调用方传入的业务配置。
- * @returns {*} 当前业务计算结果。
- */
+/** 按字面关键词拆分正文，保持纯文本渲染并高亮搜索结果。 */
+function highlightParts(message) {
+  const text = String(message || '')
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  if (!keyword) return [{ text, match: false }]
+  const parts = []
+  const lowerText = text.toLowerCase()
+  let start = 0
+  let index = lowerText.indexOf(keyword)
+  while (index >= 0) {
+    parts.push({ text: text.slice(start, index), match: false })
+    parts.push({ text: text.slice(index, index + keyword.length), match: true })
+    start = index + keyword.length
+    index = lowerText.indexOf(keyword, start)
+  }
+  parts.push({ text: text.slice(start), match: false })
+  return parts
+}
+
+/** 根据级别显示日志颜色。 */
 function getLogLevelClass(level) {
   return { ERROR: 'error', WARN: 'warn', INFO: 'info', DEBUG: 'debug' }[level] || 'info'
 }
 
-/**
- * 关闭弹窗时停止定时器并清理当前实例状态。
- * @returns {void} 通过状态或事件更新页面，无返回值。
- */
+/** 关闭后取消轮询并丢弃尚未返回的请求。 */
 function handleClosed() {
   clearTimeout(refreshTimer)
   requestVersion++
   selectedRun.value = null
+  logs.value = []
   loading.value = false
   autoRefresh.value = false
 }
 
-watch(autoRefresh, scheduleRefresh)
-// 通用详情信息的边框样式
-onMounted(() => { dialogTarget.value = document.querySelector('.app-container') })
-onBeforeUnmount(() => {
+/** 浏览器重新可见时继续增量读取。 */
+function handleVisibilityChange() {
   clearTimeout(refreshTimer)
-  requestVersion++
+  if (!document.hidden && autoRefresh.value) loadLogs(requestVersion)
+}
+
+onMounted(() => {
+  dialogTarget.value = document.querySelector('.app-container')
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+onActivated(() => { active = true; scheduleRefresh() })
+onDeactivated(() => { active = false; clearTimeout(refreshTimer) })
+onBeforeUnmount(() => {
+  handleClosed()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 defineExpose({ open, download })
@@ -491,7 +533,6 @@ defineExpose({ open, download })
 :deep(.ingest-run-log-dialog .el-dialog__body) {
   padding: 20px 40px !important;
 }
-
 
 .run-overview__icon {
   color: var(--qt-primary);

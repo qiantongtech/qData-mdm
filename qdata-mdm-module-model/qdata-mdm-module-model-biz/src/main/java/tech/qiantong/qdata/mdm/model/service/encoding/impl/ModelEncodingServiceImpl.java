@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.object.BeanUtils;
@@ -327,13 +328,13 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
         // 版本决定规则内容，模型决定独立计数归属；两者缺失时不能定位正确的流水状态。
         if (request == null || request.getEncodingVersionId() == null || request.getModelId() == null
                 || request.getEncodingVersionId() <= 0 || request.getModelId() <= 0) {
-            throw new ServiceException("编码方案版本ID和使用模型ID必须为正整数");
+            throw new ServiceException("编码方案版本ID和使用模型ID必须为正整数", HttpStatus.WARN);
         }
         ModelEncodingVersionDO version = versionMapper.selectById(request.getEncodingVersionId());
         validateVersion(version);
         // 锁方案主记录，确保尚无流水行的首次并发调用也不会重复起号。
         if (modelEncodingMapper.lockScheme(version.getEncodingId()) == null) {
-            throw new ServiceException("编码方案不存在");
+            throw new ServiceException("编码方案不存在", HttpStatus.WARN);
         }
         // 获得方案锁之后重新读取，避免等待锁期间版本已停用。
         version = versionMapper.selectById(request.getEncodingVersionId());
@@ -341,16 +342,16 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
         ModelEncodingDO scheme = modelEncodingMapper.selectById(version.getEncodingId());
         // 父方案停用或删除后，其已发布版本也不能继续分配号码。
         if (scheme == null || Boolean.TRUE.equals(scheme.getDelFlag()) || Boolean.FALSE.equals(scheme.getValidFlag())) {
-            throw new ServiceException("编码方案不存在或已停用");
+            throw new ServiceException("编码方案不存在或已停用", HttpStatus.WARN);
         }
         ModelBaseDO model = modelMapper.selectById(request.getModelId());
         if (model == null || Boolean.TRUE.equals(model.getDelFlag())) {
-            throw new ServiceException("使用模型不存在或已删除");
+            throw new ServiceException("使用模型不存在或已删除", HttpStatus.WARN);
         }
         List<ModelEncodingItemDO> items = itemMapper.selectList(new LambdaQueryWrapper<ModelEncodingItemDO>()
                 .eq(ModelEncodingItemDO::getEncodingVersionId, version.getId())
                 .orderByAsc(ModelEncodingItemDO::getSortOrder).orderByAsc(ModelEncodingItemDO::getId));
-        if (items.isEmpty()) throw new ServiceException("编码方案未配置规则段");
+        if (items.isEmpty()) throw new ServiceException("编码方案未配置规则段", HttpStatus.WARN);
         Map<String, Deque<String>> business = parameters(request.getBusinessFields(), "业务字段");
         Map<String, Deque<String>> references = parameters(request.getReferenceMappings(), "参考数据映射");
         ModelEncodingGenerateRespDTO result = new ModelEncodingGenerateRespDTO();
@@ -372,14 +373,14 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
             }
             // 不跳过已停用规则段，避免静默生成缺少某一段的错误编码。
             if (Boolean.TRUE.equals(item.getDelFlag()) || Boolean.FALSE.equals(item.getValidFlag())) {
-                throw new ServiceException("编码方案包含已停用规则段：" + item.getId());
+                throw new ServiceException("编码方案包含已停用规则段：" + item.getId(), HttpStatus.WARN);
             }
             // 排序位置既决定拼接顺序也参与流水主键，重复位置会导致不同段共用同一进度。
             if (item.getSortOrder() == null || item.getSortOrder() < 1 || !positions.add(item.getSortOrder())) {
-                throw new ServiceException("编码规则排序号必须为不重复的正整数");
+                throw new ServiceException("编码规则排序号必须为不重复的正整数", HttpStatus.WARN);
             }
             ModelEncodingItemTypeEnum type = ModelEncodingItemTypeEnum.getByValue(item.getType());
-            if (type == null) throw new ServiceException("未知编码规则类型：" + item.getType());
+            if (type == null) throw new ServiceException("未知编码规则类型：" + item.getType(), HttpStatus.WARN);
             switch (type) {
                 case FIXED_TEXT:
                     code.append(required(item.getFixedValue(), "固定内容"));
@@ -395,7 +396,7 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
                     try {
                         code.append(now.format(DateTimeFormatter.ofPattern(required(item.getFixedValue(), "日期格式"))));
                     } catch (IllegalArgumentException | java.time.DateTimeException ex) {
-                        throw new ServiceException("日期时间规则格式无效：" + item.getFixedValue());
+                        throw new ServiceException("日期时间规则格式无效：" + item.getFixedValue(), HttpStatus.WARN);
                     }
                     break;
                 case SERIAL_NUMBER:
@@ -414,11 +415,11 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
                         value = previous == null ? item.getSequenceStart()
                                 : Math.addExact(previous.getCurrentValue(), item.getStepSize());
                     } catch (ArithmeticException ex) {
-                        throw new ServiceException("流水号已超出数值范围");
+                        throw new ServiceException("流水号已超出数值范围", HttpStatus.WARN);
                     }
                     // 超出配置位数时直接失败，不能通过截断或回绕重用已发放的号码。
                     if (value < 0 || String.valueOf(value).length() > item.getSequenceLength()) {
-                        throw new ServiceException("流水号超出配置位数，规则段：" + item.getId());
+                        throw new ServiceException("流水号超出配置位数，规则段：" + item.getId(), HttpStatus.WARN);
                     }
                     String number = String.valueOf(value);
                     // 补零只影响编码展示，数据库始终保存原始数字，便于下次继续加步长。
@@ -447,7 +448,7 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
         }
         // 每个动态规则段恰好消费一条输入；仍有剩余表示多传或配置值不匹配，整次拒绝分配。
         if (!business.isEmpty() || !references.isEmpty()) {
-            throw new ServiceException("传入的业务字段或参考数据映射数量超过配置，或配置值不匹配");
+            throw new ServiceException("传入的业务字段或参考数据映射数量超过配置，或配置值不匹配", HttpStatus.WARN);
         }
         // 所有字段与规则校验通过后一次事务写入；任何段失败均不产生部分分配。
         for (int i = 0; i < states.size(); i++) {
@@ -470,7 +471,7 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
         if (version == null || version.getEncodingId() == null || Boolean.TRUE.equals(version.getDelFlag())
                 || Boolean.FALSE.equals(version.getValidFlag()) || !Integer.valueOf(3).equals(version.getStatus())
                 || (version.getEffectiveTime() != null && version.getEffectiveTime().toInstant().isAfter(clock.instant()))) {
-            throw new ServiceException("编码方案版本不存在、未发布、已停用或尚未生效");
+            throw new ServiceException("编码方案版本不存在、未发布、已停用或尚未生效", HttpStatus.WARN);
         }
     }
 
@@ -486,7 +487,7 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
         Map<String, Deque<String>> values = new HashMap<>();
         if (fields != null) {
             for (ModelEncodingGenerateReqDTO.FieldValue field : fields) {
-                if (field == null) throw new ServiceException(label + "参数不能为空");
+                if (field == null) throw new ServiceException(label + "参数不能为空", HttpStatus.WARN);
                 String key = required(field.getConfigValue(), label + "配置值");
                 values.computeIfAbsent(key, k -> new ArrayDeque<>()).add(required(field.getValue(), label + "实际值"));
             }
@@ -506,7 +507,7 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
     private String take(Map<String, Deque<String>> parameters, String key, String label) {
         required(key, label + "规则配置值");
         Deque<String> values = parameters.get(key);
-        if (values == null || values.isEmpty()) throw new ServiceException("缺少" + label + "参数：" + key);
+        if (values == null || values.isEmpty()) throw new ServiceException("缺少" + label + "参数：" + key, HttpStatus.WARN);
         String value = values.removeFirst();
         if (values.isEmpty()) parameters.remove(key);
         return value;
@@ -521,7 +522,7 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
      * @throws ServiceException 内容为null、空串或全为空白
      */
     private String required(String value, String label) {
-        if (value == null || value.trim().isEmpty()) throw new ServiceException(label + "不能为空");
+        if (value == null || value.trim().isEmpty()) throw new ServiceException(label + "不能为空", HttpStatus.WARN);
         return value;
     }
 
@@ -535,10 +536,10 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
         if (item.getSequenceLength() == null || item.getSequenceLength() < 1 || item.getSequenceLength() > 12
                 || item.getSequenceStart() == null || item.getSequenceStart() < 0
                 || item.getStepSize() == null || item.getStepSize() < 1) {
-            throw new ServiceException("流水号位数必须为1～12，起始值不能为负，步长必须为正整数");
+            throw new ServiceException("流水号位数必须为1～12，起始值不能为负，步长必须为正整数", HttpStatus.WARN);
         }
         if (!"LEFT_ZERO".equals(item.getPadChar()) && !"NONE".equals(item.getPadChar())) {
-            throw new ServiceException("流水号补位方式仅支持LEFT_ZERO或NONE");
+            throw new ServiceException("流水号补位方式仅支持LEFT_ZERO或NONE", HttpStatus.WARN);
         }
     }
 
@@ -552,7 +553,7 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
      * @throws ServiceException 重置周期缺失或不受支持
      */
     private String period(String method, LocalDateTime now) {
-        if (method == null) throw new ServiceException("流水号重置周期不能为空");
+        if (method == null) throw new ServiceException("流水号重置周期不能为空", HttpStatus.WARN);
         switch (method) {
             case "NONE":
                 return "NONE";
@@ -566,7 +567,7 @@ public class ModelEncodingServiceImpl extends ServiceImpl<ModelEncodingMapper, M
             case "DAILY":
                 return "DAY:" + now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             default:
-                throw new ServiceException("不支持的流水号重置周期：" + method);
+                throw new ServiceException("不支持的流水号重置周期：" + method, HttpStatus.WARN);
         }
     }
 }

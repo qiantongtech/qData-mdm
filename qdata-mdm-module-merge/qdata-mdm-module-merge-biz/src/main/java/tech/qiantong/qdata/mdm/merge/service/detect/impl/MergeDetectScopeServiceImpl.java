@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.merge.domain.source.MergeSourceRecordBO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceDO;
@@ -121,14 +122,14 @@ public class MergeDetectScopeServiceImpl implements IMergeDetectScopeService {
         ModelBaseDO model = requirePublishedModel(modelId);
         List<RuleMatchDO> rules = executableRules(modelId);
         if (rules.isEmpty()) {
-            throw new ServiceException("当前模型没有可执行的匹配规则");
+            throw new ServiceException("当前模型没有可执行的匹配规则", HttpStatus.WARN);
         }
         MergeDetectScopeBO scope = resolveScope(request);
         List<ModelColumnDO> columns = modelColumnMapper.selectList(new LambdaQueryWrapper<ModelColumnDO>()
                 .eq(ModelColumnDO::getModelId, modelId));
         List<MergeSourceRecordBO> sources = narrowSources(loadComparableSources(modelId), scope);
         if (maxComparableRecords > 0 && sources.size() > maxComparableRecords) {
-            throw new ServiceException("待比较来源数据超过" + maxComparableRecords + "条，请缩小范围后再检测");
+            throw new ServiceException("待比较来源数据超过" + maxComparableRecords + "条，请缩小范围后再检测", HttpStatus.WARN);
         }
         Set<Long> occupied = occupiedSourceIds(modelId, idsOf(sources));
         Map<Long, IngestSourceDO> systems = loadSystems(sources);
@@ -153,7 +154,7 @@ public class MergeDetectScopeServiceImpl implements IMergeDetectScopeService {
         }
         if (targetCount == 0) {
             throw new ServiceException(scope.isCustom()
-                    ? "当前范围内没有可参与检测的待治理来源数据" : "没有可纳入本次检测的来源数据");
+                    ? "当前范围内没有可参与检测的待治理来源数据" : "没有可纳入本次检测的来源数据", HttpStatus.WARN);
         }
         MergeDetectContextBO context = new MergeDetectContextBO();
         context.setModel(model);
@@ -342,14 +343,14 @@ public class MergeDetectScopeServiceImpl implements IMergeDetectScopeService {
     public ModelBaseDO requirePublishedModel(Long modelId) {
         ModelBaseDO model = modelBaseMapper.selectById(modelId);
         if (model == null) {
-            throw new ServiceException("主数据模型不存在或未发布");
+            throw new ServiceException("主数据模型不存在或未发布", HttpStatus.WARN);
         }
         try {
             tech.qiantong.qdata.mdm.model.base.dto.ModelPublishedRespDTO published =
                     modelPublishedApi.getPublishedModel(modelId);
             model.setVersionId(published.getVersionId());
         } catch (RuntimeException ex) {
-            throw new ServiceException("主数据模型不存在或未发布");
+            throw new ServiceException("主数据模型不存在或未发布", HttpStatus.WARN);
         }
         return model;
     }
@@ -387,22 +388,22 @@ public class MergeDetectScopeServiceImpl implements IMergeDetectScopeService {
             return scope;
         }
         if (!MergeCodes.SCOPE_CUSTOM.equals(type)) {
-            throw new ServiceException("检测范围不正确");
+            throw new ServiceException("检测范围不正确", HttpStatus.WARN);
         }
         scope.setCustom(true);
         scope.setSystemIds(MergeDetectConfigUtils.distinctIds(reqVO.getSourceSystemIds()));
         if (scope.getSystemIds().isEmpty()) {
-            throw new ServiceException("指定范围时至少选择一个来源系统");
+            throw new ServiceException("指定范围时至少选择一个来源系统", HttpStatus.WARN);
         }
         List<IngestSourceDO> systems = ingestSourceMapper.selectList(new LambdaQueryWrapper<IngestSourceDO>()
                 .in(IngestSourceDO::getId, scope.getSystemIds())
                 .eq(IngestSourceDO::getValidFlag, MergeCodes.YES));
         if (systems.size() != scope.getSystemIds().size()) {
-            throw new ServiceException("来源系统不存在或已停用");
+            throw new ServiceException("来源系统不存在或已停用", HttpStatus.WARN);
         }
         if (reqVO.getReceiveStartTime() != null && reqVO.getReceiveEndTime() != null
                 && reqVO.getReceiveStartTime().after(reqVO.getReceiveEndTime())) {
-            throw new ServiceException("接收时间起始日期不能晚于结束日期");
+            throw new ServiceException("接收时间起始日期不能晚于结束日期", HttpStatus.WARN);
         }
         scope.setStart(reqVO.getReceiveStartTime());
         scope.setEnd(reqVO.getReceiveEndTime());

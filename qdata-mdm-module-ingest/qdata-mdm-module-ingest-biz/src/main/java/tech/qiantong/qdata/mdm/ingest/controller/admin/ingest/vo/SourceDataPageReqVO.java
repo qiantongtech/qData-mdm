@@ -23,31 +23,56 @@ import lombok.EqualsAndHashCode;
 import tech.qiantong.qdata.mdm.common.core.page.PageParam;
 
 /**
- * 来源数据分页查询条件。
+ * 来源数据分页查询请求对象，封装模型、来源记录及业务字段等筛选条件。
+ *
+ * @author chentangwen
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class SourceDataPageReqVO extends PageParam {
 
-    private Long sourceSystemId;
-    private Long modelId;
-    private String sourceRecordKey;
-    private String businessFieldValue;
     /**
-     * 兼容旧版来源记录 ID 查询参数。
+     * 来源系统 ID，指定时仅查询该来源系统的数据。
+     */
+    private Long sourceSystemId;
+
+    /**
+     * 待查询的模型 ID，用于定位已发布的来源表。
+     */
+    private Long modelId;
+
+    /**
+     * 来源记录唯一标识查询条件，支持模糊匹配；非空时优先于 keyword。
+     */
+    private String sourceRecordKey;
+
+    /**
+     * 业务字段查询关键词，模糊匹配已启用的非系统业务列。
+     */
+    private String businessFieldValue;
+
+    /**
+     * 来源记录唯一标识查询关键词。
      */
     private String keyword;
-    private String governanceStatus;
+
     /**
-     * 是否包含同一来源记录的历史采集版本。
+     * 来源记录治理状态，按来源表 status 字段精确匹配。
+     */
+    private String governanceStatus;
+
+    /**
+     * 是否包含历史采集版本；为 true 时返回所有未删除版本，否则仅返回各来源记录的最新版本。
      */
     private Boolean includeHistory;
+
     /**
-     * 来源数据列表允许排序的字段：id、sourceRecordKey、lastReceiveTime。
+     * 排序字段：id、sourceRecordKey 或 lastReceiveTime；未指定时按采集时间排序。
      */
     private String orderByColumn;
+
     /**
-     * 表格排序方向：ascending 或 descending。
+     * 排序方向：ascending 或 asc 表示升序，其他值按降序处理。
      */
     private String isAsc;
 }

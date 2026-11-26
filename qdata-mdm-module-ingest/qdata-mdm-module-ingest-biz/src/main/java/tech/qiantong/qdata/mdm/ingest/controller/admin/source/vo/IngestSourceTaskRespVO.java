@@ -26,7 +26,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 来源系统接入任务引用 Response VO
+ * 来源系统详情中的接入任务引用响应对象。
  *
  * @author chentangwen
  * @date 2026-09-15
@@ -35,29 +35,56 @@ import java.util.Date;
 @Data
 public class IngestSourceTaskRespVO implements Serializable {
 
+    /**
+     * 序列化版本号。
+     */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * 接入任务 ID。
+     */
     @Schema(description = "任务ID")
     private Long id;
 
+    /**
+     * 接入任务编码。
+     */
     @Schema(description = "任务编码")
     private String code;
 
+    /**
+     * 接入任务名称。
+     */
     @Schema(description = "任务名称")
     private String name;
 
+    /**
+     * 接入类型：DATABASE 表示数据库，FILE 表示文件，API 表示接口。
+     */
     @Schema(description = "接入类型")
     private String type;
 
+    /**
+     * 目标主数据模型 ID。
+     */
     @Schema(description = "目标主数据模型ID")
     private Long modelId;
 
+    /**
+     * 目标主数据模型名称。
+     */
     @Schema(description = "目标主数据模型")
     private String modelName;
 
+    /**
+     * 接入任务启停状态：0 表示停用，1 表示启用。
+     */
     @Schema(description = "状态")
     private String status;
 
+    /**
+     * 最近一次未删除运行实例的开始时间，格式为 yyyy-MM-dd HH:mm:ss；无运行记录时为空。
+     */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "最近执行时间")
     private Date lastRunTime;

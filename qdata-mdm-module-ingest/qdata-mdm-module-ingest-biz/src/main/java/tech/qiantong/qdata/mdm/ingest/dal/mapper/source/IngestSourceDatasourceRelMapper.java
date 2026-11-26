@@ -64,4 +64,12 @@ public interface IngestSourceDatasourceRelMapper extends BaseMapperX<IngestSourc
      * @return 删除行数
      */
     int deleteBySourceIds(@Param("ids") Collection<Long> ids);
+
+    /**
+     * 按关联主键物理删除移除、失效或重复的关联，保留未变化关联的创建信息。
+     *
+     * @param ids 非空关联主键集合
+     * @return 删除行数
+     */
+    int deleteRelationsByIds(@Param("ids") Collection<Long> ids);
 }

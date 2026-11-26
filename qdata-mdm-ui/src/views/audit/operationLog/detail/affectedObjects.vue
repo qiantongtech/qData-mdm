@@ -86,7 +86,7 @@ const queryParams = data.queryParams;
 function getList(params) {
   const source = props.logList.flatMap(item => Array.isArray(item.affectedRows) ? item.affectedRows : []);
   const rows = source.filter(item =>
-      (!params.objectCode || (item.objectCode || '').includes(params.objectCode)) &&
+    (!params.objectCode || (item.objectCode || '').includes(params.objectCode)) &&
       (!params.modelName || item.modelName === params.modelName) &&
       (!params.result || item.result === params.result),
   );

@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.BeanUtils;
 
+import tech.qiantong.qdata.mdm.common.constant.HttpStatus;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.common.utils.DateUtils;
 import tech.qiantong.qdata.mdm.master.api.instance.dto.MasterFieldRespDTO;
@@ -147,11 +148,11 @@ public class MasterDataServiceImpl implements IMasterDataService {
         if (instanceId == null || instanceId <= 0) throw new ServiceException("模型实例ID格式无效");
         MasterModelRespDTO model = metadataService.getPublishedDefinition(instanceId, req.getModelId(), true);
         if (req.getModelVersionId() != null && !req.getModelVersionId().equals(model.getModelVersionId())) {
-            throw new ServiceException("列表与成功发布版本不一致，请返回卡片列表后重新进入");
+            throw new ServiceException("列表与成功发布版本不一致，请返回卡片列表后重新进入", HttpStatus.WARN);
         }
         if (req.getOrderByColumn() != null && model.getFields().stream().anyMatch(field ->
                 field.getCode().equalsIgnoreCase(req.getOrderByColumn().trim()) && "TEXT".equalsIgnoreCase(field.getDataType()))) {
-            throw new ServiceException("长文本字段不支持排序");
+            throw new ServiceException("长文本字段不支持排序", HttpStatus.WARN);
         }
         if (categoryList && !"CATEGORY".equals(model.getModelType())) {
             throw new ServiceException("普通模型不支持分类树形列表");
@@ -208,7 +209,7 @@ public class MasterDataServiceImpl implements IMasterDataService {
                     if (!"CATEGORY".equals(model.getModelType())) throw new ServiceException("普通模型不支持分类节点筛选");
                     List<MasterDataTreeNodeDTO> nodes = dataQueryRepository.selectTreeNodes(access, nameCode);
                     Set<String> ids = descendantIds(nodes, req.getTreeId().trim());
-                    if (ids.isEmpty()) throw new ServiceException("分类节点不存在");
+                    if (ids.isEmpty()) throw new ServiceException("分类节点不存在，请刷新分类树", HttpStatus.WARN);
                     query.setCategoryIds(ids.stream().map(this::masterId).collect(Collectors.toCollection(LinkedHashSet::new)));
                 }
                 if (categoryList) {
@@ -406,7 +407,7 @@ public class MasterDataServiceImpl implements IMasterDataService {
     }
 
     /**
-     * 按当前页补齐版本、审批及创建人信息；版本和审批分别批量读取。
+     * 按当前页补齐版本、审批及创建人和更新人信息。
      */
     private void fillRowExtensions(Long modelId, List<Map<String, Object>> rows) {
         if (rows == null || rows.isEmpty()) return;
@@ -425,7 +426,12 @@ public class MasterDataServiceImpl implements IMasterDataService {
             row.put("MASTER_APPROVAL_REQUEST_NO", approval == null ? null : approval.requestNo);
             row.put("MASTER_APPROVAL_CHANGE_TYPE", approval == null ? null : approval.changeType);
         }
-        fillCreatorExtensions(rows);
+        fillUserExtensions(rows, "CREATED_BY_NAME", "CREATED_BY_PHONE",
+                "主数据创建人信息暂不可用", new String[]{"CREATED_BY_ID", "CREATOR_ID"},
+                new String[]{"CREATED_BY", "CREATE_BY"});
+        fillUserExtensions(rows, "UPDATED_BY_NAME", "UPDATED_BY_PHONE",
+                "主数据更新人信息暂不可用", new String[]{"UPDATED_BY_ID", "UPDATER_ID"},
+                new String[]{"UPDATED_BY", "UPDATE_BY"});
     }
 
     /** 批量补充版本号；重复当前版本异常保留，其他查询失败时列表仍展示但版本号为空。 */
@@ -474,59 +480,60 @@ public class MasterDataServiceImpl implements IMasterDataService {
         return result;
     }
 
-    /** 补充列表创建人的姓名和电话，列表列本身仍只暴露一个创建人字段。 */
-    private void fillCreatorExtensions(List<Map<String, Object>> rows) {
+    /** 为列表和导出补充创建人、更新人的姓名和电话。 */
+    private void fillUserExtensions(List<Map<String, Object>> rows, String nameProperty, String phoneProperty,
+            String logMessage, String[] idKeys, String[] nameKeys) {
         if (rows == null || rows.isEmpty()) return;
-        Set<Long> creatorIds = new LinkedHashSet<>();
-        Set<String> creatorValues = new LinkedHashSet<>();
+        Set<Long> userIds = new LinkedHashSet<>();
+        Set<String> userValues = new LinkedHashSet<>();
         for (Map<String, Object> row : rows) {
-            String creatorId = firstValue(row, "CREATED_BY_ID", "CREATOR_ID");
-            if (creatorId != null && !creatorId.trim().isEmpty()) {
+            String userId = firstValue(row, idKeys);
+            if (userId != null && !userId.trim().isEmpty()) {
                 try {
-                    creatorIds.add(Long.valueOf(creatorId.trim()));
+                    userIds.add(Long.valueOf(userId.trim()));
                 } catch (NumberFormatException ignored) {
-                    creatorValues.add(creatorId.trim());
+                    userValues.add(userId.trim());
                 }
             }
-            String creator = firstValue(row, "CREATED_BY", "CREATE_BY");
-            if (creator != null && !creator.trim().isEmpty()) creatorValues.add(creator.trim());
-            row.put("CREATED_BY_NAME", creator);
-            row.put("CREATED_BY_PHONE", null);
+            String userName = firstValue(row, nameKeys);
+            if (userName != null && !userName.trim().isEmpty()) userValues.add(userName.trim());
+            row.put(nameProperty, userName);
+            row.put(phoneProperty, null);
         }
-        if (creatorIds.isEmpty() && creatorValues.isEmpty()) return;
+        if (userIds.isEmpty() && userValues.isEmpty()) return;
 
         try {
             Map<String, SysUser> users = new HashMap<>();
-            for (Long creatorId : creatorIds) {
-                indexUser(users, sysUserService.selectUserById(creatorId));
+            for (Long userId : userIds) {
+                indexUser(users, sysUserService.selectUserById(userId));
             }
-            for (String creatorValue : creatorValues) {
-                SysUser known = users.get(creatorValue);
-                if (known != null && creatorValue.equals(known.getUserName())) continue;
-                SysUser user = sysUserService.selectUserByUserName(creatorValue);
+            for (String userValue : userValues) {
+                SysUser known = users.get(userValue);
+                if (known != null && userValue.equals(known.getUserName())) continue;
+                SysUser user = sysUserService.selectUserByUserName(userValue);
                 if (user == null) {
                     SysUser query = new SysUser();
-                    query.setNickName(creatorValue);
+                    query.setNickName(userValue);
                     user = sysUserService.selectUserList(query).stream()
-                            .filter(candidate -> creatorValue.equals(candidate.getNickName()))
+                            .filter(candidate -> userValue.equals(candidate.getNickName()))
                             .findFirst()
                             .orElse(null);
                 }
                 indexUser(users, user);
             }
             for (Map<String, Object> row : rows) {
-                String creator = firstValue(row, "CREATED_BY", "CREATE_BY");
-                String creatorId = firstValue(row, "CREATED_BY_ID", "CREATOR_ID");
-                SysUser user = creatorId == null ? null : users.get(creatorId);
-                if (user == null && creator != null) user = users.get(creator);
+                String userName = firstValue(row, nameKeys);
+                String userId = firstValue(row, idKeys);
+                SysUser user = userId == null ? null : users.get(userId);
+                if (user == null && userName != null) user = users.get(userName);
                 if (user == null) continue;
-                String name = user.getNickName();
-                if (name == null || name.trim().isEmpty()) name = user.getUserName();
-                if (name != null && !name.trim().isEmpty()) row.put("CREATED_BY_NAME", name);
-                row.put("CREATED_BY_PHONE", user.getPhonenumber());
+                String displayName = user.getNickName();
+                if (displayName == null || displayName.trim().isEmpty()) displayName = user.getUserName();
+                if (displayName != null && !displayName.trim().isEmpty()) row.put(nameProperty, displayName);
+                row.put(phoneProperty, user.getPhonenumber());
             }
         } catch (Exception ex) {
-            log.warn("主数据创建人信息暂不可用", ex);
+            log.warn(logMessage, ex);
         }
     }
 
