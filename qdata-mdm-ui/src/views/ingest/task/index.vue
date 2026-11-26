@@ -127,9 +127,12 @@
                     :type="taskTypeTagType(row.type)"
                     size="small"
                 >{{ getOptionLabel(TASK_TYPES, row.type) }}</dict-tag>
-                <span class="flex-center"><el-icon class="mr5"><Clock/></el-icon>{{
-                    formatExecutionSchedule(row)
-                  }}</span>
+                <div class="flex-center fz14">
+                  <el-icon class="mr5 schedule-clock"><Clock/></el-icon>
+                  <span class="text-ellipsis cron-text" :title="formatExecutionSchedule(row)">
+                    {{ formatExecutionSchedule(row) }}
+                  </span>
+                </div>
               </div>
             </template>
             <template #status="{ row }">
@@ -651,6 +654,11 @@ async function copyTask(row) {
 .table-primary-text {
   color: var(--el-text-color-primary);
   font-weight: var(--qt-font-weight-medium);
+}
+
+.schedule-clock {
+  flex-shrink: 0;
+  color: #3b82f6;
 }
 
 .source-info {

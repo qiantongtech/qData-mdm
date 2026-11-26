@@ -45,7 +45,7 @@
                 :key="item.label"
                 :label="item.label"
               >
-                <el-tag v-if="item.label === '处理状态'" size="small" :type="getOptionType(PENDING_STATUS_OPTIONS, item.status)">
+                <el-tag v-if="item.label === '处理状态'" :type="getOptionType(PENDING_STATUS_OPTIONS, item.status)">
                   {{ displayValue(item.value) }}
                 </el-tag>
                 <div v-else :class="['form-readonly', 'approval-view-value', { 'approval-view-value-singleline': item.label === '来源系统' }]">
@@ -111,6 +111,11 @@ import { getMergePending } from '@/api/merge/manage'
 function displayText(value) {
   if (value === null || value === undefined || value === '') return '-'
   return value
+}
+
+function formatVersionNo(value) {
+  if (value === null || value === undefined || value === '') return '-'
+  return `V${String(value).replace(/^v/i, '')}`
 }
 
 function formatCountText(value, unit) {
@@ -181,7 +186,7 @@ const approvalItems = computed(() => {
       { label: '审批实例', value: detail.flowInstanceId },
       { label: '权威主数据ID', value: detail.resultRecordId },
       { label: '生效方式', value: changeType },
-      { label: '正式版本', value: detail.effectiveVersionNo },
+      { label: '正式版本', value: formatVersionNo(detail.effectiveVersionNo) },
       { label: '自动编码', value: automaticField?.finalValue },
       { label: '来源映射', value: detail.sourceMappingCount == null ? null : `${detail.sourceMappingCount}条来源数据已关联` },
     ]

@@ -34,6 +34,9 @@ public interface SourceDataService {
 
     PageResult<SourceDataPageRespVO> getPage(SourceDataPageReqVO pageReqVO);
 
+    /** 按固定版本读取来源数据，使用来源列表相同的展示字段。 */
+    List<SourceDataPageRespVO> listByVersionIds(Long modelId, List<Long> versionIds);
+
     List<SourceDataModelTreeRespVO> getModelTree();
 
     /**

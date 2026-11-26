@@ -35,7 +35,7 @@
         {{ (pageNum - 1) * pageSize + $index + 1 }}
       </template>
       <template #operation="{ row }">
-        <el-tag size="small" :type="getOptionType(PENDING_LOG_ACTION_OPTIONS, row.actionType)">
+        <el-tag :type="getOptionType(PENDING_LOG_ACTION_OPTIONS, row.actionType)">
           {{ getOperationLabel(row.actionType) }}
         </el-tag>
       </template>
