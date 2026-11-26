@@ -19,7 +19,7 @@
 
 **Keep master data consistent across business systems.**
 
-**qData-mdm** is open-source master data management (MDM) software for teams that maintain core business data across multiple systems. Define data models and standards, maintain master records, run quality checks, and share the results through APIs.
+**qData Master Data Platform (qData-mdm)** is an open-source master data management platform. Define data models and standards, maintain core business records in one place, run quality checks, and share master data across systems through APIs.
 
 Start with suppliers, materials, or equipment. Maintain records in one place and apply shared reference values and code generation rules to reduce duplicate records and inconsistent codes. Share the same master records with purchasing, inventory, and finance systems through REST APIs or scheduled distribution. Developers can extend the modules and reuse the built-in data management and access controls.
 
