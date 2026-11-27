@@ -111,9 +111,9 @@
               </div>
             </template>
             <template #runControl="{ row }">
-              <div class="flex-column task-controls">
-                <div class="task-control">
-                  <span class="black-label">任务状态:</span>
+              <div class="flex-column flex-column-gap">
+                <div class="flex-center">
+                  <span class="mr5">任务状态:</span>
                   <el-switch v-model="row.status"
                              active-value="1"
                              inactive-value="2"
@@ -123,8 +123,8 @@
                              @change="changeStatus(row)"
                   />
                 </div>
-                <div class="task-control">
-                  <span class="black-label">调度状态:</span>
+                <div class="flex-center">
+                  <span class="mr5">调度状态:</span>
                   <el-switch v-model="row.scheduleFlag"
                              active-value="1"
                              inactive-value="0"
@@ -849,8 +849,12 @@ const tableStore = reactive({
       showOverflowTooltip: {effect: 'light'}
     },
     {label: '归属位置', slot: 'location', align: 'left', minWidth: 190},
-    {label: '最近执行信息', slot: 'lastExecution', align: 'left', minWidth: 205},
-    {label: '运行控制', prop: 'status', slot: 'runControl', align: 'left', width: 130},
+    {
+      label: '最近执行信息', slot: 'lastExecution', align: 'left', minWidth: 205,
+      headerTooltip: '通过「更多 → 运行实例」可查看任务运行记录和执行结果。',
+      showHeaderTooltip: true,
+    },
+    {label: '运行控制', prop: 'status', slot: 'runControl', align: 'left', width: 165, minWidth: 165},
     {label: '检测范围与调度', prop: 'scheduleConfig', slot: 'scopeSchedule', align: 'left', minWidth: 210},
     {label: '负责人', prop: 'responsibleUserId', slot: 'responsiblePerson', align: 'left', width: 130},
     {label: '创建人', prop: 'createBy', slot: 'creator', align: 'left', width: 130},
@@ -1398,17 +1402,6 @@ const selectedModelOption = computed(() => modelOptions.find(item => String(item
 .muted {
   color: var(--el-text-color-secondary);
   font-size: 12px;
-}
-
-.task-control {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.task-controls {
-  font-size: 12px;
-  gap: 2px;
 }
 
 .task-schedule {
