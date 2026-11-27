@@ -267,6 +267,9 @@ async function loadDetail() {
       }
     }
     if (version !== requestVersion) return
+
+    resolvedRecord.serviceName = record.serviceName || serviceDetail.name || '-'
+    resolvedRecord.serviceCode = record.serviceCode || serviceDetail.code || '-'
     detail.value = resolvedRecord
     service.value = serviceDetail
     modelFields.value = fields

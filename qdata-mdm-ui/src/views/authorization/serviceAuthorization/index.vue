@@ -237,11 +237,16 @@
               required
               class="row-full"
             >
-              <el-select v-model="grantForm.serviceId" placeholder="请选择数据服务" filterable>
+              <el-select
+                      v-model="grantForm.serviceId"
+                      placeholder="请选择数据服务"
+                      filterable
+                      :loading="grantServicesLoading"
+              >
                 <el-option
-                  v-for="service in serviceOptions"
+                  v-for="service in grantServiceOptions"
                   :key="service.id"
-                  :label="`${service.name}（${service.code} · ${service.version}）`"
+                  :label="`${service.name}（${service.code}）`"
                   :value="service.id"
                 />
               </el-select>
@@ -436,7 +441,7 @@ import { listService } from '@/api/dist/service/service.js'
 import {
   SERVICE_AUTHORIZATION_CLIENTS as clientSubjects,
   SERVICE_AUTHORIZATION_FIELDS as fieldDefinitions,
-  SERVICE_AUTHORIZATION_SERVICES,
+
   SERVICE_AUTHORIZATION_SUBJECT_TYPES as subjectTypeOptions
 } from '@/utils/authorization/serviceAuthorization.js'
 import {
@@ -537,7 +542,10 @@ const grantForm = reactive({
   subjectType: 'user', subjectId: '', subjectIds: [], serviceId: '', scopeType: 'all', scopeDetail: '',
   scopeGroups: createScopeGroups(), fieldPermissions: createFieldPermissions(), startDate: '', endDate: '', longTerm: true
 })
-const serviceOptions = ref(SERVICE_AUTHORIZATION_SERVICES.map(service => ({ ...service })))
+const serviceOptions = ref([])
+const grantServiceOptions = ref([])
+const grantServicesLoading = ref(false)
+let grantServicesRequestVersion = 0
 const filteredSubjectOptions = computed(() => subjectOptions.value.filter(item => item.type === grantForm.subjectType))
 const scopeColumns = [
   { label: '编号', type: 'index', width: 70, minWidth: 70 },
@@ -596,8 +604,28 @@ const tableStore = reactive({
 const searchStore = reactive({
   items: [
     { label: '授权主体', prop: 'subjectId', component: { is: 'select', options: [] } },
-    { label: '主体类型', prop: 'subjectType', component: { is: 'select', options: [{ label: '平台用户', value: 'user' }, { label: '服务客户端', value: 'client' }] } },
-    { label: '数据服务', prop: 'serviceId', component: { is: 'select', options: serviceOptions.value.map(service => ({ label: service.name, value: service.id })) } },
+    { label: '主体类型',
+      prop: 'subjectType',
+      component: {
+      is: 'select',
+        options: [{ label: '平台用户', value: 'user' },
+
+          { label: '服务客户端', value: 'client'
+          }]
+      }
+    },
+    {
+      label: '数据服务',
+      prop: 'serviceId',
+      component: {
+        is: 'select',
+        options: serviceOptions.value.map(service => ({
+          label: service.name,
+          value: service.id
+        })),
+        onVisibleChange: refreshSearchServices
+      }
+    },
     { label: '授权状态', prop: 'status', component: { is: 'select', options: [{ label: '有效', value: 'active' }, { label: '未生效', value: 'pending' }] } }
   ]
 })
@@ -626,7 +654,37 @@ function resetGrantForm() {
   Object.assign(blockErrors, { scopeGroups: '', fieldPermissions: '' })
   nextTick(() => grantFormRef.value?.clearValidate())
 }
-function handleCreate() { resetGrantForm(); editingRecord.value = undefined; grantStep.value = 1; grantOpen.value = true }
+function handleCreate() {
+  resetGrantForm()
+  editingRecord.value = undefined
+  grantStep.value = 1
+  grantOpen.value = true
+  refreshGrantServices()
+}
+
+
+// 查询数据服务下拉选项
+async function refreshGrantServices() {
+  const requestVersion = ++grantServicesRequestVersion
+  grantServiceOptions.value = []
+  grantServicesLoading.value = true
+
+  try {
+    const services = await listAllServices()
+
+    if (requestVersion === grantServicesRequestVersion) {
+      grantServiceOptions.value = services
+    }
+  } catch {
+    if (requestVersion === grantServicesRequestVersion) {
+      proxy.$modal.msgError('数据服务加载失败，请重新打开下拉框重试')
+    }
+  } finally {
+    if (requestVersion === grantServicesRequestVersion) {
+      grantServicesLoading.value = false
+    }
+  }
+}
 function resetSubjects() { grantForm.subjectId = ''; grantForm.subjectIds = [] }
 function handleSubjectTypeChange() {
   resetSubjects()
@@ -822,6 +880,7 @@ async function openEdit(row) {
   editingRecord.value = detail
   grantStep.value = 1
   grantOpen.value = true
+  refreshGrantServices()
 }
 function toTag(label, type = 'primary') { return { label, value: label, elTagType: type } }
 
@@ -831,6 +890,24 @@ function extractRows(response) {
   const data = unwrapData(response) || {}
   return { rows: data.rows || data.list || (Array.isArray(data) ? data : []), total: data.total || 0 }
 }
+// 展开数据服务筛选框时，查询最新的数据服务
+async function refreshSearchServices(visible) {
+  if (!visible) return
+
+  try {
+    const services = await listAllServices()
+
+    treeServiceOptions.value = services
+
+    searchStore.items[2].component.options = services.map(service => ({
+      label: service.name,
+      value: service.id
+    }))
+  } catch {
+    proxy.$modal.msgError('数据服务加载失败，请稍后重试')
+  }
+}
+
 async function listAllServices() {
   const pageSize = 100
   const firstPage = extractRows(await listService({ pageNum: 1, pageSize }))
@@ -872,7 +949,9 @@ function mergeFieldPermissions(saved) {
   })
 }
 function mapAuthorization(item) {
-  const service = serviceOptions.value.find(option => String(option.id) === String(item.serviceId))
+  const service = treeServiceOptions.value.find(
+          option => String(option.id) === String(item.serviceId)
+  )
   const scopeType = item.dataScopeType === 'CONDITION' ? 'condition' : 'all'
   const fieldPermissions = item.fieldPermissions || []
   const subjectType = fromSubjectType(item.subjectType)
@@ -883,7 +962,7 @@ function mapAuthorization(item) {
     subjectName: item.subjectName || (subjectType === 'client' ? client?.name || item.subjectCode || '-' : item.subjectName),
     serviceName: item.serviceName || service?.name || '-',
     serviceCode: item.serviceCode || service?.code || '-',
-    version: item.serviceVersion || item.version || service?.version || '-',
+    version: item.serviceVersion || service?.version || '-',
     endpoint: item.endpoint || '-', protocol: item.protocol || '-', method: item.method || '-',
     scopeType,
     scopeGroups: deserializeScopeGroups(item.dataScopeConfig),
@@ -921,14 +1000,8 @@ async function fetchAuthorizationPage(params) {
     isAsc: params.isAsc === 'ascending' ? 'asc' : params.isAsc === 'descending' ? 'desc' : undefined
   })
   const page = extractRows(response)
-  page.rows.forEach(item => {
+
     // 只用真实服务名补充下拉选项，不再用“服务 + ID”编造名称。
-    if (item.serviceId && item.serviceName
-      && !serviceOptions.value.some(service => String(service.id) === String(item.serviceId))) {
-      serviceOptions.value.push({ id: item.serviceId, name: item.serviceName, code: item.serviceCode || '-', version: item.serviceVersion || item.version || '-' })
-    }
-  })
-  searchStore.items[2].component.options = serviceOptions.value.map(service => ({ label: service.name, value: service.id }))
   return { data: { rows: page.rows.map(mapAuthorization), total: page.total } }
 }
 function buildSavePayload(subjectIds, batch) {
@@ -955,6 +1028,13 @@ async function loadReferences() {
     listAllServices()
   ])
   treeServiceOptions.value = services.status === 'fulfilled' ? services.value : []
+  searchStore.items[2].component.options = treeServiceOptions.value.map(service => ({
+    label: service.name,
+    value: service.id
+  }))
+  if (services.status === 'fulfilled') {
+    tableRef.value?.getList()
+  }
   if (services.status === 'rejected') proxy.$modal.msgError('数据服务加载失败，请刷新后重试')
   if ([projects, layers, models].every(result => result.status === 'fulfilled')) {
     modelTreeData.value = buildAuthorizationModelTree(
