@@ -112,14 +112,17 @@
             </div>
           </div>
         </template>
-        <template #schedule="{ row }">
-          <div class="flex-column flex-column-gap">
-            <div>{{ row.triggerType === 'MANUAL' ? '人工执行' : row.triggerType === 'SCHEDULED' ? '定时执行' : '-' }}</div>
-            <div v-if="row.triggerType === 'SCHEDULED'" class="flex-center" :title="formatExecutionSchedule(row)">
-              <el-icon class="mr5"><Clock /></el-icon><span class="text-ellipsis">{{ formatExecutionSchedule(row) }}</span>
-            </div>
-          </div>
-        </template>
+            <template #schedule="{ row }">
+                <div class="flex-column flex-column-gap">
+                    <div>
+                        {{ row.triggerType === 'MANUAL' ? '人工执行' : row.triggerType === 'SCHEDULED' ? '定时执行' : '-' }}
+                    </div>
+                    <div class="flex-center" :title="formatExecutionSchedule(row)">
+                        <el-icon class="mr5 schedule-clock"><Clock /></el-icon>
+                        <span class="text-ellipsis">{{ formatExecutionSchedule(row) }}</span>
+                    </div>
+                </div>
+            </template>
         <template #status="{ row }">
           <div class="task-status-switches">
             <div class="task-status-switches__item">
@@ -341,7 +344,7 @@
 
       { label: "归属位置", prop: "projectName", minWidth: 160, align: "left", headerAlign: "left", slot: "location" },
       { label: "分发类型 / 接收接口", prop: "dataMode", minWidth: 255, align: "left", headerAlign: "left", slot: "distribution" },
-      { label: "最近执行信息", prop: "lastRunTime", minWidth: 165, align: "left", headerAlign: "left", slot: "lastExecution", className: "last-execution-column", labelClassName: "last-execution-column" },
+      { label: "最近执行信息", prop: "lastRunTime", minWidth: 165, align: "left", headerAlign: "left", slot: "lastExecution", className: "last-execution-column", labelClassName: "last-execution-column", headerTooltip: "展示任务最近一次执行的状态、时间和耗时。", showHeaderTooltip: true },
       { label: "运行控制", prop: "status", minWidth: 165, align: "left", headerAlign: "left", slot: "status" },
       { label: "调度类型 / 周期", prop: "triggerType", minWidth: 165, align: "left", headerAlign: "left", slot: "schedule" },
       { label: "负责人", prop: "responsibleUserName", minWidth: 165, align: "left", headerAlign: "left", slot: "responsible" },
@@ -560,6 +563,11 @@
 </script>
 
 <style scoped>
+.schedule-clock {
+    flex-shrink: 0;
+    color: #3b82f6;
+}
+
 :deep(.last-execution-column .cell) {
   padding-left: 20px;
 }
