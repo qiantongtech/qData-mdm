@@ -74,7 +74,13 @@ With the appropriate permissions, try publishing a query API. Select a published
 
 ### Choose a deployment method
 
-- **Docker Compose.** Use the configuration in `deploy/docker/` to start the full environment locally.
+- **Docker Compose.** Run these commands from the repository root to start the full environment locally.
+
+  ```bash
+  cd deploy/docker
+  docker compose -p qdata-mdm-ce --profile all up -d
+  ```
+
 - **Run from source.** Start the backend `qdata-mdm-server` and frontend `qdata-mdm-ui` separately for development and integration testing.
 - **Manual deployment.** Install and configure each service for production or a customized environment.
 
@@ -138,17 +144,17 @@ With the appropriate permissions, try publishing a query API. Select a published
 
 ## Capabilities overview
 
-qData-mdm covers the master data lifecycle from modeling and ingestion through record consolidation, governance, and delivery to downstream systems.
+qData-mdm aims to give ERP, CRM, SRM, and WMS applications one set of customer, supplier, and material data, with a common identifier, an authoritative record, and traceable sources for each entity.
 
-| Capability | What you can do |
+| Capability | What it enables |
 | --- | --- |
-| **Master data modeling and standards** | Organize standard models, classification models, one-to-many child models, and model relationships by domain and catalog. Standardize values and identifiers with reference data and code generation rules. Track schema changes with model versions. |
-| **Multi-source data ingestion** | Run full or incremental database imports, upload Excel and CSV files, or pull data from external APIs. Map source fields to model fields, detect changes by source record, and keep a history of ingested versions. |
-| **Record matching and consolidation** | Find potential duplicates using exact, fuzzy, or weighted multi-field matching. Use survivorship rules to recommend field values, resolve conflicts field by field, and track where each value came from. Quality checks and approvals turn the consolidated result into a trusted master record, often called a golden record. |
-| **Master data lifecycle management** | Create, update, and maintain records in bulk. Use approvals to manage changes and record states, including activation, freezing, deactivation, and archiving. Compare historical versions and request restoration. |
-| **Rule-based data quality** | Configure required field, uniqueness, format, range, and cross-field checks. Run them manually or on a schedule. Identify failing records and fields, assign remediation tasks, and verify fixes with follow-up checks. |
-| **Data distribution and query APIs** | Set data scope and field mappings for each target system. Push full datasets, incremental updates, and lifecycle changes for previously distributed records. Publish read-only REST APIs for authorized single-record and paginated queries. |
-| **Fine-grained access control and audit trails** | Grant row-level, field-level, and operation-level access by user, role, or organizational unit. Trace business actions, approvals, version differences, and source records. |
+| **Multi-source data ingestion** | Bring supplier records from ERP databases, spreadsheets, and external APIs into the same supplier model. Load database records in full or sync changes incrementally, and track source record changes by version. |
+| **Shared models and automatic identifiers** | Define fields, classifications, relationships, and details for customers, suppliers, and materials. Use shared reference data and code generation rules to keep material classifications and business identifiers consistent across systems. |
+| **Cross-system deduplication and consolidation** | Use name similarity and multi-field matching to identify the same supplier under different names. Recommend field values based on rules such as source reliability. Users resolve conflicts, and quality checks and approval turn the result into a traceable master record. |
+| **10+ quality checks with tracked remediation** | Schedule checks for duplicate material codes, invalid Chinese business registration identifiers, and start dates later than end dates. Pinpoint affected fields, assign owners, and verify fixes with follow-up checks. |
+| **Lifecycle management and version history** | Manage records from activation through freezing, deactivation, and archiving. Compare past versions, review the reasons and approvals behind changes, and restore earlier content through approval. |
+| **Master data distribution and query APIs** | Set the data scope and fields for each destination, then push full datasets, incremental updates, and lifecycle changes for previously distributed records. Offer authorized lookups by master record ID and paginated queries through read-only REST APIs. |
+| **Fine-grained permissions and audit trails** | Set row, field, and operation permissions by user, role, or organizational unit. Manage API access for service clients independently, and trace permission changes, business operations, and source records. |
 
 💡 Have feedback or a feature request? [Open an issue](https://gitee.com/qiantongtech/qData-mdm/issues).
 
