@@ -1,3 +1,19 @@
+-- Copyright © 2026-present Jiangsu Qiantong Technology Co., Ltd.
+--
+-- This file is part of qData-mdm Master Data Platform (Open Source Edition).
+--
+-- qData-mdm is licensed under Apache License 2.0 with additional qData-mdm terms.
+-- You may use qData-mdm for commercial purposes, but you may not remove, hide,
+-- modify, or replace the qData-mdm logo, copyright notices, license notices,
+-- or attribution information without a separate commercial license.
+--
+-- White-label use, OEM distribution, rebranding, or presenting qData-mdm as
+-- another product requires separate commercial authorization from
+-- Jiangsu Qiantong Technology Co., Ltd.
+--
+-- Business License: https://docs.qdata.tech/business/policy.html
+-- See the LICENSE file in the project root for full license information.
+
 -- 新增来源数据删除、匹配审核删除的菜单权限。
 SET IDENTITY_INSERT "QDATA_MDM"."SYSTEM_MENU" ON;
 INSERT INTO "QDATA_MDM"."SYSTEM_MENU"("MENU_ID","MENU_NAME","PARENT_ID","ORDER_NUM","PATH","COMPONENT","QUERY","IS_FRAME","IS_CACHE","ROUTE_NAME","MENU_TYPE","VISIBLE","STATUS","PERMS","ICON","CREATE_BY","CREATE_TIME","UPDATE_BY","UPDATE_TIME","REMARK") VALUES(2497,'来源数据删除',2265,2,'#',NULL,NULL,1,0,NULL,'F','0','0','ingest:sourceData:remove','#',1,'2026-11-18 09:54:28.818665','',NULL,'');
