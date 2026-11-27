@@ -13,7 +13,7 @@
     <description>qData开源主数据平台</description>
 
     <properties>
-        <qdata-mdm.version>1.0.1</qdata-mdm.version>
+        <qdata-mdm.version>1.0.2</qdata-mdm.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <java.version>1.8</java.version>
