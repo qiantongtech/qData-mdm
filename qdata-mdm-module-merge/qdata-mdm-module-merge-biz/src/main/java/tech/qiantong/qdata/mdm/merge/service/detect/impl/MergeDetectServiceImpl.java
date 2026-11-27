@@ -30,10 +30,12 @@ import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.common.exception.ServiceException;
 import tech.qiantong.qdata.mdm.merge.domain.source.MergeSourceRecordBO;
 import tech.qiantong.qdata.mdm.ingest.dal.dataobject.source.IngestSourceDO;
+import tech.qiantong.qdata.mdm.ingest.service.ingest.SourceDataService;
 import tech.qiantong.qdata.mdm.merge.service.source.IMergeSourceTableService;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeDetectScopeRespVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeDetectStartReqVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeGroupPageReqVO;
+import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeGroupSourcesRespVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeTaskPageReqVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeTaskRespVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeTaskCreatorVO;
@@ -98,6 +100,9 @@ public class MergeDetectServiceImpl
 
     @Resource
     private IMergeSourceTableService sourceTableService;
+
+    @Resource
+    private SourceDataService sourceDataService;
 
 
     @Resource
@@ -182,6 +187,26 @@ public class MergeDetectServiceImpl
     @Override
     public PageResult<MergeCandidateGroupDO> pageGroups(MergeGroupPageReqVO reqVO) {
         return mergeCandidateGroupMapper.selectPage(reqVO);
+    }
+
+    /** 仅返回当前执行实例下指定候选组的目标来源版本。 */
+    @Override
+    public MergeGroupSourcesRespVO listGroupSources(Long taskInstanceId, Long groupId) {
+        MergeCandidateGroupDO group = mergeCandidateGroupMapper.selectById(groupId);
+        if (group == null || !Objects.equals(taskInstanceId, group.getTaskInstanceId())) {
+            throw new ServiceException("当前执行记录下不存在该候选组", HttpStatus.WARN);
+        }
+        List<Long> versionIds = mergeCandidateGroupMemberMapper.selectList(
+                new LambdaQueryWrapper<MergeCandidateGroupMemberDO>()
+                        .eq(MergeCandidateGroupMemberDO::getGroupId, groupId)
+                        .eq(MergeCandidateGroupMemberDO::getMemberRole, MergeCodes.MEMBER_ROLE_TARGET)
+                        .eq(MergeCandidateGroupMemberDO::getValidFlag, MergeCodes.YES))
+                .stream().map(MergeCandidateGroupMemberDO::getSourceVersionId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        MergeGroupSourcesRespVO result = new MergeGroupSourcesRespVO();
+        result.setColumns(sourceDataService.getModelColumns(group.getModelId()));
+        result.setRows(sourceDataService.listByVersionIds(group.getModelId(), versionIds));
+        return result;
     }
 
     /** 保存重复检测任务配置，不立即执行。 */

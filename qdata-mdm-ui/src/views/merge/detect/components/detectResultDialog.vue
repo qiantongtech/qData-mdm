@@ -72,7 +72,7 @@
     <el-dialog
       v-model="groupVisible"
       title="查看"
-      width="min(1000px, 94vw)"
+      width="min(1400px, 94vw)"
       append-to-body
       :append-to="$refs['app-container']"
       draggable
@@ -89,24 +89,74 @@
           </el-form-item>
         </el-form>
 
-        <div v-loading="getGroupDetail(groupRow).loading">
-          <qt-wrap
-            :columns="groupDetailTableStore.columns"
-            :tableRef="groupDetailTableRef"
-            :config="{ fullContent: false, actions: { table: { show: false, search: false } } }"
-            class="group-source-wrap"
+        <qt-wrap
+          :columns="groupSourceColumns"
+          :tableRef="groupDetailTableRef"
+          :config="{ fullContent: false, actions: { table: { show: false, search: false } } }"
+          class="group-source-wrap"
+        >
+          <template #actions-data>
+            <div class="h2-title group-source-title">来源数据</div>
+          </template>
+          <qt-table
+            :key="groupSourceViewId"
+            ref="groupDetailTableRef"
+            :columns="groupSourceColumns.map(column => column.slot && column.prop ? { ...column, property: column.prop, prop: undefined } : column)"
+            :func="queryGroupSources"
+            :config="groupSourceTableConfig"
           >
-            <template #actions-data>
-              <div class="h2-title group-source-title">来源数据</div>
+            <template #rowIndex="{ row }">{{ row.sourceIndex }}</template>
+            <template #businessValue="{ row, column_data }">
+              {{ displayBusinessValue(row[column_data.property || column_data.prop]) }}
             </template>
-            <qt-table ref="groupDetailTableRef" v-bind="groupDetailTableStore" :columns="groupDetailTableStore.columns.map(column => column.slot && column.prop ? { ...column, property: column.prop, prop: undefined } : column)">
-              <template #sourceSystem="{ row }">{{ row.systemName || row.systemCode || '-' }}</template>
-              <template #sourceRecordId="{ row }">{{ row.stableRecordId || row.sourceRecordId || '-' }}</template>
-              <template #businessName="{ row }">{{ getMemberBusinessName(row) }}</template>
-              <template #businessKey="{ row }">{{ getMemberBusinessKey(row) }}</template>
-            </qt-table>
-          </qt-wrap>
-        </div>
+            <template #modelInfo="{ row }">
+              <div class="qt-table-info model-info">
+                <div class="qt-table-info__main">
+                  <img :src="getModelIcon({ icon: row.modelIcon, type: row.modelType })" alt="" class="info-icon"/>
+                  <span class="info-title model-info-title text-ellipsis">{{ row.modelName ? formatEntityTitle(row.modelName, row.modelCode) : row.modelCode || '-' }}</span>
+                  <dict-tag v-if="row.modelType" :options="MODEL_TYPE_OPTIONS" :value="row.modelType" size="small" type="primary"/>
+                  <dict-tag
+                      v-if="row.modelVersionNo"
+                      class="ml4"
+                      :options="getVersionTagOptions(row)"
+                      :value="row.modelVersionStatus ?? row.modelVersionNo"
+                      size="small"
+                      type="info"
+                  />
+                </div>
+                <div class="info-desc text-ellipsis">{{ row.modelDescription || '-' }}</div>
+              </div>
+            </template>
+            <template #sourceSystemInfo="{ row }">
+              <div class="qt-table-info model-info">
+                <div class="qt-table-info__main">
+                  <img :src="getProjectIcon(row.sourceSystemIcon)" alt="" class="info-icon"/>
+                  <span class="info-title text-ellipsis" :title="formatEntityTitle(row.sourceSystemName, row.sourceSystemCode)">
+                    {{ formatEntityTitle(row.sourceSystemName, row.sourceSystemCode) }}
+                  </span>
+                </div>
+                <div class="info-desc text-ellipsis">{{ row.sourceSystemDescription || '-' }}</div>
+              </div>
+            </template>
+            <template #taskInfo="{ row }">
+              <div class="qt-table-info model-info">
+                <div class="qt-table-info__main">
+                  <img :src="ingestTaskIcon" alt="" class="info-icon"/>
+                  <span class="info-title text-ellipsis" :title="formatEntityTitle(row.taskName, row.taskCode)">
+                    {{ formatEntityTitle(row.taskName, row.taskCode) }}
+                  </span>
+                </div>
+                <div class="info-desc text-ellipsis">{{ row.taskDescription || '-' }}</div>
+              </div>
+            </template>
+            <template v-if="groupSourceError" #empty>
+              <div class="emptyBg">
+                <img :src="emptyDataImage" alt="" />
+                <p>来源数据加载失败，<el-button link type="primary" @click="groupDetailTableRef?.getList()">点击重试</el-button></p>
+              </div>
+            </template>
+          </qt-table>
+        </qt-wrap>
       </template>
       <template #footer>
         <div class="dialog-footer"><el-button @click="groupVisible = false">关 闭</el-button></div>
@@ -118,9 +168,11 @@
 <script setup name="DetectResultDialog">
 import emptyDataImage from '@/assets/common/images/empty-state/empty-nodata.png'
 import { computed, nextTick, reactive, ref } from 'vue'
-import { getMergeReview } from '@/api/merge/review'
-import { listMergeGroup } from '@/api/merge/detect'
-import { getSourceDataModelColumns } from '@/api/ingest/LOG'
+import { listMergeGroup, listMergeGroupSources } from '@/api/merge/detect'
+import { getModelIcon, getProjectIcon } from '@/utils/imageUrl'
+import { MODEL_TYPE_OPTIONS } from '@/utils/model/modelType'
+import { MODEL_STATUS_OPTIONS } from '@/utils/model/modelStatus'
+import ingestTaskIcon from '@/assets/modules/ingest/icons/task/ingest-task.svg'
 
 function displayText(value) {
   if (value === null || value === undefined || value === '') return '-'
@@ -132,8 +184,11 @@ const visible = ref(false)
 const instance = ref(null)
 const tableRef = ref()
 const groupDetailTableRef = ref()
-const resultColumns = ref([])
-const groupDetails = reactive({})
+const groupSourceFields = ref([])
+const groupSourceColumns = computed(() => buildGroupSourceColumns(groupSourceFields.value))
+const groupSourceError = ref(false)
+const groupSourceViewId = ref(0)
+let groupSourceRequest = null
 const groupVisible = ref(false)
 const groupRow = ref(null)
 const groupQueryError = ref(false)
@@ -201,23 +256,18 @@ const tableStore = reactive({
   ],
 })
 
-const groupDetailTableStore = reactive({
-  func: queryGroupMembers,
-  params: { groupId: undefined },
-  config: {
-    initResquest: false,
-    autoPagination: true,
-    table: { stripe: true, rowKey: 'memberId' },
-    pagination: { pageSizes: [10, 20, 50], notAutoScroll: true },
+const groupSourceTableConfig = {
+  autoPagination: true,
+  sort: true,
+  table: {
+    stripe: true,
+    rowKey: 'id',
+    maxHeight: '45vh',
+    scrollbarAlwaysOn: true,
+    defaultSort: { prop: 'lastReceiveTime', order: 'descending' },
   },
-  columns: [
-    { label: '编号', prop: 'sourceIndex', sortable: 'custom', width: 80, minWidth: 80, align: 'center' },
-    { label: '来源系统', prop: 'systemName', slot: 'sourceSystem', minWidth: 150, align: 'left', showOverflowTooltip: true },
-    { label: '来源记录ID', prop: 'stableRecordId', slot: 'sourceRecordId', minWidth: 180, align: 'left', showOverflowTooltip: true },
-    { label: '业务对象', prop: 'businessName', slot: 'businessName', minWidth: 220, align: 'left', showOverflowTooltip: true },
-    { label: '来源业务标识', prop: 'businessKey', slot: 'businessKey', minWidth: 200, align: 'left', showOverflowTooltip: true },
-  ],
-})
+  pagination: { notAutoScroll: true },
+}
 
 /**
  * 查询所选执行实例生成的候选组。
@@ -249,19 +299,89 @@ function retryQueryGroups() {
   tableRef.value?.getList()
 }
 
-/**
- * 读取候选组来源成员并适配表格数据。
- * @param {*} params 表格查询、分页及排序参数。
- * @returns {Promise<Object>} 符合 QtTable 数据约定的响应。
- */
-function queryGroupMembers(params = {}) {
-  const members = getTargetMembers({ id: groupDetailTableStore.params.groupId })
-    .map((member, index) => ({ ...member, sourceIndex: index + 1 }))
-  if (params.orderByColumn === 'sourceIndex' && params.isAsc) {
-    const direction = params.isAsc === 'descending' ? -1 : 1
-    members.sort((left, right) => direction * (left.sourceIndex - right.sourceIndex))
+/** 候选组按来源数据列表的列顺序展示，不提供状态或操作列。 */
+function buildGroupSourceColumns(modelColumns) {
+  const businessColumns = modelColumns.map(column => ({
+    label: column.columnName,
+    prop: column.columnCode,
+    slot: 'businessValue',
+    minWidth: 140,
+    align: 'left',
+    showOverflowTooltip: {effect: 'light'}
+  }))
+  const overviewColumns = modelColumns.length
+      ? []
+      : [{label: '主数据模型', prop: 'modelName', minWidth: 160, align: 'center'}]
+  return [
+    {label: '编号', prop: 'id', slot: 'rowIndex', width: 40, minWidth: 40, sortable: 'custom', align: 'center'},
+    {label: '主数据模型', prop: 'modelName', slot: 'modelInfo', minWidth: 320, align: 'left', showOverflowTooltip: {effect: 'light'}},
+    {label: '接入任务信息', prop: 'taskName', slot: 'taskInfo', minWidth: 280, align: 'left'},
+    {label: '来源系统信息', prop: 'sourceSystemName', slot: 'sourceSystemInfo', minWidth: 280, align: 'left'},
+    ...overviewColumns,
+    ...businessColumns,
+    {label: '形成时间', prop: 'lastReceiveTime', width: 180, minWidth: 180, date: true, sortable: 'custom', align: 'center'}
+  ]
+}
+
+function formatEntityTitle(name, code) {
+  if (!name) return '-'
+  return code ? `${name} (${code})` : name
+}
+
+function getVersionTagOptions(row) {
+  const status = MODEL_STATUS_OPTIONS.find(item => String(item.value) === String(row.modelVersionStatus))
+  return [{
+    value: row.modelVersionStatus ?? row.modelVersionNo,
+    label: row.modelVersionNo,
+    elTagType: status?.elTagType || 'info',
+  }]
+}
+
+function displayBusinessValue(value) {
+  if (value === null || value === undefined || value === '') return '-'
+  return typeof value === 'object' ? JSON.stringify(value) : String(value)
+}
+
+function parseModelData(modelData) {
+  try {
+    return modelData ? JSON.parse(modelData) : {}
+  } catch {
+    return {}
   }
-  return Promise.resolve({ data: { rows: members, total: members.length } })
+}
+
+/** 复用当前组已加载的数据，排序后由 QtTable 分页。 */
+async function queryGroupSources(params = {}) {
+  if (!groupRow.value || !instance.value) return { data: { rows: [] } }
+  groupSourceError.value = false
+  groupSourceRequest ??= listMergeGroupSources(groupRow.value.id, instance.value.id)
+  const request = groupSourceRequest
+  try {
+    const { data } = await request
+    if (groupSourceRequest !== request) return { data: { rows: [] } }
+    groupSourceFields.value = data.columns || []
+    const direction = params.isAsc === 'ascending' ? 1 : -1
+    const rows = (data.rows || []).map(row => ({ ...parseModelData(row.modelData), ...row })).sort((left, right) => {
+      const leftId = BigInt(left.id)
+      const rightId = BigInt(right.id)
+      const ids = leftId === rightId ? 0 : leftId < rightId ? -1 : 1
+      if (params.orderByColumn === 'id') return direction * ids
+      const times = formationTime(left.lastReceiveTime) - formationTime(right.lastReceiveTime)
+      return direction * times || -ids
+    }).map((row, index) => ({ ...row, sourceIndex: index + 1 }))
+    return { data: { rows } }
+  } catch (error) {
+    if (groupSourceRequest === request) {
+      groupSourceRequest = null
+      groupSourceError.value = true
+    }
+    throw error
+  }
+}
+
+function formationTime(value) {
+  if (typeof value === 'number') return value
+  return Date.parse(String(value ?? '').replace(' ', 'T')) || 0
 }
 
 /**
@@ -296,117 +416,24 @@ function getRuleText(row) {
   return formatCountCompact(row.ruleCount, '条')
 }
 
-/**
- * 读取当前模型字段并构建结果展示列。
- * @param {*} modelId 主数据模型编号。
- * @returns {Promise<void>} 通过状态或事件更新页面，无返回值。
- */
-async function loadResultColumns(modelId) {
-  resultColumns.value = []
-  if (!modelId) return
-  try {
-    const res = await getSourceDataModelColumns(modelId)
-    resultColumns.value = res.data || []
-  } catch {
-    resultColumns.value = []
-  }
-}
-
-/**
- * 根据模型字段编码和路径读取来源值。
- * @param {*} member 候选组来源成员。
- * @param {*} column 模型列定义。
- * @returns {*} 当前业务计算结果。
- */
-function getColumnValue(member, column) {
-  if (!member?.values || !column) return ''
-  const keys = [column.columnCode, column.code, column.id]
-  for (const key of keys) {
-    if (key === undefined || key === null || key === '') continue
-    const value = member.values[key] ?? member.values[String(key)]
-    if (value !== undefined && value !== null && value !== '') return value
-  }
-  return ''
-}
-
-/**
- * 读取来源成员的业务名称。
- * @param {*} member 候选组来源成员。
- * @returns {string} 用于页面展示的格式化文本。
- */
-function getMemberBusinessName(member) {
-  const column = resultColumns.value.find((item) => String(item.nameFlag) === '1')
-    || resultColumns.value.find((item) => String(item.columnName || '').includes('名称'))
-  return getColumnValue(member, column) || '-'
-}
-
-/**
- * 读取来源成员的业务标识。
- * @param {*} member 候选组来源成员。
- * @returns {*} 当前业务计算结果。
- */
-function getMemberBusinessKey(member) {
-  const column = resultColumns.value.find((item) => String(item.columnName || '').includes('代码'))
-    || resultColumns.value.find((item) => String(item.uniqueFlag) === '1' && String(item.nameFlag) !== '1')
-  return getColumnValue(member, column) || '-'
-}
-
-/**
- * 按候选组编号取得组详情。
- * @param {*} row 当前业务记录。
- * @returns {*} 当前业务计算结果。
- */
-function getGroupDetail(row) {
-  return groupDetails[row.id] || { loading: false, members: [] }
-}
-
-/**
- * 筛选候选组中参与处理的来源成员。
- * @param {*} row 当前业务记录。
- * @returns {Array} 整理后的业务记录集合。
- */
-function getTargetMembers(row) {
-  return (getGroupDetail(row).members || []).filter((item) => String(item.memberRole) !== '2')
-}
-
-/**
- * 打开候选组详情并加载成员数据。
- * @param {*} row 当前业务记录。
- * @returns {void} 通过状态或事件更新页面，无返回值。
- */
+/** 打开候选组的只读来源列表。 */
 function openGroup(row) {
+  groupSourceRequest = null
+  groupSourceFields.value = []
+  groupSourceError.value = false
+  groupSourceViewId.value++
   groupRow.value = row
-  groupDetailTableStore.params.groupId = row.id
   groupVisible.value = true
-  loadGroupDetail(row).finally(() => nextTick(() => groupDetailTableRef.value?.resetQuery()))
-}
-
-/**
- * 加载当前候选组的详情和来源成员。
- * @param {*} row 当前业务记录。
- * @returns {Promise<void>} 通过状态或事件更新页面，无返回值。
- */
-async function loadGroupDetail(row) {
-  if (groupDetails[row.id]) return
-  groupDetails[row.id] = { loading: true, members: [] }
-  try {
-    const res = await getMergeReview(row.id)
-    groupDetails[row.id] = { loading: false, members: res.data?.members || [] }
-  } catch {
-    groupDetails[row.id] = { loading: false, members: [] }
-  }
 }
 
 /**
  * 打开当前弹窗并初始化检测任务数据。
- * @param {*} row 当前业务记录。
- * @param {*} modelId 主数据模型编号。
+ * @param {*} row 当前执行记录。
  * @returns {void} 通过状态或事件更新页面，无返回值。
  */
-function open(row, modelId) {
+function open(row) {
   instance.value = row
   tableStore.params.taskInstanceId = row.id
-  loadResultColumns(row.modelId || modelId)
   visible.value = true
   nextTick(() => tableRef.value?.resetQuery())
 }
@@ -422,8 +449,9 @@ function close() {
   visible.value = false
   instance.value = null
   groupQueryError.value = false
-  resultColumns.value = []
-  Object.keys(groupDetails).forEach((key) => delete groupDetails[key])
+  groupSourceRequest = null
+  groupSourceFields.value = []
+  groupSourceError.value = false
   emit('close')
 }
 
@@ -437,5 +465,17 @@ defineExpose({ open })
 
 .group-source-wrap {
   margin-top: 10px;
+}
+
+.model-info {
+  min-width: 0;
+}
+
+.model-info-title {
+  display: block;
+}
+
+.model-info :deep(.qt-table-info__main > .dict-tag-container) {
+  flex-shrink: 0;
 }
 </style>

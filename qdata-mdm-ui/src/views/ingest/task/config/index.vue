@@ -121,6 +121,7 @@
                     v-model="form.modelId"
                     filterable
                     placeholder="请选择主数据模型"
+                    :disabled="!selectedLayerId"
                     @change="handleModelChange"
                 >
                   <template #label="{ label }">

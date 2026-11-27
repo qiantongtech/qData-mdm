@@ -42,6 +42,7 @@ import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeDetectScope
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeDetectStartReqVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeGroupPageReqVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeGroupRespVO;
+import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeGroupSourcesRespVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeGroupTransferReqVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeInstanceRespVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeTaskPageReqVO;
@@ -117,6 +118,14 @@ public class MergeDetectController extends BaseController {
         PageResult<MergeGroupRespVO> result = BeanUtils.toBean(page, MergeGroupRespVO.class);
         mergeReviewService.fillSummary(result.getRows());
         return CommonResult.success(result);
+    }
+
+    @Operation(summary = "查询重复检测候选组来源数据")
+    @PreAuthorize("@ss.hasPermi('merge:detect:query')")
+    @GetMapping("/group/{groupId}/sources")
+    public CommonResult<MergeGroupSourcesRespVO> groupSources(@PathVariable("groupId") Long groupId,
+            @RequestParam("taskInstanceId") Long taskInstanceId) {
+        return CommonResult.success(mergeDetectService.listGroupSources(taskInstanceId, groupId));
     }
 
     /** 预览可检测来源与范围，不改变任务或治理状态。 */

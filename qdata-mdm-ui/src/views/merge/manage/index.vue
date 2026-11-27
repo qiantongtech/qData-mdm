@@ -69,7 +69,16 @@
               <span v-else class="qt-detail-link text-ellipsis" :title="getDisplayTitle(row.taskName)">{{ getDisplayTitle(row.taskName) ?? '-' }}</span>
             </template>
             <template #location="{ row }">
-              <qt-model-location :model="getModelLocation(row)" />
+              <div v-if="getModelLocation(row).projectName || getModelDirectory(row)" class="qt-table-info flex-column-gap overflow-hidden">
+                <div class="qt-table-info__main">
+                  <img :src="getProjectIcon(getModelLocation(row).projectIcon)" alt="" class="info-icon" />
+                  <span class="text-ellipsis" :title="getModelLocation(row).projectName">{{ getModelLocation(row).projectName || '-' }}</span>
+                </div>
+                <div v-if="getModelDirectory(row)" class="text-ellipsis" :title="getModelDirectory(row)">
+                  <dict-tag size="small" type="primary" :value="getModelDirectory(row)" />
+                </div>
+              </div>
+              <span v-else class="model-location-empty">-</span>
             </template>
             <template #modelInfo="{ row }">
               <div class="qt-table-info model-info">
@@ -530,7 +539,6 @@
 import { getDisplayTitle } from '@/utils/anivia.js'
 import { useDict } from '@/utils/dict'
 import QtTree from '@/components/QtTree/index.vue'
-import QtModelLocation from '@/views/merge/components/QtModelLocation/index.vue'
 import {
   computed,
   getCurrentInstance,
@@ -772,6 +780,10 @@ function resetTreeSelection() {
 const modelsById = computed(() => new Map(collectTreeModels(modelTreeData.value).map(node => [String(node.modelId), node])))
 function getModelLocation(row) {
   return modelsById.value.get(String(row.modelId)) || {}
+}
+
+function getModelDirectory(row) {
+  return getModelLocation(row).layers?.at(-1)?.name || ''
 }
 
 async function loadModelTree() {
@@ -2070,6 +2082,10 @@ watch(() => [route.query.id, route.query.step, route.query.view, route.query.pro
 </script>
 
 <style scoped>
+.model-location-empty {
+  color: var(--el-text-color-secondary);
+}
+
 .model-info {
   min-width: 0;
 }

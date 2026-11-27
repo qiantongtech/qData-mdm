@@ -23,6 +23,7 @@ import tech.qiantong.qdata.mdm.common.core.page.PageResult;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeDetectScopeRespVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeDetectStartReqVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeGroupPageReqVO;
+import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeGroupSourcesRespVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeTaskPageReqVO;
 import tech.qiantong.qdata.mdm.merge.controller.admin.detect.vo.MergeTaskRespVO;
 import tech.qiantong.qdata.mdm.merge.dal.dataobject.MergeCandidateGroupDO;
@@ -62,6 +63,9 @@ public interface IMergeDetectService extends IService<MergeDuplicateTaskDO> {
      * @return 候选组分页列表
      */
     PageResult<MergeCandidateGroupDO> pageGroups(MergeGroupPageReqVO reqVO);
+
+    /** 查询本次执行候选组参与检测的固定版本来源数据。 */
+    MergeGroupSourcesRespVO listGroupSources(Long taskInstanceId, Long groupId);
 
     /**
      * 批量补充重复检测任务统计信息。

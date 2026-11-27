@@ -76,6 +76,15 @@ export function listMergeGroup(query) {
   })
 }
 
+/** 读取当前执行记录下候选组的来源数据及列定义。 */
+export function listMergeGroupSources(groupId, taskInstanceId) {
+  return request({
+    url: `/merge/detect/group/${groupId}/sources`,
+    method: 'get',
+    params: { taskInstanceId },
+  })
+}
+
 /**
  * 预览检测范围内的系统、数量及来源记录。
  * @param {*} data 接口提交数据。

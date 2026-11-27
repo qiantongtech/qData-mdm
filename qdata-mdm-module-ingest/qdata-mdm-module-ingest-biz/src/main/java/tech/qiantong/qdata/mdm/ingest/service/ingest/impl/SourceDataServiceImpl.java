@@ -99,13 +99,35 @@ public class SourceDataServiceImpl implements SourceDataService {
         ModelPublishedMaterializationRespDTO target = materialization(request.getModelId());
         ModelPublishedMaterializedTableRespDTO table = sourceTable(target, request.getModelId());
         PageResult<Map<String, Object>> page = sourceDataTableRepository.getPage(target, table, request);
-        ModelPublishedRespDTO model = modelPublishedApi.getPublishedModel(request.getModelId());
-        List<SourceDataPageRespVO> rows = page.getRows().stream()
+        return new PageResult<>(toPageRows(page.getRows(), table), page.getTotal());
+    }
+
+    @Override
+    public List<SourceDataPageRespVO> listByVersionIds(Long modelId, List<Long> versionIds) {
+        if (versionIds == null || versionIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        ModelPublishedMaterializationRespDTO target = materialization(modelId);
+        ModelPublishedMaterializedTableRespDTO table = sourceTable(target, modelId);
+        List<Map<String, Object>> records = new ArrayList<>();
+        // 按版本 ID 精确读取，不使用来源列表默认的“每个来源只取最新版本”。
+        final int batchSize = 500;
+        for (int start = 0; start < versionIds.size(); start += batchSize) {
+            records.addAll(sourceDataTableRepository.getFusionRecords(target, table,
+                    versionIds.subList(start, Math.min(start + batchSize, versionIds.size())), false));
+        }
+        return toPageRows(records, table);
+    }
+
+    private List<SourceDataPageRespVO> toPageRows(List<Map<String, Object>> records,
+            ModelPublishedMaterializedTableRespDTO table) {
+        ModelPublishedRespDTO model = modelPublishedApi.getPublishedModel(table.getModelId());
+        List<SourceDataPageRespVO> rows = records.stream()
                 .map(row -> toPageRow(row, table, model)).collect(Collectors.toList());
         fillSourceSystemNames(rows);
         fillTaskDetails(rows);
         if (!rows.isEmpty()) {
-            ModelBaseDO modelBase = modelBaseService.getModelBaseById(request.getModelId());
+            ModelBaseDO modelBase = modelBaseService.getModelBaseById(table.getModelId());
             if (modelBase != null) {
                 rows.forEach(row -> {
                     row.setModelIcon(modelBase.getIcon());
@@ -122,7 +144,7 @@ public class SourceDataServiceImpl implements SourceDataService {
                 });
             }
         }
-        return new PageResult<>(rows, page.getTotal());
+        return rows;
     }
 
     private void fillSourceSystemNames(List<SourceDataPageRespVO> rows) {

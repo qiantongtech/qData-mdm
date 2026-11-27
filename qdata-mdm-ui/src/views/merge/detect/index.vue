@@ -72,7 +72,16 @@
               <span v-else class="qt-detail-link text-ellipsis" :title="getDisplayTitle(row.taskName)">{{ getDisplayTitle(row.taskName) ?? '-' }}</span>
             </template>
             <template #location="{ row }">
-              <qt-model-location :model="getModelLocation(row)" />
+              <div v-if="getModelLocation(row).projectName || getModelDirectory(row)" class="qt-table-info flex-column-gap overflow-hidden">
+                <div class="qt-table-info__main">
+                  <img :src="getProjectIcon(getModelLocation(row).projectIcon)" alt="" class="info-icon" />
+                  <span class="text-ellipsis" :title="getModelLocation(row).projectName">{{ getModelLocation(row).projectName || '-' }}</span>
+                </div>
+                <div v-if="getModelDirectory(row)" class="text-ellipsis" :title="getModelDirectory(row)">
+                  <dict-tag size="small" type="primary" :value="getModelDirectory(row)" />
+                </div>
+              </div>
+              <span v-else class="model-location-empty">-</span>
             </template>
             <template #modelInfo="{ row }">
               <div class="qt-table-info model-info">
@@ -127,7 +136,16 @@
               />
             </template>
             <template #lastExecuteInfo="{ row }">
-              <StatusTag size="small" :status="String(row.status) === '0' ? 'idle' : row.status" />
+              <button
+                v-if="canViewLatestRun(row)"
+                type="button"
+                class="detect-log-trigger"
+                aria-label="查看最近执行日志"
+                @click.stop="openLatestRun(row)"
+              >
+                <StatusTag size="small" :status="row.status" />
+              </button>
+              <StatusTag v-else size="small" :status="String(row.status) === '0' ? 'idle' : row.status" />
               <div class="detect-last-execute-info">
                 <div class="detect-last-execute-info__row">
                   <span></span>
@@ -168,7 +186,12 @@
             <template #schedule="{ row }">
               <div class="flex-column flex-column-gap">
                 <dict-tag :options="DETECT_TRIGGER_OPTIONS" :value="row.triggerType" size="small" />
-                <span class="detect-schedule-summary"><el-icon class="mr5"><Clock /></el-icon><span class="detect-schedule-summary__text text-ellipsis" :title="formatSchedule(row)">{{ formatSchedule(row) }}</span></span>
+                <div class="detect-schedule-summary fz14">
+                  <el-icon class="mr5"><Clock /></el-icon>
+                  <span class="detect-schedule-summary__text text-ellipsis cron-text" :title="formatSchedule(row)">
+                    {{ formatSchedule(row) }}
+                  </span>
+                </div>
               </div>
             </template>
             <template #responsiblePerson="{ row }">
@@ -500,6 +523,7 @@
       @confirm="handleCreateConfirm"
     />
     <DetectInstancesDialog v-if="!detailPage" v-model="instancesVisible" :task="instancesTask" />
+    <DetectInstanceLogsDialog v-if="!detailPage" ref="latestRunLogsRef" :task-id="latestRunTask?.id" :task-no="latestRunTask?.taskNo" />
   </div>
 </template>
 
@@ -507,7 +531,6 @@
 import { getDisplayTitle } from '@/utils/anivia.js'
 import { useDict } from '@/utils/dict'
 import QtTree from '@/components/QtTree/index.vue'
-import QtModelLocation from '@/views/merge/components/QtModelLocation/index.vue'
 import { computed, getCurrentInstance, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getSourceDataModelColumns } from '@/api/ingest/LOG'
@@ -525,6 +548,7 @@ import StatusTag from '@/components/StatusTag/index.vue'
 import DetectTaskDialog from '@/views/merge/detect/components/detectTaskDialog.vue'
 import DetectResultDialog from '@/views/merge/detect/components/detectResultDialog.vue'
 import DetectInstancesDialog from '@/views/merge/detect/components/detectInstancesDialog.vue'
+import DetectInstanceLogsDialog from '@/views/merge/detect/components/detectInstanceLogsDialog.vue'
 import GuideTipPanel from '@/components/GuideTip/GuideTipPanel.vue'
 
 import { getPublishedModelTree, listPublishedModels } from '@/api/model/base/base';
@@ -616,6 +640,9 @@ const createTitle = ref('新增重复检测任务')
 const createRow = ref({})
 const instancesVisible = ref(false)
 const instancesTask = ref(null)
+const latestRunLogsRef = ref()
+const latestRunTask = ref(null)
+let latestRunLoading = false
 const controlBusyIds = reactive(new Set())
 const detailTask = ref(null)
 const { merge_scheduler_status: enableStatusOptions } = useDict('merge_scheduler_status')
@@ -682,7 +709,11 @@ const tableStore = reactive({
     { label: '归属位置', prop: 'location', slot: 'location', minWidth: 190, align: 'left' },
     { label: '检测范围', prop: 'scopeType', slot: 'scopeType', minWidth: 200, align: 'left' },
     { label: '检测配置', prop: 'sourceCount', slot: 'detectConfig', minWidth: 300, align: 'left' },
-    { label: '最近执行信息', prop: 'lastExecuteTime', slot: 'lastExecuteInfo', sortable: true, sortableKey: 'last_execute_time', minWidth: 255, align: 'left' },
+    {
+      label: '最近执行信息', prop: 'lastExecuteTime', slot: 'lastExecuteInfo', minWidth: 255, align: 'left',
+      headerTooltip: '点击下方的状态标签，任务运行中可查看实时日志，运行结束可查看最新日志。',
+      showHeaderTooltip: true,
+    },
     { label: '运行控制', prop: 'enableStatus', slot: 'runControl', width: 165, minWidth: 165, align: 'left' },
     { label: '执行方式/调度周期', prop: 'triggerType', slot: 'schedule', minWidth: 190, align: 'left' },
     { label: '责任人', prop: 'responsibleUserId', slot: 'responsiblePerson', width: 140, minWidth: 140, align: 'left' },
@@ -742,6 +773,10 @@ function resetTreeSelection() {
 const modelsById = computed(() => new Map(collectTreeModels(modelTreeData.value).map(node => [String(node.modelId), node])))
 function getModelLocation(row) {
   return modelsById.value.get(String(row.modelId)) || {}
+}
+
+function getModelDirectory(row) {
+  return getModelLocation(row).layers?.at(-1)?.name || ''
 }
 
 async function loadModelTree() {
@@ -1303,6 +1338,32 @@ watch(instanceRows, async () => {
   executionTableRef.value?.getList()
 })
 
+/** 仅允许有查询权限的用户打开已执行或正在执行的任务日志。 */
+function canViewLatestRun(row) {
+  return row.id != null && ['1', '2', '3', '4'].includes(String(row.status)) && proxy.$auth.hasPermi('merge:detect:query')
+}
+
+/** 查看最近一次执行；日志弹窗根据实例实际状态决定是否自动刷新。 */
+async function openLatestRun(row) {
+  if (latestRunLoading || !canViewLatestRun(row)) return
+  latestRunLoading = true
+  try {
+    const { data } = await listMergeInstance({ taskId: row.id, pageNum: 1, pageSize: 1 })
+    const latestRun = data?.rows?.[0]
+    if (!latestRun) {
+      proxy.$modal.msgWarning('暂无执行记录')
+      return
+    }
+    latestRunTask.value = row
+    await nextTick()
+    latestRunLogsRef.value?.open(latestRun)
+  } catch {
+    proxy.$modal.msgWarning('运行实例加载失败，请稍后重试')
+  } finally {
+    latestRunLoading = false
+  }
+}
+
 /**
  * 打开当前任务的执行实例弹窗。
  * @param {*} row 当前业务记录。
@@ -1550,7 +1611,7 @@ function handleInstanceSort({ prop, order }) {
  */
 function openResult(row) {
   resultVisible.value = true
-  resultDialogRef.value?.open(row, detailTask.value?.modelId)
+  resultDialogRef.value?.open(row)
 }
 
 watch(() => route.fullPath, async () => {
@@ -1582,6 +1643,10 @@ watch(() => [route.query.id, route.query.taskNo, route.query.tab], async ([id, t
 </script>
 
 <style scoped>
+.model-location-empty {
+  color: var(--el-text-color-secondary);
+}
+
 .model-info {
   min-width: 0;
 }
@@ -1618,6 +1683,13 @@ watch(() => [route.query.id, route.query.taskNo, route.query.tab], async ([id, t
   }
 }
 
+.detect-log-trigger {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
 .detect-last-execute-info {
   display: flex;
   flex-direction: column;
@@ -1639,6 +1711,7 @@ watch(() => [route.query.id, route.query.taskNo, route.query.tab], async ([id, t
 
 .detect-schedule-summary > .el-icon {
   flex-shrink: 0;
+  color: #3b82f6;
 }
 
 .detect-schedule-summary__text {
